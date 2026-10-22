@@ -102,3 +102,87 @@ fn cancellation_archive_keeps_v1_and_v2_released_history_and_index_unchanged() {
         }
     }
 }
+
+struct ReleaseAdmission;
+impl radishlex_ime_product_upgrade::CancellationReleasePort for ReleaseAdmission {
+    fn confirm_authority_and_quiescence(
+        &mut self,
+        _: &radishlex_ime_product_upgrade::CancellationReleaseReceipt,
+        _: radishlex_ime_product_upgrade::CancellationReleaseCheckpoint,
+        _: radishlex_ime_product_upgrade::CancellationReleaseRequirement,
+    ) -> bool {
+        true
+    }
+}
+
+#[test]
+fn cancellation_lifecycle_v1_and_v2_then_cancellation_then_new_upgrade_release() {
+    use radishlex_ime_product_upgrade::CancellationReleaseStore;
+    for legacy in [true, false] {
+        for state in [State::Completed, State::AbortedPreserved, State::RolledBack] {
+            let fixture = Fixture::new();
+            let prior = if legacy {
+                lifecycle::legacy_release(&fixture, state).0
+            } else {
+                released(&fixture, state)
+            };
+            let before = failures::tree(&fixture.0.join(HISTORY).join(NEW));
+            let history = fixture.0.join(".radishlex-install-history-v1");
+            let old = history.join(OUTER);
+            let active = fixture.0.join(".radishlex-install-v1");
+            for path in [&history, &old, &active] {
+                DirBuilder::new().mode(0o700).create(path).unwrap();
+            }
+            let old_bytes = b"{\"synthetic_outer\":\"released_terminal\"}\n";
+            put(&old.join("receipt.json"), old_bytes);
+            put(&active.join("receipt.json"), old_bytes);
+            let (store, guard, _) = reserve_with_outer_digest(
+                &fixture,
+                &prior,
+                NEXT,
+                format!("{:x}", Sha256::digest(old_bytes)),
+            );
+            let cancel = PreparationCancellationStore::attach(store, &guard).unwrap();
+            cancel
+                .request_cancellation(&guard, NEXT, &mut Admission, &Hasher)
+                .unwrap();
+            cancel
+                .finish_source(&guard, &mut Admission, &Hasher)
+                .unwrap();
+            drop(guard);
+            let archive = CancellationArchiveStore::open_existing(fixture.verified()).unwrap();
+            let guard = archive.acquire_guard().unwrap();
+            let outer = archive.observe_outer(&guard, &Hasher).unwrap();
+            archive
+                .preserve_cancellation(&guard, &outer, &mut Admission, &Hasher)
+                .unwrap();
+            drop(guard);
+            let store = CancellationReleaseStore::open_existing(fixture.verified()).unwrap();
+            let guard = store.acquire_guard().unwrap();
+            let ready = store
+                .prepare_cancellation_release(&guard, NEXT, &mut ReleaseAdmission, &Hasher)
+                .unwrap();
+            assert_eq!(
+                ready.predecessor_kind(),
+                if legacy {
+                    radishlex_ime_product_upgrade::CancellationPredecessorKind::TerminalV1
+                } else {
+                    radishlex_ime_product_upgrade::CancellationPredecessorKind::TerminalV2
+                }
+            );
+            store
+                .finish_cancellation_release(&guard, NEXT, &mut ReleaseAdmission, &Hasher)
+                .unwrap();
+            drop(guard);
+            let cancel_before = failures::tree(&fixture.0.join(HISTORY).join(NEXT));
+            let (_, proof) =
+                lifecycle::next_release(&fixture, &prior, "77777777777777777777777777777777");
+            assert_eq!(proof.data_receipt().previous_operation_id(), Some(NEW));
+            assert_eq!(failures::tree(&fixture.0.join(HISTORY).join(NEW)), before);
+            assert_eq!(
+                failures::tree(&fixture.0.join(HISTORY).join(NEXT)),
+                cancel_before
+            );
+        }
+    }
+}

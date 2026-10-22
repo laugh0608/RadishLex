@@ -85,6 +85,18 @@ pub struct PreparationFamily {
     pub shm: Option<PreparationFileIdentity>,
     pub journal: Option<PreparationFileIdentity>,
 }
+
+/// The product entry seals the previous outer before reserving preparation.
+/// These physical identities survive task/process boundaries; a matching hash
+/// alone must not authorize adoption of a replaced file or directory.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreparationInstallEvidence {
+    pub state_directory: PreparationDirectoryIdentity,
+    pub history_root: PreparationDirectoryIdentity,
+    pub previous_directory: PreparationDirectoryIdentity,
+    pub previous_receipt: PreparationFileIdentity,
+}
 impl PreparationFamily {
     pub(crate) fn validate(&self, root: &PreparationDirectoryIdentity) -> Result<(), Error> {
         let mut identities = std::collections::BTreeSet::new();
@@ -160,16 +172,20 @@ impl PreparationBinding {
                 &self.previous_data_operation_id,
                 &self.previous_data_receipt_sha256,
             ),
-            (
-                &self.previous_data_operation_id,
-                &self.previous_inventory_sha256,
-            ),
         ] {
             if previous.is_some() != digest.is_some()
                 || digest.as_ref().is_some_and(|hash| !hex(hash, 64))
             {
                 return Err(Error::InvalidBinding);
             }
+        }
+        if (self.previous_data_operation_id.is_some() && self.previous_inventory_sha256.is_none())
+            || self
+                .previous_inventory_sha256
+                .as_ref()
+                .is_some_and(|hash| !hex(hash, 64))
+        {
+            return Err(Error::InvalidBinding);
         }
         self.data_root.validate()?;
         self.state_directory.validate()?;
@@ -238,6 +254,8 @@ pub struct PreparationReceipt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     previous_release_index_identity: Option<PreparationFileIdentity>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    previous_install_evidence: Option<PreparationInstallEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     handoff_intent: Option<PreparationHandoffIntent>,
 }
 impl PreparationReceipt {
@@ -258,6 +276,7 @@ impl PreparationReceipt {
             archived_slots: Vec::new(),
             previous_inventory_identity: None,
             previous_release_index_identity: None,
+            previous_install_evidence: None,
             handoff_intent: None,
         };
         receipt.validate()?;
@@ -300,6 +319,25 @@ impl PreparationReceipt {
         self.previous_release_index_identity.as_ref()
     }
 
+    pub fn previous_install_evidence(&self) -> Option<&PreparationInstallEvidence> {
+        self.previous_install_evidence.as_ref()
+    }
+
+    /// Bind once, before reservation. Persisted records cannot add or replace it.
+    pub fn bind_previous_install(
+        &mut self,
+        evidence: PreparationInstallEvidence,
+    ) -> Result<(), Error> {
+        if self.phase != PreparationPhase::Reserved || self.previous_install_evidence.is_some() {
+            return Err(Error::InvalidPhase);
+        }
+        let mut next = self.clone();
+        next.previous_install_evidence = Some(evidence);
+        next.validate()?;
+        *self = next;
+        Ok(())
+    }
+
     /// Bind a released predecessor before persisting the reservation. The proof
     /// supplies the inventory; the index must retain its exact physical identity.
     pub fn bind_released_predecessor(
@@ -320,6 +358,12 @@ impl PreparationReceipt {
 
     pub(crate) fn handoff_intent(&self) -> Option<&PreparationHandoffIntent> {
         self.handoff_intent.as_ref()
+    }
+
+    /// A persisted handoff intent forbids cancellation even before HandoffReady.
+    /// This is record state only; callers must still verify its physical proof.
+    pub fn handoff_started(&self) -> bool {
+        self.handoff_intent.is_some()
     }
 
     pub(crate) fn archived_inventory_sha256(&self) -> Option<&str> {
@@ -503,6 +547,7 @@ impl PreparationReceipt {
             || self.initial_source != previous.initial_source
             || self.previous_inventory_identity != previous.previous_inventory_identity
             || self.previous_release_index_identity != previous.previous_release_index_identity
+            || self.previous_install_evidence != previous.previous_install_evidence
         {
             return false;
         }
@@ -574,6 +619,34 @@ impl PreparationReceipt {
             return Err(Error::InvalidEncoding);
         }
         self.binding.validate()?;
+        if let Some(evidence) = &self.previous_install_evidence {
+            evidence.previous_receipt.validate()?;
+            let root = &self.binding.data_root;
+            let mut inodes =
+                std::collections::BTreeSet::from([root.inode, self.binding.state_directory.inode]);
+            for directory in [
+                &evidence.state_directory,
+                &evidence.history_root,
+                &evidence.previous_directory,
+            ] {
+                directory.validate()?;
+                if directory.device_id != root.device_id
+                    || directory.owner_id != root.owner_id
+                    || !inodes.insert(directory.inode)
+                {
+                    return Err(Error::InvalidIdentity);
+                }
+            }
+            if self.binding.previous_install_operation_id.is_none()
+                || self.binding.previous_install_receipt_sha256.as_ref()
+                    != Some(&evidence.previous_receipt.sha256)
+                || evidence.previous_receipt.device_id != root.device_id
+                || evidence.previous_receipt.owner_id != root.owner_id
+                || !inodes.insert(evidence.previous_receipt.inode)
+            {
+                return Err(Error::InvalidIdentity);
+            }
+        }
         if let Some(intent) = &self.handoff_intent {
             intent.validate(self)?;
         }
@@ -581,7 +654,6 @@ impl PreparationReceipt {
         if let Some(index) = &self.previous_release_index_identity {
             index.validate()?;
             if self.previous_inventory_identity.is_none()
-                || self.binding.previous_data_operation_id.is_none()
                 || index.device_id != self.binding.data_root.device_id
                 || index.owner_id != self.binding.data_root.owner_id
                 || self

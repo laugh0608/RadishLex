@@ -1,11 +1,30 @@
 //! Guard-bound composition of RadishLex program installation and data upgrade transactions.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
+
+// This harness has no product command or reader/issuer integration.
+#[cfg(all(test, target_os = "macos"))]
+mod schema_observer;
+#[cfg(all(test, target_os = "macos"))]
+mod schema_observer_budget;
+#[cfg(all(test, target_os = "macos"))]
+mod schema_observer_fs;
+#[cfg(all(test, target_os = "macos"))]
+mod schema_observer_proof;
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub mod qualification_reader;
 
 use std::fmt;
 
 mod cancellation_archive;
 pub use cancellation_archive::{CancellationArchiveAuthority, CancellationProductAuthority};
+mod cancellation_release;
+pub use cancellation_release::{
+    CancellationQualificationError, CancellationReleaseAuthority,
+    CancellationReleaseAuthorityFailure, CancellationReleaseProductAuthority,
+    CancellationSourceQualification, CancellationSourceQualificationAuthority,
+};
 
 use radishlex_ime_product_install::{
     finish_program_restore, restore_program_source, resume_install_finalization,

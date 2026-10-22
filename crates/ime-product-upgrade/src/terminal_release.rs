@@ -15,7 +15,16 @@ mod record;
 use record::{decode, encode, valid_id, PreviousIndex};
 #[path = "lifecycle_index.rs"]
 mod lifecycle_index;
-use lifecycle_index::ReleaseIndex;
+use lifecycle_index::{LifecycleProofReference, ReleaseIndex};
+#[path = "cancellation_release.rs"]
+mod cancellation_release;
+pub use cancellation_release::{
+    CancellationPredecessorKind, CancellationReleaseCheckpoint, CancellationReleasePort,
+    CancellationReleaseReceipt, CancellationReleaseRequirement, CancellationReleaseStore,
+};
+#[path = "lifecycle_release.rs"]
+mod lifecycle_release;
+pub use lifecycle_release::LifecycleReleaseReceipt;
 pub use record::{TerminalReleaseBinding, TerminalReleasePhase, TerminalReleaseReceipt};
 #[path = "terminal_release_evidence.rs"]
 mod evidence;
@@ -121,6 +130,73 @@ impl TerminalReleaseStore {
     pub fn acquire_guard(&self) -> Result<UpgradeProcessGuard> {
         self.validate_active_entries()?;
         Ok(self.journal.store.acquire_directory_guard()?)
+    }
+    pub fn verify_process_guard(&self, guard: &UpgradeProcessGuard) -> Result<()> {
+        Ok(self.journal.verify_guard(guard)?)
+    }
+
+    /// Exact guarded lookup for an interrupted release, including its one
+    /// bound move ahead of recorded progress. No scanning or startup authority.
+    pub fn inspect_terminal_release(
+        &self,
+        guard: &UpgradeProcessGuard,
+        operation: &str,
+        hasher: &impl PreparationHasher,
+    ) -> Result<TerminalReleaseReceipt> {
+        if !valid_id(operation) {
+            return Err(Error::EvidenceChanged);
+        }
+        self.journal.verify_guard(guard)?;
+        self.validate_active_entries()?;
+        let history = self
+            .journal
+            .store
+            .root
+            .path
+            .join(HISTORY)
+            .join(operation)
+            .join(RELEASE);
+        let location = self.unique_location(&self.active(RELEASE), &history)?;
+        let record = self.history().read_release(&location, hasher)?;
+        if record.binding.operation_id != operation {
+            return Err(Error::EvidenceChanged);
+        }
+        self.verify_live(guard, &record, hasher)?;
+        Ok(record)
+    }
+
+    /// Read-only projection for a fixed operation. Active or unknown guards
+    /// block; stale socket observations are retained, never consumed here.
+    pub fn inspect_terminal_release_readonly(
+        &self,
+        operation: &str,
+        hasher: &impl PreparationHasher,
+    ) -> Result<(TerminalReleaseReceipt, PreparationReceipt)> {
+        if !valid_id(operation) {
+            return Err(Error::EvidenceChanged);
+        }
+        let guard = self.journal.store.inspection_guard_identity()?;
+        let history = self.journal.store.root.path.join(HISTORY).join(operation);
+        let path = self.unique_location(&self.active(RELEASE), &history.join(RELEASE))?;
+        let identity = self.journal.evidence(&path, hasher)?;
+        let record = self.history().read_release(&path, hasher)?;
+        if record.binding.operation_id != operation {
+            return Err(Error::EvidenceChanged);
+        }
+        self.verify_live_material_with_index_temp(&record, hasher, None)?;
+        let preparation = PreparationReceipt::decode(
+            &self
+                .journal
+                .read_history_bytes(&history.join("preparation.json"))?,
+        )
+        .map_err(|_| Error::EvidenceChanged)?;
+        self.verify_live_material_with_index_temp(&record, hasher, None)?;
+        if self.journal.store.inspection_guard_identity()? != guard
+            || self.journal.evidence(&path, hasher)? != identity
+        {
+            return Err(Error::EvidenceChanged);
+        }
+        Ok((record, preparation))
     }
 
     /// Archive a real terminal v1 result and publish its locator while retaining
@@ -347,9 +423,38 @@ impl TerminalReleaseStore {
         guard: &UpgradeProcessGuard,
         hasher: &impl PreparationHasher,
     ) -> Result<Option<TerminalReleaseReceipt>> {
+        match self.load_latest_lifecycle(guard, hasher)? {
+            Some(LifecycleReleaseReceipt::Terminal(proof)) => Ok(Some(*proof)),
+            Some(LifecycleReleaseReceipt::Cancellation(_)) => Err(Error::InvalidPhase),
+            None => Ok(None),
+        }
+    }
+
+    pub fn load_latest_lifecycle(
+        &self,
+        guard: &UpgradeProcessGuard,
+        hasher: &impl PreparationHasher,
+    ) -> Result<Option<LifecycleReleaseReceipt>> {
         self.journal.verify_guard(guard)?;
+        let result = self.inspect_latest_lifecycle(hasher)?;
+        self.journal.verify_guard(guard)?;
+        Ok(result)
+    }
+
+    pub(super) fn inspect_latest_lifecycle(
+        &self,
+        hasher: &impl PreparationHasher,
+    ) -> Result<Option<LifecycleReleaseReceipt>> {
+        self.journal.store.revalidate()?;
         self.validate_active_entries()?;
         let index = self.history().load_index(hasher)?;
+        let root = self.journal.store.root.path.join(HISTORY);
+        if index.is_none()
+            && path_exists(&root)?
+            && fs::read_dir(&root).map_err(|_| Error::Io)?.next().is_some()
+        {
+            return Err(Error::EvidenceChanged);
+        }
         let result = index
             .as_ref()
             .map(|value| self.history().resolve_index(&value.index, hasher))
@@ -358,7 +463,7 @@ impl TerminalReleaseStore {
             return Err(Error::EvidenceChanged);
         }
         self.validate_active_entries()?;
-        self.journal.verify_guard(guard)?;
+        self.journal.store.revalidate()?;
         Ok(result)
     }
 

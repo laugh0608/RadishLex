@@ -24,6 +24,9 @@ use radishlex_macos_product_install_coordinator::{
 };
 use radishlex_macos_upgrade_coordinator::MacOsPreparationHasher as Hasher;
 
+#[path = "cancellation_release/mod.rs"]
+mod release;
+
 const OLD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const NEW: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);

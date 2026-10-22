@@ -363,3 +363,50 @@ fn process_guard_refuses_non_socket_without_deleting_it() {
         .is_symlink());
     fs::remove_file(store.guard_path()).expect("guard symlink is removed");
 }
+
+#[test]
+fn guard_survives_same_root_history_growth_but_not_foreign_or_replaced_directories() {
+    let fixture = TestDataRoot::new();
+    let store = UpgradeReceiptStore::open(fixture.verified()).unwrap();
+    let guard = store.acquire_guard().unwrap();
+    DirBuilder::new()
+        .mode(0o700)
+        .create(fixture.data_root.join("synthetic-history"))
+        .unwrap();
+    let reopened = UpgradeReceiptStore::open_existing(fixture.verified()).unwrap();
+    assert!(reopened.load_guarded(&guard).unwrap().is_none());
+    assert_eq!(
+        reopened.acquire_guard().unwrap_err().code(),
+        UpgradeFilesystemErrorCode::OperationAlreadyActive
+    );
+    let foreign = TestDataRoot::new();
+    let other = UpgradeReceiptStore::open(foreign.verified()).unwrap();
+    assert_eq!(
+        other.load_guarded(&guard).unwrap_err().code(),
+        UpgradeFilesystemErrorCode::IdentityChanged
+    );
+    fs::rename(
+        fixture.data_root.join(STATE_DIRECTORY_NAME),
+        fixture.data_root.join("retained-state"),
+    )
+    .unwrap();
+    DirBuilder::new()
+        .mode(0o700)
+        .create(fixture.data_root.join(STATE_DIRECTORY_NAME))
+        .unwrap();
+    let replaced = UpgradeReceiptStore::open_existing(fixture.verified()).unwrap();
+    assert_eq!(
+        replaced.load_guarded(&guard).unwrap_err().code(),
+        UpgradeFilesystemErrorCode::IdentityChanged
+    );
+    fs::rename(&fixture.data_root, fixture.container.join("retained-root")).unwrap();
+    DirBuilder::new()
+        .mode(0o700)
+        .create(&fixture.data_root)
+        .unwrap();
+    let replaced = UpgradeReceiptStore::open(fixture.verified()).unwrap();
+    assert_eq!(
+        replaced.load_guarded(&guard).unwrap_err().code(),
+        UpgradeFilesystemErrorCode::IdentityChanged
+    );
+}

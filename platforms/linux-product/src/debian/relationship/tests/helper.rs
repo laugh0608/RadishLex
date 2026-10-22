@@ -196,7 +196,7 @@ impl ArtifactFixture {
             "Package: radishlex\n\
              Version: {version}\n\
              Architecture: arm64\n\
-             Maintainer: RadishLex <laugh0608@foxmail.com>\n\
+             Maintainer: RadishLex <luobo@radishx.com>\n\
              Section: utils\n\
              Priority: optional\n\
              Installed-Size: 42\n\

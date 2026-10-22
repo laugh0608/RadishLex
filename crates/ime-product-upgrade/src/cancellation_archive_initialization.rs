@@ -190,7 +190,14 @@ impl CancellationArchiveStore {
                     }
                 }
             }
-            self.verify_outer(&record.request, &record.outer, None, false, false, hasher)?;
+            self.verify_outer(
+                record.request.preparation(),
+                &record.outer,
+                None,
+                false,
+                false,
+                hasher,
+            )?;
             self.verify_runtime_materials(record, hasher)?;
             let directory = self.directory(record);
             let history = directory.parent().ok_or(Error::EvidenceChanged)?;

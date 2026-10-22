@@ -48,7 +48,7 @@ platforms/macos-product/
 
 ## UpgradePreflightHost
 
-生产 executable 不接受参数，只从用户域 `Application Support/RadishLex` 解析固定 data root，并使用从 `packaging/macos/product.json` 编译注入的 Manager/InputMethod bundle ID。它执行：
+生产 executable 的普通调用不带参数；新增的唯一专用模式为 `--cancellation-release`，两种模式都不接受路径或进程名，只从用户域 `Application Support/RadishLex` 解析固定 data root，并使用从 `packaging/macos/product.json` 编译注入的 Manager/InputMethod bundle ID。它执行：
 
 - 同时读取 important-usage 与普通 volume available capacity，取可用正值中的保守值；
 - 检查 data root 为当前用户所有的 canonical `0700` 目录；
@@ -58,7 +58,9 @@ platforms/macos-product/
 
 输出为 `radishlex-upgrade-preflight-v1` JSON，只包含 result、available bytes、quiescent、固定 blocker/error 和必要数值错误码，不输出路径、PID、命令行或 `lsof` 正文。host 不创建目录、不 chmod、不清理文件、不停止进程，也不能阻止旧产品在点时检查后重新启动；持续静止必须由 startup gate 与 upgrade guard 共同保证。
 
-`./scripts/check-macos-upgrade-preflight.sh` 构建生产 host，但只执行拒绝参数路径；真实检查逻辑由合成 contract executable 在私有临时目录验证。普通门禁不得无参数运行生产 host，因为那会读取真实 Application Support 的只读状态。
+取消模式使用独立 `radishlex-cancellation-preflight-v1`，额外返回实际 data root 的 device/inode/owner/mode 和两个固定 bundle ID；观察前后必须为同一安全 root。Rust 调用方核对精确取消证明的 root/target manifest，并另外绑定当前任务授权与完整 source 双程序。输出不包含 proof、路径或数据库内容，不提供旧程序兼容资格。
+
+`./scripts/check-macos-upgrade-preflight.sh` 构建生产 host，但只执行未知参数的拒绝路径。真实检查逻辑在私有临时目录验证；另以固定合成 bundle ID 编译同一 CLI，并用隔离 Foundation home 检查两种 JSON 输出、root 实物身份、零文件创建与多余参数拒绝。普通门禁不得无参数或以取消模式运行具有生产 ID/当前用户路径的 host。
 
 ## UpgradeValidationHosts
 
@@ -108,13 +110,15 @@ upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/d
 
 ## InstallerExecutor
 
-执行器只接受 `InstallerDriver` 已授权的 intent，但仍在 guard 内重新读取 current receipt 并执行 manifest-bound preflight。begin/retry/remove 先持久化 `prepared` 并返回；用户重新确认静止后才进入 `quiesced` 和程序 mutation。first install、repair、remove 共用外层程序终态；upgrade 从外层 receipt 和固定 data root bootstrap 或重绑同 operation 的 M4-P02 receipt，并按已证明状态继续数据协调、程序恢复或两段终态；专用 `AbortPreSwitchUpgrade` 不走普通 resume/bootstrap，先只读检查双 receipt，再绑定原 operation 和不可改写保留证据执行。
+普通 v1 执行器只接受 `InstallerDriver` 已授权的 intent，但仍在 guard 内重新读取 current receipt 并执行 manifest-bound preflight。begin/retry/remove 先持久化 `prepared` 并返回；用户重新确认静止后才进入 `quiesced` 和程序 mutation。first install、repair、remove 共用外层程序终态；upgrade 从外层 receipt 和固定 data root bootstrap 或重绑同 operation 的 M4-P02 receipt，并按已证明状态继续数据协调、程序恢复或两段终态；专用 `AbortPreSwitchUpgrade` 不走普通 resume/bootstrap，先只读检查双 receipt，再绑定原 operation 和不可改写保留证据执行。
 
 执行器不接受 UI 路径、`HOME`、release、bundle identity 或 available bytes 自报值。随机 operation ID 来自系统熵；active guard、stale intent、缺失 upgrade context、preflight/receipt/identity 失败均关闭。
 
+新准备 Executor 已连接旧 outer 封存、reservation、源库准备与新 v1 handoff。接续任务保留 outer → inner 双锁，连接程序切换、数据协调、成功或失败恢复，以及终态封存与最后 marker 释放；进展态重新绑定精确记录并取得当次授权。Driver/Bridge/AppKit 已接完整交接或封存的 `ContinuePreparedUpgrade` / `10`，准备未交接和取消状态继续只刷新，普通 intent 仍阻断。新准备和主动取消的 Bridge dispatch、独立旧程序资格与真实升级验收仍未完成；最终取消仍需显式资格，详见 [Executor 说明](InstallerExecutor/README.md#接续准入任务)。
+
 ## InstallerBridge
 
-ABI v1 固定整数 enum、POD snapshot 与 contract/snapshot/perform 三个 symbol。AppKit 已静态链接并实际调用；Objective-C 不解释 receipt，只把已知 enum 映射为 driver snapshot。Rust dispatch 每次重新投影并授权 fresh action，再调用 executor。可加 action 9 对应显式切换前中止，POD/symbol/version 不变；未知值仍失败关闭。执行失败保留 receipt 进度但强制 blocked/refresh，不由非零 receipt 掩盖错误。隔离测试证明 prepared/restart/stale/active guard、错误呈现及新动作双向映射。
+ABI v1 固定整数 enum、POD snapshot 与 contract/snapshot/perform 三个 symbol。AppKit 已静态链接并实际调用；Objective-C 不解释 receipt，只把已知 enum 映射为 driver snapshot。Rust dispatch 每次重新投影并授权 fresh action，再调用 executor。action 9 对应显式切换前中止，action 10 对应完成交接后的专用升级接续；POD/symbol/version 不变；未知值仍失败关闭。执行失败保留 receipt 进度但强制 blocked/refresh，不由非零 receipt 掩盖错误。隔离测试证明 prepared/restart/stale/active guard、错误呈现及新动作双向映射。
 
 生产只读 bootstrap 通过 `geteuid/getpwuid_r` 取得 authoritative current-user home，从当前 executable 固定推导 Installer resources，并严格读取 sealed `ReleaseIdentity.json` 与内嵌 InstallPayload。Installer 自身先过 strict ad-hoc 结构验证；resource 绑定 Manager/InputMethod target 与全部历史 source 的 exact requirement 集合。身份与 payload 通过后四类 operation 都进入真实 executor；upgrade 从外层 receipt 选择 exact release 的 `UpgradeSources/<version>-<build>`。缺失 source 返回 `driver_unavailable`；source manifest/tree/signature、release 顺序或 helper 漂移返回产品身份阻断。
 

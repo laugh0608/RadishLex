@@ -124,6 +124,7 @@ static NSString *const RLXDataRoot = @"Library/Application Support/RadishLex";
         [NSString stringWithFormat:@"当前操作：%@", self.presentation.operationTitle];
     self.diagnostic.stringValue = self.presentation.stableDiagnosticSummary;
     self.progress.doubleValue = self.presentation.progressStep;
+    self.progress.hidden = !self.presentation.showsReceiptProgress;
     self.primaryButton.title =
         [self.presentation titleForAction:self.presentation.primaryActionCode];
     self.primaryButton.enabled =

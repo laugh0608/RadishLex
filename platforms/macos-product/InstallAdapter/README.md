@@ -14,6 +14,7 @@ adapter 在 `ime-product-install` 的路径无关事务核心与 macOS 产品之
 - 在 source、installed target 和 restored source 阶段重新验证 tree/code identity。
 - 实现 `InstallProgramValidationPort`，供独立协调组合层在每个数据 checkpoint 和程序恢复后复验双 bundle。
 - 为 bridge 提供 Installer 自身 strict ad-hoc inspection、已安装产品与 receipt identity 交叉复验，以及显式 first-install action 后的固定目录 provisioning。
+- `verify_data_root` 只读复核既有固定用户域与协调器持有的 root identity；不打开 receipt store、不创建状态目录，不因 root 缺失或换 inode 自动恢复。取消程序观察据此防止跨 home/root 使用有效 bundle 结果。
 
 production 构造必须提供两个 component 的精确 ad-hoc designated requirement 集合；集合有界、排序、无重复且两端不重叠。strict ad-hoc 只证明包内 identity，不提供 Apple 发布者认证；单元测试通过注入的合成 verifier/copy port 覆盖平台编排，不产生发布证据。
 

@@ -338,7 +338,7 @@ def parse_control(
         "Package": metadata.package_name,
         "Version": metadata.package_version,
         "Architecture": metadata.debian_architecture,
-        "Maintainer": "RadishLex <laugh0608@foxmail.com>",
+        "Maintainer": "RadishLex <luobo@radishx.com>",
         "Section": "utils",
         "Priority": "optional",
         "Homepage": "https://github.com/laugh0608/RadishLex",

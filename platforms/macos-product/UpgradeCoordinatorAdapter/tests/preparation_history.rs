@@ -27,6 +27,8 @@ mod cancellation;
 mod cancellation_archive;
 #[path = "preparation_history/handoff.rs"]
 mod handoff;
+#[path = "preparation_history/predecessor_inspection.rs"]
+mod predecessor_inspection;
 #[path = "preparation_history/release.rs"]
 mod terminal_release;
 const STATE: &str = ".radishlex-upgrade-v1";

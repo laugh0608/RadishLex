@@ -24,7 +24,7 @@
 | [store](../../crates/ime-product-upgrade/src/filesystem.rs) | 状态目录对象白名单严格；guard 绑定 data root、状态目录 inode 和 socket | 不整体 rename 状态目录后沿用旧 store/guard；未知准备格式必须阻断旧 reader |
 | [switch](../../crates/ime-product-upgrade/src/switch.rs) | active/candidate/backup 均无 sidecar 后才记录 backup identity | 保留该门禁；准备成功不能仅凭 WAL 长度为零 |
 | [终态加载](../../crates/ime-product-upgrade/src/switch.rs) / [rollback](../../crates/ime-product-upgrade/src/rollback.rs) | `Completed` 和 `RolledBack` 仍验证零 sidecar 与活动库历史长度 | 源码显示正常 WAL 写入后可能阻止再次启动；须覆盖终态释放，不能仅修好首次升级；尚未运行该缺口的复现测试 |
-| [Executor](../../platforms/macos-product/InstallerExecutor/src/lib.rs) | 先创建 outer operation，再独立 bootstrap，guard 跨步骤释放 | 新路径须在统一锁顺序和持久准备意图下交接，不能把当前 bootstrap 简单前移 |
+| [Executor 普通 v1 路径](../../platforms/macos-product/InstallerExecutor/src/lib.rs) | 先创建 outer operation，再独立 bootstrap，guard 跨步骤释放 | 专用新准备与初始接续准入已连续持双锁；后续执行仍须在同一任务接线，不能直接复用普通 bootstrap |
 | [snapshot](../../crates/ime-userdb/src/store/snapshot.rs) | backup 读取 WAL 一致视图；A 段已将 estimate/backup 成功路径改为显式检查连接关闭 | 继续保留显式关闭条件；snapshot 成功不等于原库可切换 |
 
 后续升级还必须接受正常使用后发生的合法学习。旧终态中的源 identity/hash 是历史事实，不得用它要求今天的 active DB 仍与上次升级时逐字节一致；本次源身份由 fresh 静止观察建立，历史 snapshot/candidate/backup 则继续按原记录保护。
@@ -180,11 +180,11 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 | 准备 marker 已移出、返回前 crash | 新 v1 receipt 与历史 `handoff_ready` 记录交叉核验，幂等认定交接；不能重新开新 operation |
 | 已交接后的 candidate/switch/rollback 失败 | 使用原 v1 状态机；准备记录只提供历史身份关系，不修改原 v1 source 字段 |
 
-原批准方案中的明确中止分两种：维护意图前可在证明源业务数据未修改后封存准备记录、保持旧活动槽并结清新 outer；维护意图后必须先证明 prepared source 仍等价、standalone、旧版本兼容，再创建/结清新 v1 `aborted_preserved` 并结清 outer，不能直接回写旧 receipt。准备完成前程序未切换，outer 拟复用 `InstallReceipt::abort_preserved` 的合法终态，不伪造 `programs_restored`。下述兼容复核表明这条主动取消路径不能按原描述直接实施；用于取消最终释放的完整 guard-bound 后置证明和 UI 入口仍未交付。
+原批准方案中的明确中止分两种：维护意图前可在证明源业务数据未修改后封存准备记录、保持旧活动槽并结清新 outer；维护意图后必须先证明 prepared source 仍等价、standalone、旧版本兼容，再创建/结清新 v1 `aborted_preserved` 并结清 outer，不能直接回写旧 receipt。准备完成前程序未切换，outer 拟复用 `InstallReceipt::abort_preserved` 的合法终态，不伪造 `programs_restored`。下述兼容复核表明这条主动取消路径不能按原描述直接实施；当前采用后述独立取消证明；guard-bound 组合与取消 Executor 已实现，最终旧程序资格及 UI action 仍未交付。
 
 实施复核发现，现有 v1 的 `aborted_preserved` 必须携带既有 `UpgradeFailureCode`，其中没有主动取消原因；2026-09-25 进一步确认外层 `InstallFailureCode` 也有相同缺口，双层回归测试均拒绝未知取消码及 null 失败码。不能把用户取消伪装成 snapshot/switch/安装失败，也不能在保持旧 reader 兼容的承诺下直接新增未知枚举值。三类真实数据终态共用的封存基础已实现，但不能用于无新 data receipt 的取消。
 
-[准备中止兼容补充设计](macos-preparation-cancellation-compatibility.md)已于 2026-09-25 获项目所有者确认：独立取消证明、完整封存新 outer、受控恢复原 outer 兼容回执及生命周期前驱。它替代本节原定主动取消结清方式，不修改本设计其他已批准部分，也不允许直接人工回写旧 receipt。已实现只表示 `requested` 的取消意图持久化、普通入口阻断及专用源库维护收尾；后者以独立 `source_ready` 证明源保持/等价，原准备与请求记录不改写。2026-09-29 已继续实现取消材料与 outer 兼容封存/恢复，`preserved` 保持活动 marker；取消类型的 v2 证明/索引及最终释放仍未实现。B 段未退出，旧程序资格与真实产品接线仍开放。
+[准备中止兼容补充设计](macos-preparation-cancellation-compatibility.md)已于 2026-09-25 获项目所有者确认：独立取消证明、完整封存新 outer、受控恢复原 outer 兼容回执及生命周期前驱。它替代本节原定主动取消结清方式，不修改本设计其他已批准部分，也不允许直接人工回写旧 receipt。已实现只表示 `requested` 的取消意图持久化、普通入口阻断及专用源库维护收尾；后者以独立 `source_ready` 证明源保持/等价，原准备与请求记录不改写。2026-09-29 已继续实现取消材料与 outer 兼容封存/恢复，`preserved` 保持活动 marker；10-05 已继续接入取消完整证明、v2 索引、受资格约束的释放组合、专用静止/任务授权、只读 UI 与取消 Executor。B 段未退出，新准备入口、Bridge/action 和独立旧程序资格仍开放。
 
 维护后无法证明内容等价、关闭完成或源安全时，不提供“已中止且可启动”终态。保留原 family、保护快照和记录；从快照替换真实原库属于另行设计的恢复动作，不包含在本方案的自动 fallback 内。此停止结果须向用户明确呈现，不能伪装为普通 retry 可以解决。
 
@@ -224,7 +224,7 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 
 2026-09-25 新准备入口已接通已释放前驱：显式 data ID 与最新索引交叉核验，复用 release 中的 inventory，首次 reservation 以 `bind_released_predecessor` 固定证明与索引身份。新增可选 `previous_release_index_identity` 不可改认；无字段编码及原 v1 合同保持，旧严格准备 reader 拒绝新字段。当前源 release/product 与已释放结果一致，重新观察合法 WAL family 并生成保护快照；已释放槽不再移动，`archived_slots` 保持空。准备、归档确认与 handoff 均复验历史，三种初始终态之后的完整准备/升级/释放，以及第三次新 v1 接续使用真实 SQLite/文件和合成产品 port 验证。
 
-明确中止及其取消原因兼容、C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，09-25 各批验证和环境限制见[本周周志](../devlogs/2026-W39.md)。
+明确中止的核心证明与接续已由 10-05 批次承接，C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，09-25 各批验证和环境限制见[本周周志](../devlogs/2026-W39.md)。
 
 按以下顺序串行实施，每段完成匹配检查后再进入下一段；支持 schema、历史接续和旧 reader 兼容属于必要工作，不能只交付一个 checkpoint helper。
 
@@ -249,6 +249,22 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 
 拟执行检查：相关 Rust fmt/check/test/clippy、`check-macos-upgrade-coordinator.sh`、`check-macos-install-coordinator.sh`、`check-macos-installer.sh`、真实程序副本资格，以及完整 `check-repo.sh`。文档另执行 `check-docs.sh`、`check-text-files.sh` 和 `git diff --check`。资格对所有冻结输入作前后身份比较，合成检查不得表述为真实升级完成。
 
+### 2026-10-08：新准备产品任务入口
+
+Executor 已接 `authorize_source_preparation` / `authorize_preparation_resume` / `prepare_upgrade_source`：先封存旧 outer canonical 字节，绑定不可改认的 `previous_install_evidence` 后持久化 reservation，再创建新 outer；连续双锁连接源库准备、旧槽保留与新 v1 handoff。新证据只扩展外围准备记录，无字段的旧编码以及原 v1 安装/数据回执和 FFI ABI 保持。严格 reader 对未知字段继续拒绝。
+
+已释放取消前驱只可通过完整 lifecycle 证明复用精确旧 outer 原件，不能凭相同字节或残留目录认领。新任务/重开任务需要 fresh 确认、可撤销期限与实际程序/静止观察；未知临时材料保持阻断。成功仅交接非终态数据回执，不复用普通 bootstrap 的首次 data 假设。实现边界见 [Executor](../../platforms/macos-product/InstallerExecutor/README.md#新源库准备任务)，验证见 [W41](../devlogs/2026-W41.md)。独立旧程序资格、WAL/pager 内部断电与 B 段退出仍开放，冻结现场不变。
+
+同日后续接入 handoff 中间位置和完成位置的只读查询，以及 `rebind_prepared_upgrade` 严格数据重绑。固定旧历史/保护快照与可推进的 v1 receipt 分别核验，保留两个前驱 ID、产品、schema、原 artifact 和目录/文件身份；v1 switch 中断沿真实槽位解释。查询和重绑不打开 SQLite 或补同步，不能确认最后一次 rename 的持久化，也不授予执行权限。UI 仍为只读维护投影；下一步固定专用 continuation、fresh 授权和首个 v1 mutation 前的 handoff 持久化重验，再接 Driver/Bridge/action，详细合同见 [Installer 边界](../macos-installer-app-boundary.md#handoff-后的只读检查与严格重绑)。
+
+同日接续准入实现：新增精确 `prepared/preflighted` 任务授权与持有双锁的 `PreparedContinuationTask`，重验 actual 产品/静止和 sealed 历史，补同步 outer 与全部 handoff 移动材料。回归定位并修正 `HandoffReady` 重放未再次同步 data receipt 的遗漏；outer/proof 相同字节 inode 替换阻断。Driver/Bridge action `10` 的完整开放合同已固定，当前仍未知值拒绝；程序、data 与终态执行必须在同一任务内逐检查点复验后再接入，不能把准入结果作为解锁后的执行凭证。详细范围见 [Installer 合同](../macos-installer-app-boundary.md#专用接续准入与待开放动作合同)，验证记录见 W41。
+
+### 2026-10-12：同锁接续执行与进展态恢复
+
+接续任务已连接程序 staging/preserve/逐端 commit、v1 数据协调及成功/失败恢复；数据终态先封存，再持久化匹配 outer 终态，最后释放 marker。进展态和终态封存使用各自严格 reader，重新绑定完整 preparation/outer/data 或 release 并取得 fresh 任务授权；合法回滚状态可接续，未绑定临时材料保留阻断。Core 原 v1 编码、失败码与普通 bootstrap 的空前驱限制保持。
+
+Driver/Bridge/AppKit 已接 `ContinuePreparedUpgrade` / `10`，仅完整交接/封存可提供动作。生产 Bridge 在 authoritative root 与 sealed payload 下重读关系并核验实际程序槽位，再执行同一双锁任务；普通 UI action 不替代任务授权。新准备/取消 dispatch、独立 source 39 正常双程序资格及 WAL/pager 内部断电仍开放，不构成 B 段退出或真实升级完成。实现与验证记录见 [W42](../devlogs/2026-W42.md)。
+
 ## 进入实机前必须另行确定
 
 仓库实现和独立产品资格通过后，再确定新候选版本/构建身份、唯一 source、当前数据库与旧事务归档清单、准备写入与停止条件，并请求一次新的实机授权。9 月 9 日恢复授权已消费，本方案不授权复跑恢复、直接重试 target 40、手工 checkpoint、删除 sidecar 或搬移冻结材料。
@@ -258,3 +274,10 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 2026-09-29：取消材料封存、专用外层兼容投影及真实双 guard 的类型绑定桥已实现仓库路径；产品观察仍为合成，未接 Executor/UI，B 段未退出。详细合同见取消兼容补充设计，交付与验证记录见[2026-W40](../devlogs/2026-W40.md)。
 
 2026-09-29 后续：真实终态外围证明与唯一定位索引已增加严格 v2，旧 v1 原格式重放不改写，连续准备支持 v1→v2→v2 并核验完整绑定祖先。首次 v2 的空索引须有对应空历史或精确未释放 inventory 证明，既有历史丢失索引时拒绝。取消类型仍失败关闭，完整取消证明、接续和最终 marker 协调留待下一步；详见取消补充设计的实施状态。
+
+
+2026-10-05：取消的完整不可变证明、v2 取消索引、类型化历史解析、连续取消及取消后新准备/新 v1/真实终态释放已接入。独立核心释放步骤要求 `QualifiedSource`，原 archive 与请求分别原 inode 保留，请求 marker 最后移走；当前仅有合成 port，尚无真实产品取消释放实现。B 段仍未退出，后续为真实双 guard/产品观察/Executor 接线与旧 source 程序副本资格；WAL/pager 内部断电与全部冻结现场停止线保持。验证见[2026-W41](../devlogs/2026-W41.md)。
+
+2026-10-05 后续：已实现取消释放组合层的真实双 guard、活动旧终态、source 完整身份/schema/取消证明资格绑定，以及资格回调后的产品/静止复验。Executor 提供复用现有安装适配器的程序实物观察；生产静止/任务授权、独立旧程序资格证据提供者及 dispatch/UI 仍待接线，结构化资格对象与隔离合成回归不等于产品资格。下一步及停止线见 [current](../status/current.md)，B 段保持开放。
+
+2026-10-05 收尾：专用 native 静止/容量观察、可撤销任务授权、六类只读 UI 与取消 Executor 双锁执行均已接入。取消任务分为材料保留与最终释放，后者另需完整 proof 授权和显式独立资格；当前没有生产旧程序资格提供者。新准备/handoff 的产品入口与 Bridge/action 仍待完成，保持现有账户和 Agent 会话，不新增用户或切换登录；精确顺位见 [current](../status/current.md)，今日验证及明日事项见 [W41](../devlogs/2026-W41.md#2026-10-06明日事项)。

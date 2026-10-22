@@ -300,6 +300,7 @@ fn upgrade_revalidates_source_target_and_restored_programs() {
     let source_fixture = Fixture::new("0.1.0", "35", "source");
     let target_payload = source_fixture.container.join("target-payload");
     build_payload(&target_payload, "0.2.0", "36", "target");
+    add_upgrade_source(&target_payload, "0.1.0", "35", "source");
     let signature = Arc::new(SignatureState::default());
     let copy = Arc::new(CopyState::default());
     let source_adapter = source_fixture
@@ -354,6 +355,16 @@ fn upgrade_revalidates_source_target_and_restored_programs() {
     receipt_store
         .persist(&guard, &receipt)
         .expect("prepared receipt");
+    target_adapter
+        .verify_prepared_upgrade_material_readonly(&receipt)
+        .expect("initial readonly source/payload observation");
+    assert!(
+        !source_fixture
+            .home
+            .join("Applications/.radishlex-install-00112233445566778899aabbccddeeff")
+            .exists(),
+        "readonly initial observation must not create program stores"
+    );
     receipt.advance(InstallState::Quiesced).expect("quiesced");
     receipt_store
         .persist(&guard, &receipt)
@@ -371,11 +382,17 @@ fn upgrade_revalidates_source_target_and_restored_programs() {
         .expect("InputMethod store");
     for store in [&manager, &input_method] {
         target_adapter
+            .verify_program_continuation_material(store, &receipt)
+            .expect("initial source material");
+        target_adapter
             .verify_and_record_source(&receipt_store, &guard, store, &mut receipt)
             .expect("record source");
         target_adapter
             .prepare_and_record_staged(&receipt_store, &guard, store, &mut receipt)
             .expect("record target staging");
+        target_adapter
+            .verify_program_continuation_material(store, &receipt)
+            .expect("bound staging material");
     }
     finish_target_staging(
         &receipt_store,
@@ -388,6 +405,9 @@ fn upgrade_revalidates_source_target_and_restored_programs() {
     for store in [&manager, &input_method] {
         preserve_program_source(&receipt_store, &guard, store, &mut receipt)
             .expect("preserve source");
+        target_adapter
+            .verify_program_continuation_material(store, &receipt)
+            .expect("one preserved source");
     }
     finish_source_preservation(
         &receipt_store,
@@ -398,6 +418,11 @@ fn upgrade_revalidates_source_target_and_restored_programs() {
     )
     .expect("finish preservation");
     commit_program_target(&receipt_store, &guard, &manager, &mut receipt).expect("commit Manager");
+    for store in [&manager, &input_method] {
+        target_adapter
+            .verify_program_continuation_material(store, &receipt)
+            .expect("mixed committed programs");
+    }
     target_adapter
         .verify_installed_target(&manager, &receipt)
         .expect("verify installed Manager");
@@ -406,6 +431,9 @@ fn upgrade_revalidates_source_target_and_restored_programs() {
     target_adapter
         .verify_installed_target(&input_method, &receipt)
         .expect("verify installed InputMethod");
+    target_adapter
+        .verify_prepared_upgrade_material_readonly(&receipt)
+        .expect("readonly committed program relation");
 
     receipt
         .require_rollback(InstallFailureCode::DataCoordinationFailed)
@@ -415,6 +443,9 @@ fn upgrade_revalidates_source_target_and_restored_programs() {
         .expect("persist rollback");
     for store in [&manager, &input_method] {
         restore_program_source(&receipt_store, &guard, store, &receipt).expect("restore source");
+        target_adapter
+            .verify_program_continuation_material(store, &receipt)
+            .expect("one restored source");
     }
     finish_program_restore(
         &receipt_store,
@@ -428,7 +459,29 @@ fn upgrade_revalidates_source_target_and_restored_programs() {
         target_adapter
             .verify_restored_source(store, &receipt)
             .expect("verify restored source");
+        target_adapter
+            .verify_program_continuation_material(store, &receipt)
+            .expect("restored material");
     }
+    signature.drift.store(true, Ordering::SeqCst);
+    assert!(target_adapter
+        .verify_program_continuation_material(&manager, &receipt)
+        .is_err());
+    signature.drift.store(false, Ordering::SeqCst);
+    let replacement = source_fixture.container.join("same-source-new-inode.app");
+    copy_tree(manager.target_path(), &replacement).unwrap();
+    fs::rename(
+        manager.target_path(),
+        source_fixture.container.join("retained-source.app"),
+    )
+    .unwrap();
+    fs::rename(&replacement, manager.target_path()).unwrap();
+    assert!(
+        target_adapter
+            .verify_program_continuation_material(&manager, &receipt)
+            .is_err(),
+        "equal product bytes do not replace recorded physical source identity"
+    );
 }
 
 #[test]
@@ -517,6 +570,41 @@ fn layout_payload_and_product_mutations_fail_closed() {
             .code(),
         MacOsInstallAdapterErrorCode::ProductChanged
     );
+}
+
+#[test]
+fn readonly_product_root_binding_rejects_foreign_or_replaced_root_without_creating_state() {
+    let fixture = Fixture::new("0.1.0", "35", "source");
+    let adapter = fixture
+        .adapter(
+            Arc::new(SignatureState::default()),
+            Arc::new(CopyState::default()),
+        )
+        .unwrap();
+    let root = VerifiedInstallRoot::verify(fixture.data_root(), fixture.owner_id).unwrap();
+    let store = InstallReceiptStore::open(root).unwrap();
+    let identity = store.root_identity().clone();
+    adapter.verify_data_root(&identity).unwrap();
+    let foreign = Fixture::new("0.1.0", "35", "other");
+    let foreign_store = InstallReceiptStore::open(
+        VerifiedInstallRoot::verify(foreign.data_root(), foreign.owner_id).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        adapter
+            .verify_data_root(foreign_store.root_identity())
+            .unwrap_err()
+            .code(),
+        MacOsInstallAdapterErrorCode::UnsafeTarget
+    );
+    let retained = fixture.container.join("retained-root");
+    fs::rename(fixture.data_root(), &retained).unwrap();
+    assert!(adapter.verify_data_root(&identity).is_err());
+    assert!(!fixture.data_root().exists());
+    create_directory(&fixture.data_root(), 0o700);
+    assert!(adapter.verify_data_root(&identity).is_err());
+    assert_eq!(fs::read_dir(fixture.data_root()).unwrap().count(), 0);
+    assert!(retained.join(".radishlex-install-v1").is_dir());
 }
 
 #[test]

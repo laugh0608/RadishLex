@@ -20,10 +20,19 @@ pub use cancellation_archive::{
 #[path = "terminal_release.rs"]
 mod terminal_release;
 pub use terminal_release::{
-    TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
-    TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
-    TerminalReleaseReceipt, TerminalReleaseStore,
+    CancellationPredecessorKind, CancellationReleaseCheckpoint, CancellationReleasePort,
+    CancellationReleaseReceipt, CancellationReleaseRequirement, CancellationReleaseStore,
+    LifecycleReleaseReceipt, TerminalReleaseBinding, TerminalReleaseCheckpoint,
+    TerminalReleaseDirectory, TerminalReleaseOuterRequirement, TerminalReleasePhase,
+    TerminalReleasePort, TerminalReleaseReceipt, TerminalReleaseStore,
 };
+
+#[path = "maintenance_inspection.rs"]
+mod maintenance_inspection;
+pub use maintenance_inspection::{inspect_maintenance, MaintenanceInspection, MaintenancePhase};
+
+#[path = "preparation_predecessor_inspection.rs"]
+mod predecessor_inspection;
 
 impl PreparationJournalStore {
     /// Exact, guard-bound continuation from source_prepared. The preparation

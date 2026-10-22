@@ -27,6 +27,8 @@ pub(crate) enum ProductRole {
 
 #[derive(Debug, Clone)]
 pub(crate) struct VerifiedProductAssembly {
+    root: PathBuf,
+    manifest_sha256: String,
     release: ProductRelease,
     schema_version: i64,
     manager_validation: VerifiedExecutable,
@@ -76,6 +78,8 @@ impl VerifiedProductAssembly {
         };
 
         Ok(Self {
+            manifest_sha256: format!("{:x}", Sha256::digest(&bytes)),
+            root,
             release,
             schema_version,
             manager_validation,
@@ -86,6 +90,16 @@ impl VerifiedProductAssembly {
 
     pub(crate) fn matches(&self, release: &ProductRelease, schema_version: i64) -> bool {
         self.release == *release && self.schema_version == schema_version
+    }
+
+    pub(crate) fn verify_manifest(&self, expected: &str) -> Result<(), MacOsUpgradeAdapterError> {
+        let manifest = self.root.join("ProductManifest.json");
+        require_real_directory(&self.root)?;
+        require_regular_file(&manifest, false)?;
+        if self.manifest_sha256 != expected || file_sha256(&manifest)? != expected {
+            return Err(MacOsUpgradeAdapterError::ProductChanged);
+        }
+        Ok(())
     }
 
     pub(crate) fn schema_version(&self) -> i64 {

@@ -34,6 +34,16 @@ impl TerminalReleaseStore {
         temporary: Option<&PreparationFileIdentity>,
     ) -> Result<()> {
         self.journal.verify_guard(guard)?;
+        self.verify_live_material_with_index_temp(record, hasher, temporary)?;
+        self.journal.verify_guard(guard)?;
+        Ok(())
+    }
+    pub(super) fn verify_live_material_with_index_temp(
+        &self,
+        record: &TerminalReleaseReceipt,
+        hasher: &impl PreparationHasher,
+        temporary: Option<&PreparationFileIdentity>,
+    ) -> Result<()> {
         self.validate_active_entries()?;
         record.validate()?;
         self.history().verify_directories(record, false)?;
@@ -61,7 +71,6 @@ impl TerminalReleaseStore {
         if marker != self.active(RELEASE) {
             self.history().require_published_index(record, hasher)?;
         }
-        self.journal.verify_guard(guard)?;
         Ok(())
     }
 }

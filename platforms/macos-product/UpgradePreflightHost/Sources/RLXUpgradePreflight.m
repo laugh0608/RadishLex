@@ -23,7 +23,8 @@ static NSError *RLXError(RLXUpgradePreflightErrorCode code);
 @interface RLXUpgradePreflightResult ()
 
 - (instancetype)initWithAvailableBytes:(unsigned long long)availableBytes
-                              blocker:(nullable NSString *)blocker;
+                              blocker:(nullable NSString *)blocker
+                     dataRootIdentity:(NSDictionary<NSString *, NSNumber *> *)identity;
 
 @end
 
@@ -31,12 +32,14 @@ static NSError *RLXError(RLXUpgradePreflightErrorCode code);
 @implementation RLXUpgradePreflightResult
 
 - (instancetype)initWithAvailableBytes:(unsigned long long)availableBytes
-                              blocker:(nullable NSString *)blocker {
+                              blocker:(nullable NSString *)blocker
+                     dataRootIdentity:(NSDictionary<NSString *, NSNumber *> *)identity {
   self = [super init];
   if (self != nil) {
     _availableBytes = availableBytes;
     _blocker = [blocker copy];
     _quiescent = blocker == nil;
+    _dataRootIdentity = [identity copy];
   }
   return self;
 }
@@ -59,6 +62,11 @@ RLXUpgradePreflightResult *_Nullable RLXInspectUpgradePreflight(
     NSURL *dataRootURL, NSString *managerBundleIdentifier,
     NSString *inputMethodBundleIdentifier, NSError **error) {
   if (!RLXValidateDataRoot(dataRootURL, error)) {
+    return nil;
+  }
+  struct stat before;
+  if (lstat(dataRootURL.fileSystemRepresentation, &before) != 0) {
+    if (error != NULL) *error = RLXError(RLXUpgradePreflightErrorUnsafeDataRoot);
     return nil;
   }
   NSNumber *availableCapacity = RLXAvailableCapacity(dataRootURL, error);
@@ -89,9 +97,23 @@ RLXUpgradePreflightResult *_Nullable RLXInspectUpgradePreflight(
   }
   NSString *blocker = RLXUpgradeQuiescenceBlocker(
       managerProcesses.count, inputMethodProcesses.count, hasOpenDataHandle);
+  struct stat after;
+  if (!RLXValidateDataRoot(dataRootURL, error) ||
+      lstat(dataRootURL.fileSystemRepresentation, &after) != 0 ||
+      before.st_dev != after.st_dev || before.st_ino != after.st_ino ||
+      before.st_uid != after.st_uid || before.st_mode != after.st_mode) {
+    if (error != NULL) *error = RLXError(RLXUpgradePreflightErrorUnsafeDataRoot);
+    return nil;
+  }
   return [[RLXUpgradePreflightResult alloc]
       initWithAvailableBytes:availableCapacity.unsignedLongLongValue
-                     blocker:blocker];
+                     blocker:blocker
+            dataRootIdentity:@{
+              @"device_id" : @((unsigned long long)before.st_dev),
+              @"inode" : @((unsigned long long)before.st_ino),
+              @"owner_id" : @(before.st_uid),
+              @"mode" : @(before.st_mode & 07777)
+            }];
 }
 
 static NSArray<NSString *> *RLXControlledDataFileNames(void) {

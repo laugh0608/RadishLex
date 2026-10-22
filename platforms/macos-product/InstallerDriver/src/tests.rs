@@ -13,6 +13,70 @@ use super::*;
 
 static SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
+#[test]
+fn prepared_continuation_requires_fresh_offering_and_all_four_confirmations() {
+    let base = snapshot(
+        InstallerViewPhase::PreparingSource,
+        InstallerAction::Refresh,
+        InstallerAction::None,
+        InstallerStableError::None,
+        InstallerManualPrompt::None,
+        Some(InstallOperationKind::Upgrade),
+        None,
+        None,
+    );
+    let receipt = InstallReceipt::new(
+        "00112233445566778899aabbccddeeff",
+        None,
+        InstallOperationKind::Upgrade,
+        radishlex_ime_product_install::InstallRootIdentity::new(1, 2, 501, 0o700).unwrap(),
+        Some(product("1.0.0", 1)),
+        Some(product("2.0.0", 2)),
+    )
+    .unwrap();
+    let full = InstallerUserAuthorization {
+        explicit_action_confirmed: true,
+        data_retention_acknowledged: true,
+        neutral_input_source_selected: true,
+        manager_closed: true,
+    };
+    assert_eq!(
+        authorize_installer_action(base, InstallerAction::ContinuePreparedUpgrade, full),
+        Err(InstallerAuthorizationError::ActionNotOffered)
+    );
+    let eligible = base.with_prepared_continuation(&receipt);
+    for bit in 0..4 {
+        let mut missing = full;
+        match bit {
+            0 => missing.explicit_action_confirmed = false,
+            1 => missing.data_retention_acknowledged = false,
+            2 => missing.neutral_input_source_selected = false,
+            _ => missing.manager_closed = false,
+        }
+        assert!(authorize_installer_action(
+            eligible,
+            InstallerAction::ContinuePreparedUpgrade,
+            missing
+        )
+        .is_err());
+    }
+    let intent =
+        authorize_installer_action(eligible, InstallerAction::ContinuePreparedUpgrade, full)
+            .unwrap();
+    assert!(intent.resume_existing() && intent.requires_platform_preflight());
+    assert_eq!(
+        eligible.primary_action(),
+        InstallerAction::ContinuePreparedUpgrade
+    );
+    assert!(!eligible
+        .with_maintenance(InstallerViewPhase::CancellationAwaitingQualification)
+        .offers(InstallerAction::ContinuePreparedUpgrade));
+    assert!(!base
+        .with_recovery_inspection_error(InstallerStableError::OperationActive)
+        .with_prepared_continuation(&receipt)
+        .offers(InstallerAction::ContinuePreparedUpgrade));
+}
+
 struct Fixture {
     container: PathBuf,
     data_root: PathBuf,
@@ -376,4 +440,150 @@ fn pre_switch_recovery_requires_fresh_offering_and_all_acknowledgements() {
     assert!(!blocked_snapshot(InstallerStableError::InvalidReceipt)
         .with_pre_switch_recovery(&receipt, true)
         .offers(InstallerAction::AbortPreSwitchUpgrade));
+}
+
+#[test]
+fn maintenance_views_offer_only_refresh_even_after_historical_completion() {
+    let fixture = Fixture::new(false);
+    let base = inspect_installer_view(
+        &fixture.data_root,
+        fixture.owner_id,
+        InstallerProductSituation::OlderReleaseInstalled,
+    );
+    for phase in [
+        InstallerViewPhase::PreparingSource,
+        InstallerViewPhase::CancellationRequested,
+        InstallerViewPhase::CancellationFinishingSource,
+        InstallerViewPhase::CancellationPreserving,
+        InstallerViewPhase::CancellationAwaitingQualification,
+        InstallerViewPhase::CancellationCompleted,
+    ] {
+        let view = base.with_maintenance(phase);
+        assert_eq!(view.phase(), phase);
+        assert_eq!(view.receipt_state(), None);
+        assert_eq!(view.progress_step(), 0);
+        assert_eq!(view.manual_prompt(), InstallerManualPrompt::None);
+        assert!(authorize_installer_action(
+            view,
+            InstallerAction::Refresh,
+            InstallerUserAuthorization::default()
+        )
+        .is_ok());
+        for action in [
+            InstallerAction::BeginUpgrade,
+            InstallerAction::BeginRepair,
+            InstallerAction::RetryOperation,
+            InstallerAction::RemovePrograms,
+            InstallerAction::ConfirmQuiescence,
+            InstallerAction::ResumeOperation,
+            InstallerAction::AbortPreSwitchUpgrade,
+        ] {
+            assert_eq!(
+                authorize_installer_action(
+                    view,
+                    action,
+                    InstallerUserAuthorization {
+                        explicit_action_confirmed: true,
+                        data_retention_acknowledged: true,
+                        neutral_input_source_selected: true,
+                        manager_closed: true,
+                    }
+                ),
+                Err(InstallerAuthorizationError::ActionNotOffered)
+            );
+        }
+    }
+}
+
+#[test]
+fn preparation_actions_require_each_fresh_confirmation_and_hide_old_receipt_progress() {
+    let base = inspect_installer_view(
+        "/not-a-real-preparation-action-root",
+        0,
+        InstallerProductSituation::OlderReleaseInstalled,
+    );
+    let confirmed = InstallerUserAuthorization {
+        explicit_action_confirmed: true,
+        data_retention_acknowledged: true,
+        neutral_input_source_selected: true,
+        manager_closed: true,
+    };
+    for (view, action) in [
+        (
+            base.with_source_preparation(false, false),
+            InstallerAction::BeginSourcePreparation,
+        ),
+        (
+            base.with_source_preparation(true, true),
+            InstallerAction::ResumeSourcePreparation,
+        ),
+        (
+            base.with_source_preparation(true, true),
+            InstallerAction::PreservePreparationCancellation,
+        ),
+        (
+            base.with_maintenance(InstallerViewPhase::CancellationPreserving)
+                .with_cancellation_preservation(),
+            InstallerAction::PreservePreparationCancellation,
+        ),
+    ] {
+        assert_eq!(view.operation_code(), "upgrade");
+        assert_eq!(view.receipt_state_code(), "none");
+        assert_eq!(view.progress_step(), 0);
+        assert_eq!(view.stable_error(), InstallerStableError::None);
+        assert_eq!(
+            view.manual_prompt(),
+            InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager
+        );
+        assert!(authorize_installer_action(view, action, confirmed).is_ok());
+        for missing in 0..4 {
+            let mut auth = confirmed;
+            match missing {
+                0 => auth.explicit_action_confirmed = false,
+                1 => auth.data_retention_acknowledged = false,
+                2 => auth.neutral_input_source_selected = false,
+                3 => auth.manager_closed = false,
+                _ => unreachable!(),
+            }
+            assert!(
+                authorize_installer_action(view, action, auth).is_err(),
+                "{action:?} / {missing}"
+            );
+        }
+        assert_eq!(
+            authorize_installer_action(view, InstallerAction::ContinuePreparedUpgrade, confirmed),
+            Err(InstallerAuthorizationError::ActionNotOffered)
+        );
+    }
+    assert_eq!(
+        base.with_source_preparation(false, true).secondary_action(),
+        InstallerAction::None
+    );
+    assert_eq!(
+        base.with_source_preparation(true, false).secondary_action(),
+        InstallerAction::None
+    );
+    for phase in [
+        InstallerViewPhase::CancellationAwaitingQualification,
+        InstallerViewPhase::CancellationCompleted,
+    ] {
+        let view = base.with_maintenance(phase);
+        assert_eq!(
+            authorize_installer_action(
+                view,
+                InstallerAction::PreservePreparationCancellation,
+                confirmed
+            ),
+            Err(InstallerAuthorizationError::ActionNotOffered)
+        );
+        assert_eq!(
+            view.with_cancellation_preservation().phase(),
+            InstallerViewPhase::Blocked
+        );
+    }
+    let blocked = base.with_recovery_inspection_error(InstallerStableError::OperationActive);
+    assert_eq!(
+        blocked.with_source_preparation(true, true).stable_error(),
+        InstallerStableError::OperationActive
+    );
 }

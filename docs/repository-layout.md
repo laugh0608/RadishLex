@@ -224,9 +224,11 @@ SQLite 用户数据层：
 
 该 crate 的既有 v1 路径已闭合固定布局内从 `preflighted` 到终态的核心调度与数据恢复，但仍不停止进程、不定位或启动产品 host，也不提供安装载体；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
 
-`preparation_inventory.rs` / `preparation_history.rs` 管理旧终态清单与私有槽位置；`preparation_handoff*` 负责新 v1 回执交接和准备证明封存；`terminal_release*` 负责真实数据终态保留、外层结果确认及绑定祖先核验，`lifecycle_index.rs` 负责唯一释放索引的严格 v1/v2 编码，`preparation_released_predecessor.rs` 只读消费已释放前驱。业务 DB/settings/Rime 不移入历史槽，真实 outer/程序授权仍由产品组合层提供。
+`preparation_inventory.rs` / `preparation_history.rs` 管理旧终态清单与私有槽位置；`preparation_handoff*` 负责新 v1 回执交接和准备证明封存；`terminal_release*` 负责真实数据终态保留、外层结果确认及绑定祖先核验，`lifecycle_index.rs` 负责唯一释放索引的严格 v1/v2 编码，`lifecycle_release.rs` 区分真实终态与准备取消的生命周期结果，`preparation_released_predecessor.rs` 只读消费已释放前驱。业务 DB/settings/Rime 不移入历史槽，真实 outer/程序授权仍由产品组合层提供。
 
-`preparation_cancellation*` 保存独立不可撤回请求，`cancellation_source*` 分担源库收尾、严格记录、持久化与受限 journal 恢复，`cancellation_archive*` 保留取消材料并受控恢复 outer 兼容投影；不回用普通准备入口，不修改双层 v1 失败码，也不以 `source_ready` 或 `preserved` 解除启动门禁。完整合同见组件说明和当前激活设计。
+`maintenance_inspection.rs` 提供准备/取消六类只读状态，复用严格实物与祖先核验，不创建文件、取得 guard 或打开 SQLite；Executor 交叉核验实际 outer 后投影到 Driver/Bridge/AppKit，普通 v1 写入口重新拒绝维护状态。
+
+`preparation_cancellation*` 保存独立不可撤回请求，`cancellation_source*` 分担源库收尾、严格记录、持久化与受限 journal 恢复，`cancellation_archive*` 保留取消材料并受控恢复 outer 兼容投影，`cancellation_release*` 负责完整不可变证明、实物解析、索引发布与受资格约束的最后 marker 协调；不回用普通准备入口，不修改双层 v1 失败码，也不以 `source_ready` 或 `preserved` 解除启动门禁。完整合同见组件说明和当前激活设计。
 
 ### ime-product-install
 
@@ -394,7 +396,7 @@ startup observer 只读 `/var/lib/dpkg/status`、guard/tmp/receipt、terminal ac
 
 当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract、公开 TIS 只读状态/监视工具、生产 `LearningContext`、privacy CFPreferences receipt、精确进程 stop、R01B userdb 与 M2 manager 固定测试数据 receipt 清理入口，以及合成 reference probe 和 unknown/P0 `ValidationHost`。两个数据 profile 复用同一 hardened helper：R01B 只允许四个 SQLite 名称，M2 另允许 manager settings 与原子写临时文件；二者都不接受调用方路径。分类 contract 直接编译 controller 使用的生产源码，并以两个 host 的固定 Bundle ID 覆盖 unknown/P0；host 本体只构建不启动，也不读取或保存输入框内容。正式薄壳已在 Apple Development build 32 完成 R01A；R01B 以同一 Apple Development build 34 完成真实重排、重启、删除/恢复、隐私/unknown/P0/secure 系统路由与零残留退出。曾冻结的 build 33 只保留历史意义。
 
-`platforms/macos-product/UpgradePreflightHost/` 是 M4-P02 双 bundle 之外的只读升级平台端口。生产 executable 不接受路径或其他参数，只解析用户域固定 `Application Support/RadishLex`；Manager/InputMethod bundle ID 从 `packaging/macos/product.json` 编译进入二进制。host 验证私有数据根和受控普通文件，查询卷级可用容量，并以 `NSRunningApplication` 与固定 `lsof` 检查双端进程和 SQLite/settings 打开句柄；只输出固定 JSON 状态，不创建目录、不停止进程、不修改文件。contract 使用合成目录验证容量、打开/关闭句柄、symlink 拒绝和无参数边界，生产 host 不在仓库门禁中对真实数据根执行。
+`platforms/macos-product/UpgradePreflightHost/` 是 M4-P02 双 bundle 之外的只读升级平台端口。生产 executable 只接受无参数普通模式或唯一 `--cancellation-release` 模式，不接受路径，只解析用户域固定 `Application Support/RadishLex`；Manager/InputMethod bundle ID 从 `packaging/macos/product.json` 编译进入二进制。host 验证私有数据根和受控普通文件，查询卷级可用容量，并以 `NSRunningApplication` 与固定 `lsof` 检查双端进程和 SQLite/settings 打开句柄；只输出固定 JSON 状态，不创建目录、不停止进程、不修改文件。contract 使用合成目录验证容量、打开/关闭句柄、symlink 拒绝、两种严格响应及非法参数边界，生产 host 不在仓库门禁中对真实数据根执行。
 
 `platforms/macos-product/UpgradeValidationHosts/` 保存双端共用的数据库字节/sidecar 复验与两个受控 main。Manager helper 链接 Manager bundle 自带 native library；InputMethod helper 链接 native Rime 产品库并从自身 bundle 固定读取 `RimeData`。生产入口只接受无参数 candidate 模式或 `--post-switch` 最终路径模式，路径均由 Application Support v1 布局推导，不接受调用方路径或其他 validation input；共享参数与路径 contract 由独立 Objective-C 门禁覆盖。
 
@@ -403,6 +405,8 @@ startup observer 只读 `/var/lib/dpkg/status`、guard/tmp/receipt、terminal ac
 `platforms/macos-product/InstallAdapter/` 是 M4-P03 的 manifest-bound 程序平台组合层。它内嵌 committed install layout，严格解析 payload v2、target 与全部历史 source ProductManifest，按完整文件与内部 symlink 形成 bundle tree 身份，并把 strict ad-hoc `TeamIdentifier=not set`、CodeDirectory/CDHash、designated requirement 与 sealed requirement 集合转换为脱敏 code identity SHA-256。adapter 只从 authoritative current-user home 形成固定双目标，按外层 receipt release 暴露只读历史 source lookup，使用 metadata-preserving `ditto` 填充核心 staging，递归同步后记录 evidence，并在 source、installed 和 restored 阶段重新复验 tree/code identity。普通门禁只使用合成 verifier/copy port，不访问真实用户目录或签名凭据。
 
 `platforms/macos-product/InstallCoordinatorAdapter/` 是 M4-P03 的跨核心组合层。它不接管两个 receipt 的字段或文件操作，只在同时持有 install/upgrade guard 时验证同一 operation ID、data-root identity、source/target release 和双 `ProgramSwitchStore` binding。M4-P02 每个 quiescence checkpoint 同时消费 `InstallAdapter` 提供的 target 双 bundle 身份结果；数据失败只有在 data terminal、source 双程序精确恢复并重复复验后才把外层推进到 `rolled_back`。9 项合成测试覆盖成功、两类数据失败、静止/身份暂不可得、重启续跑、未持久化双 receipt 状态和绑定拒绝。
+
+其中 `cancellation_release.rs` 将准备取消完整证明绑定到真实 outer guard、活动旧终态、两代产品及独立旧程序资格，资格返回后复验产品/静止。`InstallerExecutor/src/cancellation_observation.rs` 复用安装适配器执行同 root 的程序实物核验，`cancellation_authorization.rs` 提供可撤销/到期的任务授权并组合专用 native root/双程序静止观察；`cancellation_execution.rs` 连续持有双 guard，连接取消请求、源库收尾、材料封存和证明发布，最终释放另用 proof 授权与显式资格提供者。`preparation_execution.rs` 接新准备任务与精确重开，`preparation_outer.rs` 负责 reservation 前旧 outer canonical 封存与物理身份，`preparation_authority.rs` 在连续双锁下提供 fresh 程序/静止/任务授权。`preparation_rebinding.rs` 严格连接交接证明和现存 v1 链，`preparation_continuation.rs` 接初始授权、持久化重验和保留双锁的准入任务；`prepared_execution.rs` 与 `prepared_authority.rs` 接同锁程序/data/终态执行、进展态重授权和逐检查点观察。完整交接/封存的只读投影可提供 action `10`，Bridge 的 `prepared.rs` 独立重读并授权；新准备/取消 dispatch 尚未开放，旧程序资格接口无默认放行实现。实现与合成验证边界见各组件 README 和当前设计。
 
 `platforms/macos-product/InstallerDriver/` 把外层 receipt/guard 和平台已验证的 installed-product situation 投影为 snapshot v1，不创建状态目录、不解释路径或执行 mutation。它固定 operation、phase、action、稳定 error、receipt progress、manual prompt 与保留数据策略，并在形成 authorized intent 前拒绝 stale action 和缺失确认。`InstallerExecutor/` 在 guard 内重取证并执行可续跑事务，upgrade 还从外层 receipt 与固定 data root bootstrap/rebind 数据 receipt。`InstallerBridge/` 固定 AppKit 使用的整数 enum、POD snapshot 和版本化 native ABI，并从系统用户数据库、当前 executable、sealed community ad-hoc identity 和内嵌 InstallPayload 形成 user-domain bootstrap；四类 operation 都已接真实 platform mutation port，upgrade 在 dispatch 前按 receipt 精确选择并构造历史 source/target coordinator，缺失或漂移 source 在写入前阻断。`InstallerApp/` 只展示 snapshot、固定目标与脱敏摘要，不在 UI 中实现复制、rename、删除、receipt 或 TIS 操作。普通开发构建因缺失 sealed identity 返回 `product_identity_unavailable`。
 

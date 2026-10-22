@@ -20,6 +20,13 @@ pub fn inspect_installer_view_with_recovery(
 ) -> InstallerViewSnapshot {
     let root = root.as_ref();
     let snapshot = inspect_installer_view(root, owner, situation);
+    if snapshot.stable_error() != InstallerStableError::OperationActive {
+        if let Some(maintenance) = maintenance_inspection::inspect(root, owner, situation, snapshot)
+        {
+            return maintenance;
+        }
+    }
+
     if snapshot.operation_kind() != Some(InstallOperationKind::Upgrade)
         || !matches!(
             snapshot.receipt_state(),
@@ -119,6 +126,7 @@ where
     let outer_guard = outer_store
         .acquire_guard()
         .map_err(|error| InstallerExecutionError::InstallFilesystem(error.code()))?;
+    maintenance_inspection::require_no_maintenance(outer_store)?;
     let mut outer = outer_store
         .load_guarded(&outer_guard)
         .map_err(|error| InstallerExecutionError::InstallFilesystem(error.code()))?

@@ -100,8 +100,32 @@ impl CancellationArchiveStore {
         }
         let request =
             PreparationCancellationRequest::decode(&self.read_bytes(&self.active(REQUEST))?)?;
-        let previous = request
-            .preparation()
+        self.observe_preparation_outer(guard, request.preparation(), hasher)
+    }
+
+    /// Observe immutable outer originals before recording cancellation, or while
+    /// finishing its source. The preparation must still be the active record.
+    /// The caller separately holds the outer guard and validates v1 semantics.
+    pub fn observe_preparation_outer(
+        &self,
+        guard: &UpgradeProcessGuard,
+        preparation: &PreparationReceipt,
+        hasher: &impl PreparationHasher,
+    ) -> Result<CancellationOuterBinding> {
+        self.journal.verify_guard(guard)?;
+        // The owning request/source coordinator validates its controlled
+        // temporary slot. This observer reads only preparation and outer proof.
+        if path_exists(&self.active(ARCHIVE))?
+            || self
+                .journal
+                .read_record()?
+                .as_ref()
+                .map(|value| &value.receipt)
+                != Some(preparation)
+        {
+            return Err(Error::EvidenceChanged);
+        }
+        let previous = preparation
             .binding()
             .previous_install_operation_id
             .as_deref()
@@ -140,7 +164,7 @@ impl CancellationArchiveStore {
         } else {
             result
         };
-        self.verify_outer(&request, &result, None, false, false, hasher)?;
+        self.verify_outer(preparation, &result, None, false, false, hasher)?;
         self.journal.verify_guard(guard)?;
         Ok(result)
     }
@@ -156,6 +180,21 @@ impl CancellationArchiveStore {
             return Ok(None);
         };
         self.verify(guard, &record, hasher, None)?;
+        if self.journal.evidence(&self.active(ARCHIVE), hasher)? != identity {
+            return Err(Error::EvidenceChanged);
+        }
+        Ok(Some(record))
+    }
+
+    pub(super) fn inspect_record(
+        &self,
+        hasher: &impl PreparationHasher,
+    ) -> Result<Option<CancellationArchiveReceipt>> {
+        self.validate_entries(None)?;
+        let Some((record, identity)) = self.read_record(hasher)? else {
+            return Ok(None);
+        };
+        self.verify_readonly(&record, hasher, None)?;
         if self.journal.evidence(&self.active(ARCHIVE), hasher)? != identity {
             return Err(Error::EvidenceChanged);
         }

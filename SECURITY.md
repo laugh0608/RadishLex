@@ -6,7 +6,7 @@ RadishLex 涉及系统输入法、个人化学习、端到端加密同步、设�
 
 ## 私下报告
 
-远程仓库已启用 [GitHub Private Vulnerability Reporting](https://github.com/laugh0608/RadishLex/security/advisories/new)，请使用该私密入口提交安全漏洞。若该入口不可用，可发送邮件至 `laugh0608@foxmail.com`，主题包含 `[RadishLex Security]`。
+远程仓库已启用 [GitHub Private Vulnerability Reporting](https://github.com/laugh0608/RadishLex/security/advisories/new)，请使用该私密入口提交安全漏洞。若该入口不可用，可发送邮件至 `luobo@radishx.com`，主题包含 `[RadishLex Security]`。
 
 请不要为未修复漏洞创建公开 Issue 或 Pull Request，也不要在首次联系中附带真实用户数据、密钥或可直接利用的完整材料。报告尽量包含：
 

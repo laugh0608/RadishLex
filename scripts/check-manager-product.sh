@@ -171,7 +171,7 @@ set +e
 preflight_argument_status=$?
 set -e
 if [[ ${preflight_argument_status} -ne 2 ]]; then
-  echo "bundled upgrade preflight host must reject every argument." >&2
+  echo "bundled upgrade preflight host must reject unrecognized arguments." >&2
   exit 1
 fi
 manager_bundle_id="$(python3 "${product_tool}" field manager_bundle_id)"

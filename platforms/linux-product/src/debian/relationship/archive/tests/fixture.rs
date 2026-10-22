@@ -293,7 +293,7 @@ fn build_control(version: &str, installed_size_kib: u64) -> Vec<u8> {
         "Package: radishlex\n\
          Version: {version}\n\
          Architecture: arm64\n\
-         Maintainer: RadishLex <laugh0608@foxmail.com>\n\
+         Maintainer: RadishLex <luobo@radishx.com>\n\
          Section: utils\n\
          Priority: optional\n\
          Installed-Size: {installed_size_kib}\n\

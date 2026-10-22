@@ -347,7 +347,50 @@ impl PreparationCancellationStore {
         progress: &CancellationSourceReceipt,
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
-        self.verify_bound_materials(guard, request, hasher)?;
+        self.journal.verify_guard(guard)?;
+        self.verify_source_progress_readonly(request, progress, hasher)?;
+        Ok(self.journal.verify_guard(guard)?)
+    }
+
+    pub(in super::super) fn inspect_request_and_source(
+        &self,
+        hasher: &impl PreparationHasher,
+    ) -> Result<(
+        PreparationCancellationRequest,
+        Option<CancellationSourceReceipt>,
+    )> {
+        self.validate_source_entries()?;
+        self.reject_source_staged()?;
+        let (request, identity) = self.read_request(hasher)?.ok_or(Error::InvalidPhase)?;
+        let progress = self.read_source_progress(hasher)?;
+        if let Some((progress, progress_identity)) = &progress {
+            if progress.request_identity() != &identity {
+                return Err(Error::EvidenceChanged);
+            }
+            self.verify_source_progress_readonly(&request, progress, hasher)?;
+            if self
+                .journal
+                .evidence(&self.journal.path(SOURCE_PROGRESS), hasher)?
+                != *progress_identity
+            {
+                return Err(Error::EvidenceChanged);
+            }
+        } else {
+            self.verify_request_readonly(&request, hasher)?;
+        }
+        if self.journal.evidence(&self.journal.path(REQUEST), hasher)? != identity {
+            return Err(Error::EvidenceChanged);
+        }
+        Ok((request, progress.map(|value| value.0)))
+    }
+
+    fn verify_source_progress_readonly(
+        &self,
+        request: &PreparationCancellationRequest,
+        progress: &CancellationSourceReceipt,
+        hasher: &impl PreparationHasher,
+    ) -> Result<()> {
+        self.verify_bound_materials_readonly(request, hasher)?;
         progress.validate_request(request)?;
         self.verify_slot(Some((REQUEST, progress.request_identity())), hasher)?;
         let family = self.journal.read_family(hasher)?;

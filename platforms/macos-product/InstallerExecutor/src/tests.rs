@@ -167,7 +167,7 @@ impl Drop for Fixture {
     }
 }
 
-struct TestPrograms {
+pub(crate) struct TestPrograms {
     target_product: ProductArtifactIdentity,
     manager_parent: PathBuf,
     input_method_parent: PathBuf,
@@ -180,7 +180,51 @@ struct TestPrograms {
 }
 
 impl TestPrograms {
-    fn target_path(&self, component: ProgramComponent) -> PathBuf {
+    pub(crate) fn for_prepared_upgrade(
+        root: &Path,
+        target_product: ProductArtifactIdentity,
+    ) -> Self {
+        let manager_parent = root.join("synthetic-programs/Applications");
+        let input_method_parent = root.join("synthetic-programs/Input Methods");
+        create_directory(&manager_parent, 0o700);
+        create_directory(&input_method_parent, 0o700);
+        create_bundle(
+            &manager_parent.join("RadishLex Manager.app"),
+            "source-manager",
+        );
+        create_bundle(
+            &input_method_parent.join("RadishLexInputMethod.app"),
+            "source-input-method",
+        );
+        Self {
+            target_product,
+            manager_parent,
+            input_method_parent,
+            owner_id: fs::metadata(root).unwrap().uid(),
+            fail_input_stage_once: false,
+            reject_finalization_completion: false,
+            installed_validation_calls: 0,
+            recovery_checks: 0,
+            reject_recovery_check: None,
+        }
+    }
+    pub(crate) fn reopen_prepared_upgrade(
+        root: &Path,
+        target_product: ProductArtifactIdentity,
+    ) -> Self {
+        Self {
+            target_product,
+            manager_parent: root.join("synthetic-programs/Applications"),
+            input_method_parent: root.join("synthetic-programs/Input Methods"),
+            owner_id: fs::metadata(root).unwrap().uid(),
+            fail_input_stage_once: false,
+            reject_finalization_completion: false,
+            installed_validation_calls: 0,
+            recovery_checks: 0,
+            reject_recovery_check: None,
+        }
+    }
+    pub(crate) fn target_path(&self, component: ProgramComponent) -> PathBuf {
         match component {
             ProgramComponent::Manager => self.manager_parent.join("RadishLex Manager.app"),
             ProgramComponent::InputMethod => {
@@ -710,4 +754,36 @@ fn create_directory(path: &Path, mode: u32) {
 fn create_bundle(path: &Path, marker: &str) {
     create_directory(path, 0o755);
     fs::write(path.join("marker.txt"), marker.as_bytes()).expect("bundle marker");
+}
+
+#[test]
+fn stale_ordinary_intent_stops_before_mutation_when_maintenance_appears() {
+    for bootstrap in [false, true] {
+        let mut fixture = Fixture::new(product("1.0.0", 1, 0));
+        fixture.begin_and_confirm(
+            InstallerProductSituation::NotInstalled,
+            InstallerAction::BeginFirstInstall,
+        );
+        let intent = fixture.authorize(
+            InstallerProductSituation::MatchingReleaseInstalled,
+            InstallerAction::BeginRepair,
+        );
+        let receipt = fixture.receipt();
+        let ids = fixture.operation_ids.ids.clone();
+        let state = fixture.data_root.join(".radishlex-upgrade-v1");
+        create_directory(&state, 0o700);
+        let marker = state.join("preparation-cancellation.json");
+        fs::write(&marker, b"{}\n").unwrap();
+        fs::set_permissions(&marker, fs::Permissions::from_mode(0o600)).unwrap();
+        let result = if bootstrap {
+            fixture.execute_with_upgrade_bootstrap(intent, &mut TestUpgradePort)
+        } else {
+            fixture.execute(intent, &mut NoUpgradeExecution)
+        };
+        assert_eq!(result, Err(InstallerExecutionError::InvalidState));
+        assert_eq!(fixture.receipt(), receipt);
+        assert_eq!(fixture.operation_ids.ids, ids);
+        assert_eq!(fs::read(&marker).unwrap(), b"{}\n");
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+    }
 }

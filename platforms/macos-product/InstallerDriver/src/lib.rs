@@ -31,6 +31,26 @@ pub enum InstallerViewPhase {
     Completed,
     RecoveryAvailable,
     Blocked,
+    PreparingSource,
+    CancellationRequested,
+    CancellationFinishingSource,
+    CancellationPreserving,
+    CancellationAwaitingQualification,
+    CancellationCompleted,
+}
+
+impl InstallerViewPhase {
+    pub const fn is_maintenance(self) -> bool {
+        matches!(
+            self,
+            Self::PreparingSource
+                | Self::CancellationRequested
+                | Self::CancellationFinishingSource
+                | Self::CancellationPreserving
+                | Self::CancellationAwaitingQualification
+                | Self::CancellationCompleted
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,6 +65,10 @@ pub enum InstallerAction {
     RetryOperation,
     RemovePrograms,
     AbortPreSwitchUpgrade,
+    ContinuePreparedUpgrade,
+    BeginSourcePreparation,
+    ResumeSourcePreparation,
+    PreservePreparationCancellation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -153,6 +177,7 @@ pub struct InstallerViewSnapshot {
     failure_code: Option<InstallFailureCode>,
     progress_step: u8,
     recovery_binding: Option<RecoveryIntentBinding>,
+    prepared_continuation: bool,
 }
 
 impl InstallerViewSnapshot {
@@ -198,6 +223,111 @@ impl InstallerViewSnapshot {
         self.secondary_action = InstallerAction::None;
         self.stable_error = error;
         self.manual_prompt = InstallerManualPrompt::None;
+        self.prepared_continuation = false;
+        self
+    }
+
+    /// Read-only maintenance projection. No phase here authorizes a mutation,
+    /// even when historical cancellation evidence is fully released.
+    pub fn with_maintenance(mut self, phase: InstallerViewPhase) -> Self {
+        if !phase.is_maintenance() {
+            return self.with_recovery_inspection_error(InstallerStableError::UnknownDriverResult);
+        }
+        self.phase = phase;
+        self.primary_action = InstallerAction::Refresh;
+        self.secondary_action = InstallerAction::None;
+        self.stable_error = InstallerStableError::None;
+        self.manual_prompt = InstallerManualPrompt::None;
+        self.operation_kind = Some(InstallOperationKind::Upgrade);
+        // Preparation/cancellation are not v1 receipt states or v1 progress.
+        self.receipt_state = None;
+        self.failure_code = None;
+        self.progress_step = 0;
+        self.recovery_binding = None;
+        self.prepared_continuation = false;
+        self
+    }
+
+    /// The composition layer must prove the complete fresh handoff or release
+    /// first. This view never replaces the executor's exact task authorization.
+    pub fn with_prepared_continuation(mut self, receipt: &InstallReceipt) -> Self {
+        if !matches!(
+            self.stable_error,
+            InstallerStableError::None
+                | InstallerStableError::ProductIdentityUnavailable
+                | InstallerStableError::ManualRecoveryRequired
+        ) {
+            return self.with_recovery_inspection_error(self.stable_error);
+        }
+        if receipt.operation_kind() != InstallOperationKind::Upgrade
+            || receipt.encode().is_err()
+            || (receipt.manual_recovery_required()
+                && !matches!(
+                    receipt.state(),
+                    InstallState::RollbackRequired | InstallState::ProgramsRestored
+                ))
+            || receipt.state() == InstallState::AbortedPreserved
+        {
+            return self.with_recovery_inspection_error(InstallerStableError::InvalidReceipt);
+        }
+        self.phase = InstallerViewPhase::PreparingSource;
+        self.primary_action = InstallerAction::ContinuePreparedUpgrade;
+        self.secondary_action = InstallerAction::None;
+        self.stable_error = InstallerStableError::None;
+        self.manual_prompt = InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager;
+        self.operation_kind = Some(InstallOperationKind::Upgrade);
+        self.receipt_state = Some(receipt.state());
+        self.failure_code = receipt.failure_code();
+        self.progress_step = progress_step(receipt.state());
+        self.recovery_binding = None;
+        self.prepared_continuation = true;
+        self
+    }
+
+    /// Supplied only after the composition layer checks the authoritative root,
+    /// sealed products and strict lifecycle predecessor. Execution rechecks it.
+    pub fn with_source_preparation(mut self, resume: bool, cancellable: bool) -> Self {
+        if !matches!(
+            self.stable_error,
+            InstallerStableError::None
+                | InstallerStableError::ProductIdentityUnavailable
+                | InstallerStableError::ManualRecoveryRequired
+        ) {
+            return self.with_recovery_inspection_error(self.stable_error);
+        }
+        self = self.with_maintenance(InstallerViewPhase::PreparingSource);
+        self.primary_action = if resume {
+            InstallerAction::ResumeSourcePreparation
+        } else {
+            InstallerAction::BeginSourcePreparation
+        };
+        self.secondary_action = if resume && cancellable {
+            InstallerAction::PreservePreparationCancellation
+        } else {
+            InstallerAction::None
+        };
+        self.manual_prompt = InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager;
+        self
+    }
+
+    /// Preservation requests/continues cancellation; it never releases its marker.
+    pub fn with_cancellation_preservation(mut self) -> Self {
+        if self.stable_error != InstallerStableError::None
+            || self.receipt_state.is_some()
+            || self.progress_step != 0
+            || !matches!(
+                self.phase,
+                InstallerViewPhase::PreparingSource
+                    | InstallerViewPhase::CancellationRequested
+                    | InstallerViewPhase::CancellationFinishingSource
+                    | InstallerViewPhase::CancellationPreserving
+            )
+        {
+            return self.with_recovery_inspection_error(InstallerStableError::UnknownDriverResult);
+        }
+        self.primary_action = InstallerAction::PreservePreparationCancellation;
+        self.secondary_action = InstallerAction::None;
+        self.manual_prompt = InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager;
         self
     }
 
@@ -504,6 +634,7 @@ fn snapshot(
         failure_code,
         progress_step: receipt_state.map_or(0, progress_step),
         recovery_binding: None,
+        prepared_continuation: false,
     }
 }
 
@@ -578,9 +709,17 @@ pub fn authorize_installer_action(
     if action == InstallerAction::AbortPreSwitchUpgrade && snapshot.recovery_binding.is_none() {
         return Err(InstallerAuthorizationError::ActionNotOffered);
     }
+    if action == InstallerAction::ContinuePreparedUpgrade && !snapshot.prepared_continuation {
+        return Err(InstallerAuthorizationError::ActionNotOffered);
+    }
     if matches!(
         action,
-        InstallerAction::RemovePrograms | InstallerAction::AbortPreSwitchUpgrade
+        InstallerAction::RemovePrograms
+            | InstallerAction::AbortPreSwitchUpgrade
+            | InstallerAction::ContinuePreparedUpgrade
+            | InstallerAction::BeginSourcePreparation
+            | InstallerAction::ResumeSourcePreparation
+            | InstallerAction::PreservePreparationCancellation
     ) && !authorization.data_retention_acknowledged
     {
         return Err(InstallerAuthorizationError::DataRetentionAcknowledgementRequired);
@@ -593,6 +732,10 @@ pub fn authorize_installer_action(
             | InstallerAction::RetryOperation
             | InstallerAction::RemovePrograms
             | InstallerAction::AbortPreSwitchUpgrade
+            | InstallerAction::ContinuePreparedUpgrade
+            | InstallerAction::BeginSourcePreparation
+            | InstallerAction::ResumeSourcePreparation
+            | InstallerAction::PreservePreparationCancellation
     ) && (!authorization.neutral_input_source_selected || !authorization.manager_closed)
     {
         return Err(InstallerAuthorizationError::ManualQuiescenceAcknowledgementRequired);
@@ -605,7 +748,11 @@ pub fn authorize_installer_action(
         InstallerAction::ConfirmQuiescence
         | InstallerAction::ResumeOperation
         | InstallerAction::RetryOperation
-        | InstallerAction::AbortPreSwitchUpgrade => snapshot.operation_kind,
+        | InstallerAction::AbortPreSwitchUpgrade
+        | InstallerAction::ContinuePreparedUpgrade
+        | InstallerAction::BeginSourcePreparation
+        | InstallerAction::ResumeSourcePreparation
+        | InstallerAction::PreservePreparationCancellation => snapshot.operation_kind,
         InstallerAction::None | InstallerAction::Refresh => None,
     };
     Ok(AuthorizedInstallerIntent {
@@ -616,6 +763,9 @@ pub fn authorize_installer_action(
             InstallerAction::ConfirmQuiescence
                 | InstallerAction::ResumeOperation
                 | InstallerAction::AbortPreSwitchUpgrade
+                | InstallerAction::ContinuePreparedUpgrade
+                | InstallerAction::ResumeSourcePreparation
+                | InstallerAction::PreservePreparationCancellation
         ),
         requires_platform_preflight: true,
         recovery_binding: if action == InstallerAction::AbortPreSwitchUpgrade {
@@ -675,6 +825,14 @@ const fn phase_code(phase: InstallerViewPhase) -> &'static str {
         InstallerViewPhase::Completed => "completed",
         InstallerViewPhase::RecoveryAvailable => "recovery_available",
         InstallerViewPhase::Blocked => "blocked",
+        InstallerViewPhase::PreparingSource => "preparing_source",
+        InstallerViewPhase::CancellationRequested => "cancellation_requested",
+        InstallerViewPhase::CancellationFinishingSource => "cancellation_finishing_source",
+        InstallerViewPhase::CancellationPreserving => "cancellation_preserving",
+        InstallerViewPhase::CancellationAwaitingQualification => {
+            "cancellation_awaiting_qualification"
+        }
+        InstallerViewPhase::CancellationCompleted => "cancellation_completed",
     }
 }
 
@@ -690,6 +848,10 @@ const fn action_code(action: InstallerAction) -> &'static str {
         InstallerAction::RetryOperation => "retry_operation",
         InstallerAction::RemovePrograms => "remove_programs",
         InstallerAction::AbortPreSwitchUpgrade => "abort_pre_switch_upgrade",
+        InstallerAction::ContinuePreparedUpgrade => "continue_prepared_upgrade",
+        InstallerAction::BeginSourcePreparation => "begin_source_preparation",
+        InstallerAction::ResumeSourcePreparation => "resume_source_preparation",
+        InstallerAction::PreservePreparationCancellation => "preserve_preparation_cancellation",
     }
 }
 

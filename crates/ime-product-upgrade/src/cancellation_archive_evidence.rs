@@ -138,6 +138,17 @@ impl CancellationArchiveStore {
         temporary: Option<(&Path, &PreparationFileIdentity)>,
     ) -> Result<()> {
         self.journal.verify_guard(guard)?;
+        self.verify_readonly(record, hasher, temporary)?;
+        Ok(self.journal.verify_guard(guard)?)
+    }
+
+    pub(super) fn verify_readonly(
+        &self,
+        record: &CancellationArchiveReceipt,
+        hasher: &impl PreparationHasher,
+        temporary: Option<(&Path, &PreparationFileIdentity)>,
+    ) -> Result<()> {
+        self.journal.store.revalidate()?;
         record.validate()?;
         self.validate_entries(temporary.map(|v| v.0))?;
         let prep = record.request.preparation();
@@ -243,7 +254,7 @@ impl CancellationArchiveStore {
         let compatibility_temp =
             temporary.filter(|(path, _)| *path == directory.join(COMPATIBILITY));
         self.verify_outer(
-            &record.request,
+            record.request.preparation(),
             &record.outer,
             record
                 .compatibility
@@ -258,7 +269,7 @@ impl CancellationArchiveStore {
                 return Err(Error::EvidenceChanged);
             }
         }
-        self.journal.verify_guard(guard)?;
+        self.journal.store.revalidate()?;
         Ok(())
     }
 
@@ -298,7 +309,9 @@ impl CancellationArchiveStore {
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
         let prep = record.request.preparation();
-        let inventory = if prep.binding().previous_data_operation_id.is_none() {
+        let inventory = if prep.binding().previous_data_operation_id.is_none()
+            && prep.previous_release_index_identity().is_none()
+        {
             PreviousInventory::empty(
                 &self.journal,
                 &prep.binding().operation_id,
@@ -311,6 +324,9 @@ impl CancellationArchiveStore {
             || inventory.directories != record.previous_directories
         {
             return Err(Error::EvidenceChanged);
+        }
+        if inventory.released.is_some() && inventory.receipt.is_none() {
+            return self.journal.verify_empty_v1_slots();
         }
         if inventory.released.is_some() {
             // load_previous_inventory resolves the exact v1 index and complete
@@ -345,7 +361,7 @@ impl CancellationArchiveStore {
 
     pub(super) fn verify_outer(
         &self,
-        request: &PreparationCancellationRequest,
+        prep: &PreparationReceipt,
         outer: &CancellationOuterBinding,
         compatibility: Option<&PreparationFileIdentity>,
         moved: bool,
@@ -353,7 +369,12 @@ impl CancellationArchiveStore {
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
         let root = &self.journal.store.root.path;
-        let prep = request.preparation();
+        if prep
+            .previous_install_evidence()
+            .is_some_and(|expected| *expected != outer.previous_install_evidence())
+        {
+            return Err(Error::EvidenceChanged);
+        }
         let previous = prep
             .binding()
             .previous_install_operation_id

@@ -2,6 +2,8 @@
 
 状态：**2026-09-25 项目所有者已确认，授权继续仓库实现与隔离验证。** 本文补充[已批准的 WAL 源库准备设计](macos-wal-source-preparation-design.md)，只处理新 v1 handoff 前的主动取消。设计批准不代表整条取消链已实现；分步实施范围见下节，执行顺位以 [current](../status/current.md) 为准。
 
+截至 2026-10-12，取消核心/产品组合、静止与任务授权、只读 UI、取消 Executor，以及新准备/交接、同锁程序/data/终态接续与进展态恢复均已接线；完整 handoff/封存可通过接续 action `10` 重新授权。新准备/取消 dispatch、独立旧程序资格与 WAL/pager 内部断电仍开放，最终取消 marker 仍受资格约束，B 段未退出。各日期记录保留当时事实；继续保持现有账户与 Agent 会话，当前顺位见 [current](../status/current.md)，本批记录见 [W42](../devlogs/2026-W42.md)。
+
 ## 已批准的调整
 
 建议以独立、严格版本化的准备取消证明表示用户意图。取消完成后，当前真实程序仍是 source，旧版本读取经过核验的原 outer 终态回执，活动 data 状态槽为空；新 Installer 从取消证明识别最近一次维护的真实结果。被取消的新 outer 原字节与准备材料完整封存，不伪造数据事务，不抹去操作历史。
@@ -20,7 +22,7 @@
 
 请求入口仍拒绝尚有 journal 的 family；只有取消收尾意图已持久化后，专用恢复才可检查同一源 inode、无 WAL/SHM 的单 journal，沿用现有资格验证、持久化恢复身份、恢复后再次准备/等价验证。未知或变化 journal、busy、身份/内容漂移、容量/授权失效均保留阻断。中断临时进度不自动认领或删除；已 rename 的精确记录可以补同步重载。`load_source_guarded` 只核验物理证据，不能代替 `finish_source` 的 fresh 授权和逻辑复验。
 
-已存在 handoff 意图、无合法 outer 前驱绑定、未知/不安全对象、未绑定临时文件及身份漂移均阻断。原准备与 v1 序列化、正常状态转换和白名单不变；旧 reader 对新增取消槽失败关闭。源库 `source_ready` 不表示 `cancel_ready`，本轮已继续实现下述材料封存与 outer 兼容恢复；取消类型的 v2 证明/索引及 marker 最后释放仍未实现，真实产品/旧程序副本资格与 UI 入口仍开放，不宣称 B 段退出。
+已存在 handoff 意图、无合法 outer 前驱绑定、未知/不安全对象、未绑定临时文件及身份漂移均阻断。原准备与 v1 序列化、正常状态转换和白名单不变；旧 reader 对新增取消槽失败关闭。源库 `source_ready` 不表示 `cancel_ready`，本轮已继续实现下述材料封存与 outer 兼容恢复；取消完整证明与核心释放已在下述 10-05 批次接入，真实产品/旧程序副本资格与 UI 入口仍开放，不宣称 B 段退出。
 
 ### 2026-09-29：取消材料封存与 outer 兼容恢复
 
@@ -28,7 +30,7 @@
 
 前一 outer 原件必须已封存在同一 data root 的 `.radishlex-install-history-v1/<previous-outer-operation>/receipt.json`，目录 `0700`、原件 `0600` 单链接，并匹配准备记录中的原摘要；本入口不扫描寻找前驱，也不负责事后制造旧原件。该固定槽是后续真实 Executor 接线的前置输入，冻结现场没有创建或搬动此目录。新 outer 尚未创建时核验仍活动的旧回执；已创建时必须是同 ID、同产品、无 artifact 的 `prepared`。
 
-旧 data 私有材料依原 inventory 的固定 `data/` 槽逐项保留；已经释放的历史只核验原证明及对应版本的 v1/v2 真实终态索引，不重归档、不改写索引；取消类型索引仍未开放。当前 operation 的历史目录保留 `preparation.json`、可空 `preparation-snapshot.sqlite3`、`cancellation-source.json` 和可空 `cancelled-outer.json`，原文件 inode/字节不变。业务 DB/settings/Rime 不移入历史槽。
+旧 data 私有材料依原 inventory 的固定 `data/` 槽逐项保留；已经释放的历史只核验原证明及对应版本的 v1/v2 真实终态索引，不重归档、不改写索引；本封存入口不发布取消类型索引；该步骤由后述取消释放协调器负责。当前 operation 的历史目录保留 `preparation.json`、可空 `preparation-snapshot.sqlite3`、`cancellation-source.json` 和可空 `cancelled-outer.json`，原文件 inode/字节不变。业务 DB/settings/Rime 不移入历史槽。
 
 新 outer 原 inode 封存后，在当前 operation 的 `compatibility-outer.json` 独占创建旧 outer canonical 字节副本，先同步并在取消进度中持久绑定新 inode，再原子发布到活动 outer `receipt.json`，同步目标/源目录并回读。旧 outer 历史原件继续保留；普通 v1 `persist` / `can_replace` 不变。每次 rename 只接受唯一合法位置；已绑定中断可补同步接续，未绑定目录、临时进度、兼容临时副本、冲突或身份漂移全部保留阻断，不自动认领或清理。
 
@@ -57,6 +59,58 @@
 [数据合同测试](../../crates/ime-product-upgrade/src/tests.rs)与[外层合同测试](../../crates/ime-product-install/src/tests.rs)均用合法失败终态作为正向对照，验证未知取消枚举、合法 JSON 形状但无失败码的记录被拒绝。外层接续用例同时验证不能逆向 `can_replace`。这些测试只证明仓库 v1 合同，未运行冻结二进制。
 
 不选择用 `snapshot_failed`、`data_coordination_failed`、`io` 等既有失败码承载纯用户意图；没有对应真实失败就不能这样写。也不通过删除全部安装状态、关闭 gate、重开旧终态或把非终态 UI 显示成“取消完成”解决问题。
+
+## 2026-10-05 实施：取消证明、生命周期接续与受资格约束的核心释放
+
+`CancellationReleaseStore` 只接续已完成 `preserved` 的材料。新增严格 canonical、256 KiB 上限的 `radishlex-cancellation-release-v1`，固定在本 operation 历史目录的 `cancellation-release.json`；记录内嵌原封存证明、绑定其文件身份、可空的真实旧 data receipt 及前驱索引。请求和封存进度原字节不改写，`preserved` 本身仍不表示 `cancel_ready`。这份完整不可变证明承担 `cancel_ready`，原 `radishlex-preparation-cancellation-v1` 请求仍保持 `requested`。
+
+核心顺序为：核验已保留材料、fresh port 与源库等价 → 独占写入/同步/原子发布完整证明 → 将原 `cancellation-archive.json` 原 inode 移入同历史目录并同步两侧 → 发布唯一 `latest-release.json` → 独立的资格检查 → 最后将原请求 marker 原 inode 移为历史 `preparation-cancellation.json`，同步两侧并回读。证明和索引的 `.tmp` 均为本次独占写入，崩溃后不认领未知临时对象；已绑定且位置唯一的 rename 可在 fresh guard 下补同步。
+
+`prepare_cancellation_release` 返回后仍有活动请求，普通准备、v1 与 startup gate 继续拒绝。`finish_cancellation_release` 的每个回调要求 `QualifiedSource`：真实 outer guard、严格旧/新 canonical 回执、精确 source 双程序与静止条件，以及绑定该 source/schema 的独立旧程序 gate/打开/再学习/重启资格。核心没有提供生产 port；当前测试用的是显式合成资格，不能据此开放 Installer 取消入口、启动旧程序或操作真实用户库。
+
+v2 索引增加 `proof.kind = preparation_cancellation`，`proof.sha256` 与 `proof.file_identity` 同时绑定完整证明的内容及原文件身份，二者摘要必须一致；lifecycle ID 为本次取消，legacy outer 为保留的旧安装事务，data 为最后真实数据事务或显式空。`load_latest_lifecycle` 返回明确的终态/取消类型并迭代核验全部祖先；旧 `load_latest_release` 对取消返回类型不匹配错误，不伪造数据终态。缺失索引但存在历史、缺失证明、活动同 ID marker、错误类型/版本/前驱、循环和身份漂移均拒绝。
+
+取消时首次封存的旧 inventory 由完整取消证明直接绑定，其原件与实物持续核验；已释放 v1/v2 前驱继续核验原证明。新准备显式绑定当前 lifecycle 的证明与索引，同时保留实际 outer/data 前驱；无 data 时仍必须绑定取消证明，不能按首次路径绕过历史。无 data 的 `previous_inventory_sha256` 此时表示生命周期证明摘要；旧准备 reader 不具备此接续能力，原 v1 data/outer 格式及失败码保持。
+
+连续取消、取消后新准备/新 v1/真实数据终态释放及 v1/v2→取消→新释放均使用同一解析器，运行 DB 的后续正常学习/WAL 不受历史物理摘要约束；尚在取消中的恢复仍要求原静止条件、源内容关系和 fresh 授权。B 段仍未退出，真实组合层/Executor/UI、独立旧程序资格与 WAL/pager 内部断电证据继续开放。验证见 [2026-W41](../devlogs/2026-W41.md)。
+
+## 2026-10-05 后续：取消释放组合层与资格绑定
+
+`InstallCoordinatorAdapter::CancellationReleaseAuthority` 已将核心 `Preserve` / `QualifiedSource` 要求接到真实 outer guard、共同 root、两代产品和严格旧/新 v1 原件核验；释放阶段还必须回读活动旧终态。产品观察与独立资格两类回调前后均复验外层，资格返回后再次观察程序和静止。核心在回调两侧继续核验 inner guard、源 family 与所有不可变材料，不允许提供者绕过实物关系。
+
+`CancellationSourceQualification` 是可信资格提供者的结构化返回值，固定 source 完整双程序身份、source schema 和本次不可变取消证明；其他证明/程序、缺失或失效资格、与 snapshot 不同的 schema 均拒绝。构造该类型只验证结构，不运行旧程序、不形成资格证据。维护前可能无 snapshot schema，提供者必须以精确 source family 另证 schema，不能把 target schema 或字段缺失当作资格。尚无生产资格提供者；测试中的合成实现仅验证组合层拒绝和接续合同。
+
+Executor 新增程序实物观察组合，复用安装适配器的签名/tree/manifest 校验，在静止/任务授权回调前后验证同一用户域 root、sealed target 和安装 source。它未接 Installer dispatch/UI；生产静止/任务授权提供者、独立旧程序 gate/打开/再学习/重启资格及其证据验证仍开放。既有 target-only preflight 不具备完整 proof/root/源双程序绑定，不能直接当作该提供者。
+
+隔离合同覆盖维护前后、outer 创建前后、错误 root/双 guard/产品/schema/资格证明、各 marker 边界资格丢失、回调期间 outer/源库漂移和移动后重载。移动前资格失效保留活动 marker；移动后检查失败保留历史原件且不报告成功，重新接续仍须 fresh 资格。全量结果见[2026-W41](../devlogs/2026-W41.md)，B 段与实机停止线不变。
+
+## 2026-10-05 后续：专用静止观察与当前任务授权
+
+`UpgradePreflightHost --cancellation-release` 在固定用户域运行同一只读进程/句柄检查，以独立 `radishlex-cancellation-preflight-v1` 返回实际 root 的 device/inode/owner/mode 和固定双 bundle ID；观察前后再次验证同一安全 root。它不接受调用方路径、不打开 SQLite、不运行旧 runtime。Rust 专用 reader 在 helper 前后验证精确 target manifest 与 executable，严格核对 root、bundle ID 和 ready/quiescent，拒绝旧响应及未知/重复字段。普通无参数 v1 输出保持不变。
+
+`authorize_cancellation_release` 只为当前明确确认的任务生成内存授权，固定完整取消证明和 source 双程序；要求保留数据、中立输入源及 Manager 关闭确认，但这些声明不替代 native 检查。授权期限由调用者指定、最长 5 分钟，任务所有者另持 control；显式撤销、control 释放或期限届满均失效，不可序列化、不可自动续权。专用 `MacOsCancellationQuiescenceAuthority` 在 native 调用前后复验授权，外层程序 authority 在其两侧继续验证真实 source/target/root。
+
+本批只完成上述可独立验证的提供者，不开放 UI 或 dispatch。核对旧 source validation host 后确认，其既有 candidate/PostSwitch 合同无法证明无新 data receipt 的正常 gate、再学习和重启；独立资格必须由专用程序副本验证产生，不能把现有 host 退出码包装成合格证据。该资格提供者及证据生成/读取/失效校验仍是下一顺位，最终 marker 继续要求真实资格。native 合同在新合成目录验证，任务/reader 负向测试不代表旧二进制或真实用户取消验收。
+
+## 2026-10-05 后续：准备/取消只读展示
+
+`inspect_maintenance` 复用严格记录及物理材料检查，识别准备、请求、源库收尾、封存、等待资格和已释放的历史取消；Executor 将其与当前严格 outer 绑定，Bridge/AppKit 显示对应状态。完整证明或索引单独存在不构成完成，最后请求 marker 仍活动时显示资格阻断。缺失/损坏/孤立证据与未知状态失败关闭；历史已释放后允许正常学习改变运行库，不以旧物理摘要封死后续读取。
+
+只读链不创建文件、不取得/清理 guard、不补同步、不打开 SQLite、不执行维护；观察期间身份/材料变化阻断。六项状态均只提供刷新，state/进度不套用旧 v1，普通 v1 mutation 在 outer guard 内再次拒绝维护状态。ABI v1 POD 与 symbol 不变，新 phase 对旧 reader 仍失败关闭；映射与具体语义见 [Installer 边界](../macos-installer-app-boundary.md#准备与取消的只读维护投影)。本步不生成独立旧程序资格，不开放取消 action，不启动真实程序；测试仅用合成数据与显式合成资格。
+
+## 2026-10-05 后续：取消 Executor 执行接线
+
+Executor 已提供独立的 preservation 授权/执行入口，连接已有准备、取消请求、源库收尾、封存及证明/索引发布；连续持有 outer → inner 双锁，成功仍保留最后 marker。任务绑定完整 preparation 与两侧程序，最长 5 分钟、可撤销、不可从持久请求续权。请求前及源库每个检查点交叉验证 sealed outer 原件与当前合法回执；真实程序观察及专用 native 静止/容量响应在回调前后重新核验。guard 以既有根身份元组匹配，允许创建历史目录带来的正常目录链接数变化，目录和 socket 替换仍失败关闭。
+
+最终释放另用完整 proof 的当次授权及显式独立资格提供者；缺失、错误绑定或资格返回后授权失效均保留阻断。已绑定中断位置支持同 operation 续跑，未绑定临时文件不能被接纳。合成回归覆盖所有可取消准备阶段、新 outer 有无、各阶段续跑及真实子进程退出；这不提供实际旧程序资格。新准备入口和 Bridge/action 仍待接线，UI 继续仅刷新，实际取消按钮不开启。具体入口和失败语义见 [Installer 边界](../macos-installer-app-boundary.md#取消-executor-任务入口)。
+
+## 2026-10-08：新准备产品任务承接
+
+Executor 已在旧 outer 活动槽未改变前独占保存 canonical 字节，完成同步/回读后绑定 `previous_install_evidence`，再持久化 reservation 和新 outer。该可选证据固定原件文件与目录身份，禁止持久替换中追加/移除/改认；取消封存对带证据的新准备交叉检查，旧无字段准备的编码和读取保持。连续取消的新准备只可经完整 lifecycle 核验复用同一个旧 outer 原件；取消后的合法学习不受旧 DB 物理摘要限制。
+
+新准备任务贯穿双 guard 并连接源库准备、旧槽保留与 v1 handoff。成功仍是 `prepared` outer / `preflighted` data；Bridge/action、交接后产品接续及独立旧程序资格未开放，取消最后 marker 的独立资格要求不变。具体入口见 [Installer 边界](../macos-installer-app-boundary.md#新准备-executor-任务入口)，验证见 [W41](../devlogs/2026-W41.md)。
+
+同日收尾补充：handoff 后的查询与严格重绑、初始 `prepared/preflighted` 接续准入也已实现，均不开放取消或升级按钮；持锁准入不能代替后续程序/data/终态执行。action `10` 仅固定了待开放合同，当前仍按未知值拒绝；详细状态以 [Installer 合同](../macos-installer-app-boundary.md#专用接续准入与待开放动作合同)和 [current](../status/current.md) 为准。
 
 ## 取消入口与数据保持
 
@@ -100,7 +154,7 @@
 
 ## 持久化顺序与恢复
 
-始终按 outer install guard → inner upgrade guard 取得双锁，每次动作 fresh 核验 source 产品、静止、私有对象及授权；固定状态目录不移动，guard 不更换。以下是专用协议的完整目标；源库收尾及封存/兼容恢复已接入仓库，最终索引/释放仍待实现，不是人工文件搬移步骤。
+始终按 outer install guard → inner upgrade guard 取得双锁，每次动作 fresh 核验 source 产品、静止、私有对象及授权；固定状态目录不移动，guard 不更换。以下专用协议的核心持久化顺序、产品组合、可撤销授权和取消 Executor 已接入仓库；独立旧程序资格提供者及 Bridge/action 仍待接线。这不是人工文件搬移步骤。
 
 1. 保存不可改认的取消意图，绑定准备记录与前驱，阻止继续 handoff。活动准备 marker 与新增取消 marker 均保持；旧 reader 对未知对象失败关闭。
 2. 按请求时点完成源库证明。必要时仅恢复原维护意图，旧 data 私有材料依原 inventory 封存；此前尚未具备 `source_prepared` 的取消归档须由此专用证明授权，不能放宽 B4 原状态转换。
@@ -125,6 +179,41 @@
 需先完成核心纯记录/实物证明与故障矩阵，再接真实 outer/Executor 和只读 UI，最后做独立程序副本资格。UI 在维护后提示“完成安全准备后取消”，中断/busy/不兼容均显示仍需恢复，不显示取消成功。新增 UI action 的映射依已批准合同另行固定，不能提前暴露未获资格的按钮。
 
 B 段仍未退出；本补充获确认也不等于产品已支持取消。真实源码/旧二进制若不能满足任一前置条件，应保留阻断并回报设计差异，不削弱 v1 gate。WAL/pager 内部真实断电资格、C–D 产品接线、REV-01/REV-02 和所有冻结现场停止线保持。
+
+## 2026-10-05 资格前置审计与当前会话约束
+
+本轮只读盘点发现本地保留 build 35–40 的历史 release 装配。既有 `verify_historical_product_root` 对六份 release 的完整文件记录、版本、许可证和运行资源关系均通过；这不是旧程序运行资格。当前绑定的 source 39 原始 release 仍可定位，完整摘要与签名核对结果保存在 [W41](../devlogs/2026-W41.md)。35–38 的存在不能代替 source 39；同为 39 的普通装配与 release manifest 不同，也不得混用。原始 39/40 仍冻结，本轮没有复制或运行它们。
+
+### 已查明的执行约束
+
+- [旧 FFI 的外层 gate](../../crates/ime-ffi/src/product_install.rs) 从 `current_exe` 推导运行身份，要求进程位于固定用户域双 bundle 的 `Contents/MacOS`，再核验完整 tree 与签名。外置 probe 即使链接精确旧 dylib，也不能取得相同的正向运行身份；把 probe 插入 bundle 或重新签名会改变被验证对象。
+- [Manager 正常启动](../../apps/radishlex-manager/macos/Runner/AppDelegate.swift)和 [InputMethod 正常启动](../../platforms/macos-imk/Sources/main.m)均先执行 outer/data 两道 gate。InputMethod 随后创建 `IMKServer` 并进入 `NSApplication` 会话；仅重定向 Foundation home 不能证明 GUI/InputMethodKit 命名空间已隔离。
+- 既有 validation host 只验证指定 v1 candidate/PostSwitch 数据；包内 FFI smoke 可以补充存储与学习证据，二者都不替代原始双程序的正常 gate、打开、再学习和重启。只读校验或退出码不能直接生成 `CancellationSourceQualification`。
+
+### 当前会话约束与可继续范围
+
+项目所有者已明确拒绝新增 macOS 用户或切换登录账户：操作成本过高，且会打断当前 Agent 会话。原独立账户建议撤回，不再作为下一步或资格工作的必要环境条件；本轮没有创建账户、切换会话或制作程序副本。后续工作须保持当前账户和 Agent 会话连续。
+
+1. 仓库内继续推进合成数据的协调器回归、失败关闭检查及产品接线准备。真实旧程序资格尚缺时，最终 marker 与取消按钮继续阻断；这个运行资格缺口不阻止不依赖它的仓库工作。
+2. 在当前会话可执行的 headless 验证中，既有 validation host 与 FFI smoke 只能证明各自的数据验证/存储/学习范围；使用精确冻结程序或 dylib 的副本仍须单独明确范围。不得将临时 HOME、外置 probe、注入/补丁或重新签名当作原始双程序正常启动的等价证据。
+3. 原始双程序的正常 gate、打开、再学习、重启资格保留未完成。当前尚无经验证的无干扰执行方案，不自动在工作会话启动旧 InputMethod，也不将其他账户、虚拟机或新环境作为默认替代要求。后续若确需实机动作，应先形成保持当前 Agent 会话的具体方案，再明确目标、影响和授权。
+4. 原有资格矩阵、精确 source/schema/proof 绑定与证据失效条件保持。静态资产检查、合成结果和 headless 子项不得升级为完整生产资格；不能为了继续开发而增加默认合格提供者或减弱 gate。
+
+本轮落实的是资产定位与执行边界审计，以及按项目所有者要求撤回不合适的环境建议。没有新生产资格、dispatch/UI 或 B 段退出结论；冻结原件、真实数据和既有现场停止线保持，仓库实现授权继续有效。
+
+## 2026-10-17：准备与取消保存产品动作
+
+本批在现有 Executor 上增加新准备 `11`、准备续跑 `12` 和取消保存 `13`，具体投影、确认文字和任务合同见 [Installer 边界](../macos-installer-app-boundary.md#新准备与取消保存动作合同2026-10-17)。action `10` 保持只处理已交接的升级接续；准备完成返回 `prepared/preflighted`，继续升级需要新的确认。
+
+新准备只读准入复用严格终态前驱、私有材料与生命周期链，不取得 guard、不打开 SQLite、不创建记录。准备记录显式提供交接意图是否已开始；即使 phase 仍为 `previous_archived`，交接意图已持久化也不再允许请求取消。取消只读观察返回已由核心核验的 outer 封存关系，使合法的 active outer 暂缺可续跑取消保存，缺失证据或未知位置仍失败关闭。上述扩展不改变回执编码、生命周期版本或双锁顺序。
+
+取消保存只完成请求、必要的源库收尾和材料封存；成功仍为等待独立资格，最后 marker 保留。界面明确提示保存材料不等于取消完成、暂不能启动旧版本，未新增最终取消释放动作或资格提供者。已有 Executor 在保存完成检查点中断后的授权重放合同保留；界面等待资格阶段继续只刷新。取消完成的历史视图也不自动开始下一次准备。
+
+本批不提供 source 39 正常双程序资格，不操作冻结现场。当前账户与 Agent 会话连续的限制、WAL/pager 内部断电缺口和 B 段退出条件保持；实现与验证记录见 [W42](../devlogs/2026-W42.md)。
+
+## 2026-10-17：独立 source 39 资格方案复核
+
+项目所有者确认没有备用 Mac 或独立 macOS 环境，继续保持当前账户、Agent 会话和冻结现场。新增[资格执行方案与逐包授权清单](macos-source39-qualification-plan.md)，固定精确历史 source 身份、矩阵、证据与失效规则。单独授权的 A1 短命 Foundation 实验已经执行：仅设置 `CFFIXED_USER_HOME` 后 8 项路径仍位于真实用户域，按合同拒绝并保留材料，不复跑。当前变量方案不能提供数据隔离，也未证明正常 IMK/GUI 会话隔离；不进入复制/启动 source。随后按批准的[证据 reader 合同](macos-cancellation-qualification-reader-contract.md)实现只读核验及合成负向测试；生产目录为空，报告不生成资格对象。writer、生产 issuer 与最终入口仍须独立批准，最终 marker 保持阻断。
 
 ## 备选方案与取舍
 

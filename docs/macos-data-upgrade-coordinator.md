@@ -59,7 +59,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 ### 新升级的源库维护原语
 
-已批准的 [WAL 准备与接续方案](remediation/macos-wal-source-preparation-design.md)先增加以下仓库原语；尚未接入生产 Installer，不改变现有活动事务：
+已批准的 [WAL 准备与接续方案](remediation/macos-wal-source-preparation-design.md)已实现以下仓库原语，并由专用 Executor 任务连接准备与 handoff；初始接续准入、同锁执行/进展态恢复及接续 Bridge action `10` 已接线，新准备/取消 dispatch 和独立旧程序资格仍未完成，不改变冻结活动事务：
 
 - `UserDb::verify_maintenance_snapshot` 在只读事务中比较源库与独立 standalone 保护快照。比较受支持的表和索引定义、数据库属性、所有表的 rowid 与逐列 storage class/值，保留重复记录和 sequence 语义；未知表、视图、trigger、未支持的隐藏列或 WITHOUT ROWID 表失败关闭。不向协调层输出行内容。
 - `UserDb::prepare_source_for_upgrade` 在调用方已持久化意图、证明静止并验证文件 family 后，使用不含 CREATE 且带 NOFOLLOW 的连接，完整 truncate WAL、转为 DELETE、显式检查关闭、复验内容等价及零 sidecar；不调用普通 `UserDb::open` 或 migration。错误只返回固定分类，物理文件可能已变化，错误不表示回滚。
@@ -72,7 +72,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 专用 `prepare_userdb_source` 编排已经串接保护快照、持久维护意图、SQLite 准备及 `source_prepared` 复核；固定路径与实际文件的 owner/mode/link/device/inode/length/SHA-256 由核心检查。快照读取阶段允许受限 SHM/零长 WAL 辅助变化，原主库和既有 WAL 内容不变；进入维护窗口后仍要求同一主 inode、保护快照和全量逻辑内容一致。文件/目录 fsync、rename、记录回读及后置静止缺一不可；无证明 snapshot 残留或不满足下述资格的 journal 阻断，不自动清理或用快照覆盖源库。
 
-快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。Executor 接线、完整准备取消及终态封存的产品接线仍待完成；下述 handoff、终态释放和取消源库收尾已实现核心编排，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
+快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。新准备与取消 Executor 已按专用任务入口接线，后续执行和终态封存已由专用接续任务连接；下述 handoff、终态释放和取消源库收尾已实现核心编排，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
 
 #### 旧事务 inventory 与保留接续
 
@@ -82,15 +82,15 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 只有精确的两槽互斥位置和有序移动前缀可以重放；最多一个移动可领先其持久位置证明，重放必须补做同步。冲突、缺失、inode/owner/mode/link/hash 漂移、未知对象和无证明临时记录保留并阻断。初始化产生的已有私有 operation 不认领；仅空共享父目录可重新核验并同步。首次无 data receipt 且无历史目录可用显式空清单；已释放历史前驱通过下述固定索引核验，缺少明确前驱时仍拒绝扫描猜测。
 
-原 v1 data receipt 编码与普通 reader 不变；新增准备字段只在使用时编码，旧严格准备 reader 拒绝它们。归档核心推进至 `previous_archived` 时，marker 和准备快照仍留在活动目录，之后必须经过独立 handoff。前一 outer canonical 字节的产品级保存、真实双 guard、明确中止和终态封存的产品接线仍须完成，不能据此允许产品启动或对真实目录执行升级。
+原 v1 data receipt 编码与普通 reader 不变；新增准备字段只在使用时编码，旧严格准备 reader 拒绝它们。归档核心推进至 `previous_archived` 时，marker 和准备快照仍留在活动目录，之后必须经过独立 handoff。新准备 Executor 在 reservation 前独占封存前一 outer canonical 字节，并以可选 `previous_install_evidence` 固定其文件和目录身份；该证据不能在持久替换中追加、移除或改认。准备和取消任务均连续持有真实双 guard，终态封存已连接同锁产品执行，独立旧程序资格及实机验收仍未完成；仓库接线不能授权对冻结真实目录执行升级。
 
 #### 新 v1 handoff 与准备证明封存
 
 `handoff_userdb_source` 已实现从 `previous_archived` 到新 v1 `preflighted` 的受控交接，调用方须明确预期新 operation 并持有原 guard。新回执取准备后 DB 身份、已绑定 release/schema、当前可选 settings/Rime，数据前驱不与 outer 前驱混用。先在新 operation 历史固定 `receipt.json` 创建并同步回执，于准备记录追加 `handoff_intent`，绑定 canonical 回执、文件 inode/metadata/hash、两层目录和 settings 身份，才允许移入活动槽；已有未知目标保留阻断。
 
-新 v1 活动回执完成目标/源目录同步及精确回读后，记录 `handoff_ready`，再保留式移动保护快照，最后移动 marker 为历史 `preparation.json`。每个检查点复验当前授权、guard、旧 inventory/私有槽、DB/保护快照等价与身份、settings/Rime 和唯一槽位关系；同字节但不同 inode 的已绑定材料同样拒绝。新回执已写或 marker 已封存的中断可在 fresh guard 下精确重放，不重复维护、不另开 ID、不改写最终证明；未绑定的目录/文件、未知版本/临时对象和冲突保持阻断。
+新 v1 活动回执完成两侧目录同步与精确回读后记录 `handoff_ready`，再移动保护快照，最后将 marker 封存为 `preparation.json`。每个检查点复验授权、guard、旧材料、源库/快照等价、settings/Rime 和唯一槽位关系；同字节 inode 替换仍拒绝。完成交接后重放也重新同步 data receipt 及两侧父目录，再同步快照/proof；阶段可见不能替代持久化重验。已绑定中断位置支持 fresh guard 下精确重放，不重复维护、不另开 ID、不改写证明；未知或未绑定对象保持阻断。成功返回原 guard 可用的 v1 store，后续 migration snapshot 与保护快照独立；marker 移出后普通 reader 可读回执，但非终态 gate 仍阻断。真实文件/SQLite、合成观察和子进程重载测试不等于真实双产品升级资格。
 
-成功返回同一 guard 可用的普通 v1 store，其后可生成独立 migration snapshot。marker 存在时旧 reader 拒绝；marker 移出后普通 reader 可读新回执，非终态 startup gate 仍拒绝。当前仅验证合成产品 port、真实私有文件/SHA-256/SQLite 与子进程重载，尚非真实双产品升级资格。
+`inspect_maintenance` 对中间位置执行物理核验，交接完成后返回 `PreparationHandedOff`；`rebind_handed_off_upgrade` / 产品 `rebind_prepared_upgrade` 核验封存历史与现有 v1 的完整绑定及合法进展，不打开 SQLite、不补同步或授权执行。产品初始接续另走 `authorize_prepared_continuation` / `admit_prepared_continuation`，仅接受 outer `prepared` / data `preflighted`，持双锁重验本次授权、实际程序、静止、交接持久化与源库/快照等价。准入成功不推进状态；实际接续通过同锁任务完成程序/data/终态，进展态重取精确授权，活动 v1 补同步而不改 receipt inode，封存态用 `inspect_terminal_release` 核验移动位置；只读 `PreparationTerminalRelease` 观察不授予执行权。详细接口与动作开放条件见 [Installer 边界](macos-installer-app-boundary.md#专用接续准入与待开放动作合同)。
 
 #### 终态封存、外层确认与释放索引
 
@@ -100,15 +100,15 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 只有 `finish_terminal_release` 的每个检查点都证明外层已针对同一完整 release 证明和实际安装版本落到匹配终态，才最后移走 marker 并回读空活动 v1 槽。普通 reader 的白名单保持，因此 marker 期间继续拒绝；合成资格覆盖 marker 移出后 `AllowedNoUpgradeState` 和正常 WAL 学习/删除，不等于真实产品启动资格。无 proof 的索引、错误外层终态或不同证明均不得解除阻断。
 
-`load_latest_release` 为后续生命周期提供只读定位和历史材料核验，不授予 startup 或 mutation 权限；已释放后的运行数据允许正常变化。明确中止的无 data receipt 分支、主动取消原因与旧 reader 兼容处理，以及 outer/Executor/真实程序资格仍开放。不得用该入口搬移被冻结的 source 39 事务。
+`load_latest_release` 为后续生命周期提供只读定位和历史材料核验，不授予 startup 或 mutation 权限；已释放后的运行数据允许正常变化。取消由独立完整证明和 `load_latest_lifecycle` 的类型化结果承接；`load_latest_release` 对取消类型拒绝，不能伪造 data receipt。outer/Executor 的同锁终态接线已完成，独立真实程序资格仍开放。不得用该入口搬移被冻结的 source 39 事务。
 
 历史核验沿证明内绑定的 `previous_index` 迭代至链首，每代检查对应版本的严格格式、证明/目录/私有材料/准备证据及实际 data 前驱、source release 连续性；重复 operation、缺失或漂移失败关闭。保存的旧索引须与其 canonical 字节长度和摘要一致，已绑定的准备证据还须匹配原索引及前代证明身份。旧索引被原子替换后不要求其 inode 仍位于当前索引槽，不制造历史索引副本。查询完成前复验当前索引身份；准备接续及终态释放的初始化、记录写入、索引发布和 marker 协调回调前后都复验祖先链。此核验不重写 v1 历史，也不检查已经恢复正常使用的旧运行库 hash。
 
-v2 索引使用 `radishlex-latest-release-v2`，显式包含 `operation_id`、`legacy_outer_operation_id`、可空类型的 `data_operation_id` 和带 `kind` / `sha256` 的 `proof`，同时保留 installed release 与 data root。当前只接收真实终态的 `terminal_release`，三个 ID 必须相同，data 不能为空；取消 kind 在完整证明与解析器接入前严格拒绝。v2 可绑定原 v1 或 v2 前驱，v1 证明不能绑定 v2 前驱；索引和最终证明必须同版本、同类型、同摘要。首次 v2 的空索引须以当前 operation 及明确绑定的旧未释放 inventory 证明，已有不相关历史或丢失索引拒绝；旧 inventory 的原件及实物继续核验。v1→v2→v2 新准备/真实终态释放保持三类 v1 数据终态合同和原持久化顺序。
+v2 索引使用 `radishlex-latest-release-v2`，显式包含 `operation_id`、`legacy_outer_operation_id`、可空类型的 `data_operation_id` 和带 `kind` / `sha256` 的 `proof`，同时保留 installed release 与 data root。真实终态的 `terminal_release` 仍要求三个 ID 相同且 data 非空；`preparation_cancellation` 则绑定独立完整取消证明，legacy outer 保持旧事务，data 可为空。v2 可绑定原 v1 或 v2 前驱，v1 证明不能绑定 v2 前驱；索引和最终证明必须同版本、同类型、同摘要。首次 v2 的空索引须以当前 operation 及明确绑定的旧未释放 inventory 证明，已有不相关历史或丢失索引拒绝；旧 inventory 的原件及实物继续核验。v1→v2→v2 新准备/真实终态释放保持三类 v1 数据终态合同和原持久化顺序。
 
 #### 已释放前驱的连续准备
 
-活动 v1 槽为空时，新 reservation 可通过明确 data 前驱读取最新 release 索引及其终态证明；必须保留真实 outer/data 两条前驱，不能从目录扫描或旧 target 猜测当前产品。`capture_previous_inventory` 返回已封存 inventory 的只读投影，`previous_inventory_identity` 为 release 证明身份，`release_index_identity` 为索引身份；以 `bind_released_predecessor` 在首次持久化前同时固定，不再向旧历史写 `inventory.json`。
+活动 v1 槽为空时，新 reservation 可通过明确 data 前驱（取消类型允许显式空）读取最新 lifecycle 索引及其完整证明；必须保留真实 outer/data 两条前驱，不能从目录扫描或旧 target 猜测当前产品。`capture_previous_inventory` 返回已封存 inventory 的只读投影，`previous_inventory_identity` 为 release 证明身份，`release_index_identity` 为索引身份；以 `bind_released_predecessor` 在首次持久化前同时固定，不再向旧历史写 `inventory.json`。
 
 新增可选 `previous_release_index_identity` 不改变无字段编码或旧 v1 合同；旧严格准备 reader 拒绝新字段。新准备每个 checkpoint 核验索引和证明的 inode/metadata/hash、目录、私有材料、安装 release/product 与显式 data 前驱；源库从当前 family 新建保护快照，保留正常学习及 tombstone。错误前驱、索引漂移、无证明的新 operation 目录或活动 v1 残留在 SQLite 写入前拒绝。
 
@@ -122,7 +122,13 @@ v2 索引使用 `radishlex-latest-release-v2`，显式包含 `operation_id`、`l
 
 源库收尾已接入独立 `CancellationSourceReceipt`，在固定 `cancellation-source.json` / `.tmp` 中绑定不可改认的请求文件身份与工作准备副本；只允许 `finishing`、受限 journal 恢复身份追加及 `source_ready`，不改原准备记录、请求或保护快照。维护意图前不打开 SQLite，保持请求 family 原身份/字节；维护意图后在 `CancellationSourcePort` 的 fresh outer/产品/静止与容量证明下完成原准备，核验 standalone、源 schema、全量内容/删除语义和显式关闭，再同步主文件与数据根。已准备/已归档路径重新校验等价，旧私有材料只核验，不搬动。
 
-请求入口仍拒绝现存 journal；只有取消收尾意图已持久化，专用恢复才可在同一主 inode、无 WAL/SHM 和下述单 journal 资格成立后记录恢复身份并重放。物理 `load_source_guarded` 不代表 fresh 授权或逻辑复验；这些由 `finish_source` 完成。未知临时进度、身份/内容漂移、busy 或授权/容量不足均保留阻断。`source_ready` 不等于 `cancel_ready`。后续 `CancellationArchiveStore` 已实现取消材料封存与 outer 兼容恢复，固定原件、目录和逐槽位置证明；组合层持有真实 outer guard 并调用安装核心严格校验旧/新 v1 合同。返回 `preserved` 仍保留活动取消请求与封存进度；取消类型的 v2 生命周期证明/索引、最终 marker 释放、真实产品观察/Executor 和产品 UI 仍未接入，不能显示“取消完成”。固定槽位、顺序与验证口径见[取消兼容设计](remediation/macos-preparation-cancellation-compatibility.md)。
+请求入口仍拒绝现存 journal；只有取消收尾意图已持久化，专用恢复才可在同一主 inode、无 WAL/SHM 和下述单 journal 资格成立后记录恢复身份并重放。物理 `load_source_guarded` 不代表 fresh 授权或逻辑复验；这些由 `finish_source` 完成。未知临时进度、身份/内容漂移、busy 或授权/容量不足均保留阻断。`source_ready` 不等于 `cancel_ready`。后续 `CancellationArchiveStore` 已实现取消材料封存与 outer 兼容恢复，固定原件、目录和逐槽位置证明；组合层持有真实 outer guard 并调用安装核心严格校验旧/新 v1 合同。返回 `preserved` 仍保留活动取消请求与封存进度；独立 `CancellationReleaseStore` 已接入完整不可变证明、v2 取消索引和受资格约束的最后 marker 协调，取消 Executor 已组合真实产品观察与双锁任务，旧程序资格及 Bridge/action 仍缺；只读 UI 按完整证明和 marker 位置区分状态，不开放执行按钮。固定槽位、顺序与验证口径见[取消兼容设计](remediation/macos-preparation-cancellation-compatibility.md)。
+
+`CancellationReleaseStore::prepare_cancellation_release` 消费完整封存证据，独占发布历史 `cancellation-release.json`，封存原 archive，再发布唯一索引；活动原请求继续阻断。独立 `finish_cancellation_release` 必须在每个检查点取得 `QualifiedSource` port 证明，才最后原 inode 移走请求、同步两目录并回读。组合层 `CancellationReleaseAuthority` 持有真实 outer guard，核验严格旧/新 v1 原件及活动旧终态，并绑定 source 完整双程序身份、schema 和本次完整证明的资格返回值；资格回调后复验产品/静止，两类回调前后核对外层。Executor 已提供绑定完整 proof/source、可撤销且最长 5 分钟的内存任务授权与专用 native 静止观察，helper 前后复核授权及 target manifest，核对实际 root。结构化资格返回值不是独立旧程序资格本身；资格提供者及 Bridge/action 尚未接线，不能放行真实产品取消。源库等价在每次恢复入口重新验证，各 I/O 回调前后复验全部实物。
+
+取消 Executor 的 preservation 任务完整接续请求、源库收尾、封存与证明发布，成功只表示等待资格；最终释放另需完整 proof 授权和显式独立资格。两个入口在同一调用中连续持有 outer → inner 双锁，阶段切换不释放再取；root guard 复验与下述目录身份合同一致，创建历史目录引起的链接数变化不改变锁归属。程序实物、专用 native 静止及容量、任务撤销/到期均在回调前后重新核验。未绑定临时材料不接纳，执行器不清理证据，详见 [Installer 任务入口](macos-installer-app-boundary.md#取消-executor-任务入口)。
+
+历史查询不检查旧运行库 hash，但继续验证请求、封存证明、准备/保护快照、旧 outer 原件、兼容关系及真实 data 材料。取消首次封存但没有旧 release proof 的 inventory 由取消证明承载，不能猜造终态；连续取消及取消后新准备分别绑定 lifecycle、outer、data 链。缺失索引且存在历史不能回退首次路径。新记录、索引、归档及最后 marker 的子进程中断测试只证明仓库恢复语义，不代表内部 pager 断电或旧程序资格。
 
 #### 维护中断的受限 journal 恢复
 
@@ -361,6 +367,8 @@ Manager 与 InputMethod 在产品启动前必须检查是否存在非终态升�
 新调用先验证既有对象确为同用户私有 socket：连接成功视为活动 operation；仅在精确 socket 返回 `ConnectionRefused` 时按异常退出残留删除并重新绑定。symlink、普通文件、owner/mode/type 漂移或其他连接错误一律失败关闭且不删除现场。guard 释放时也只删除与取得时 device/inode 身份完全一致的 socket，不扫描或清理其他临时内容。
 
 macOS preflight host 不接受调用方路径或进程名。它从产品 manifest 固定 Manager/InputMethod bundle ID，通过 `NSRunningApplication` 判断双端是否仍运行，并以系统固定 `/usr/sbin/lsof` 检查已存在的 `userdb.sqlite3` family、`manager-settings.json` 与其原子写临时文件是否仍有打开句柄；输出只包含 format、result、available bytes、quiescent 和稳定 blocker，不回显路径、进程详情或 `lsof` 内容。unsafe root/file、容量不可得或检测工具异常都失败关闭。
+
+专用 `--cancellation-release` 模式另用严格 `radishlex-cancellation-preflight-v1`，增加实际 root 的 device/inode/owner/mode 与固定双 bundle ID；观察前后 root 身份不一致即拒绝。旧无参数响应不变，取消 reader 不接受旧响应作为证明。此模式不接收 proof 或路径，也不打开 SQLite；proof/source/当前任务授权绑定由 Rust 组合层完成，完整合同见[取消设计](remediation/macos-preparation-cancellation-compatibility.md)。
 
 这份结果只是同一时刻的只读证据：它不停止进程，也不能阻止旧版本在检测后、snapshot 前重新启动。数据 startup gate 继续由 ABI v9 兼容保留，并位于外层 install gate 之后、Manager `super.applicationWillFinishLaunching` 与 InputMethod `IMKServer` 之前；只读允许 data root/state absent 与终态 receipt，active guard、所有非终态、损坏 receipt、中断 artifact、未知对象和身份漂移均阻止业务初始化。它不创建目录、不改权限、不连接或清理 guard。
 

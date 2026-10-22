@@ -240,6 +240,62 @@ impl UpgradeReceiptStore {
         &self.root.identity
     }
 
+    /// Verify the already-held lock without interpreting another lifecycle's
+    /// directory grammar. This never grants permission to mutate or load v1.
+    pub fn verify_process_guard(
+        &self,
+        guard: &UpgradeProcessGuard,
+    ) -> Result<(), UpgradeFilesystemError> {
+        self.revalidate()?;
+        if !guard.belongs_to(self) {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
+        guard.revalidate()
+    }
+
+    /// Reaffirm an observed v1 state after restart without replacing its inode.
+    /// The strict reader validates partial switch scenes before and after fsync.
+    pub fn reaffirm_current(
+        &self,
+        guard: &UpgradeProcessGuard,
+        receipt: &UpgradeReceipt,
+    ) -> Result<(), UpgradeFilesystemError> {
+        self.verify_current(guard, receipt)?;
+        for entry in fs::read_dir(&self.state_directory)
+            .map_err(|_| error(UpgradeFilesystemErrorCode::Io))?
+        {
+            let path = entry
+                .map_err(|_| error(UpgradeFilesystemErrorCode::Io))?
+                .path();
+            let metadata =
+                fs::symlink_metadata(&path).map_err(|_| error(UpgradeFilesystemErrorCode::Io))?;
+            if metadata.is_file() {
+                File::open(&path)
+                    .and_then(|file| file.sync_all())
+                    .map_err(|_| error(UpgradeFilesystemErrorCode::Io))?;
+            }
+        }
+        for name in ["userdb.sqlite3", "manager-settings.json"] {
+            if name == "manager-settings.json"
+                && !receipt
+                    .artifacts()
+                    .iter()
+                    .any(|a| a.slot() == UpgradeArtifactSlot::SourceSettings)
+            {
+                continue;
+            }
+            let path = self.root.path.join(name);
+            if path_exists(&path)? {
+                File::open(&path)
+                    .and_then(|file| file.sync_all())
+                    .map_err(|_| error(UpgradeFilesystemErrorCode::Io))?;
+            }
+        }
+        sync_directory(&self.state_directory)?;
+        sync_directory(&self.root.path)?;
+        self.verify_current(guard, receipt)
+    }
+
     /// Opens an existing state directory without creating or changing any object.
     pub fn open_existing(root: VerifiedDataRoot) -> Result<Self, UpgradeFilesystemError> {
         let store = Self::open_existing_directory(root)?;
@@ -275,27 +331,39 @@ impl UpgradeReceiptStore {
         if path_exists(&self.staged_receipt_path())? {
             return Err(error(UpgradeFilesystemErrorCode::InterruptedReceiptWrite));
         }
-        if path_exists(&self.guard_path())? {
-            let before = fs::symlink_metadata(self.guard_path())
-                .map_err(|_| error(UpgradeFilesystemErrorCode::IdentityChanged))?;
-            verify_private_socket(&before, self.root.expected_owner_id)?;
-            match UnixStream::connect(self.guard_path()) {
-                Err(io) if io.kind() == ErrorKind::ConnectionRefused => {}
-                _ => return Err(error(UpgradeFilesystemErrorCode::OperationAlreadyActive)),
-            }
-            let after = fs::symlink_metadata(self.guard_path())
-                .map_err(|_| error(UpgradeFilesystemErrorCode::IdentityChanged))?;
-            verify_private_socket(&after, self.root.expected_owner_id)?;
-            if FileIdentity::from_metadata(&before) != FileIdentity::from_metadata(&after) {
-                return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
-            }
-        }
+        let guard = self.inspection_guard_identity()?;
         let receipt = self.load_current_internal()?.map(|(receipt, _, _)| receipt);
         snapshot::validate_snapshot_state(self, receipt.as_ref())?;
         candidate::validate_candidate_state(self, receipt.as_ref())?;
         settings::validate_settings_backup_state(self, receipt.as_ref())?;
         switch::validate_switch_state(self, receipt.as_ref())?;
+        if self.inspection_guard_identity()? != guard {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
         Ok(receipt)
+    }
+
+    // Observation only: never binds, removes or adopts a guard socket.
+    fn inspection_guard_identity(&self) -> Result<Option<FileIdentity>, UpgradeFilesystemError> {
+        self.revalidate()?;
+        if !path_exists(&self.guard_path())? {
+            return Ok(None);
+        }
+        let before = fs::symlink_metadata(self.guard_path())
+            .map_err(|_| error(UpgradeFilesystemErrorCode::IdentityChanged))?;
+        verify_private_socket(&before, self.root.expected_owner_id)?;
+        match UnixStream::connect(self.guard_path()) {
+            Err(io) if io.kind() == ErrorKind::ConnectionRefused => {}
+            _ => return Err(error(UpgradeFilesystemErrorCode::OperationAlreadyActive)),
+        }
+        let after = fs::symlink_metadata(self.guard_path())
+            .map_err(|_| error(UpgradeFilesystemErrorCode::IdentityChanged))?;
+        verify_private_socket(&after, self.root.expected_owner_id)?;
+        let identity = FileIdentity::from_metadata(&before);
+        if identity != FileIdentity::from_metadata(&after) {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
+        Ok(Some(identity))
     }
 
     pub fn acquire_guard(&self) -> Result<UpgradeProcessGuard, UpgradeFilesystemError> {
@@ -604,7 +672,10 @@ impl fmt::Debug for UpgradeProcessGuard {
 
 impl UpgradeProcessGuard {
     fn belongs_to(&self, store: &UpgradeReceiptStore) -> bool {
-        self.root_identity == store.root.identity
+        // Creating a bound history directory changes the root's link count.
+        // Root identity is the same stable tuple used by filesystem revalidation
+        // and receipt binding; state directory and socket remain pinned too.
+        directory_artifacts_match(&self.root_identity, &store.root.identity)
             && self.state_directory_identity == store.state_directory_identity
             && self.socket_path == store.guard_path()
     }
@@ -866,12 +937,15 @@ mod tests;
 #[path = "preparation_journal.rs"]
 mod preparation_journal;
 pub use preparation_journal::{
-    CancellationArchiveCheckpoint, CancellationArchivePort, CancellationArchiveReceipt,
-    CancellationArchiveSlot, CancellationArchiveStore, CancellationOuterBinding,
-    CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
-    CancellationSourceReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
-    PreparationCancellationRequest, PreparationCancellationStore, PreparationHasher,
-    PreparationJournalError, PreparationJournalStore, PreviousInventory,
+    inspect_maintenance, CancellationArchiveCheckpoint, CancellationArchivePort,
+    CancellationArchiveReceipt, CancellationArchiveSlot, CancellationArchiveStore,
+    CancellationOuterBinding, CancellationPredecessorKind, CancellationReleaseCheckpoint,
+    CancellationReleasePort, CancellationReleaseReceipt, CancellationReleaseRequirement,
+    CancellationReleaseStore, CancellationSourceCheckpoint, CancellationSourcePhase,
+    CancellationSourcePort, CancellationSourceReceipt, LifecycleReleaseReceipt,
+    MaintenanceInspection, MaintenancePhase, PreparationCancellationCheckpoint,
+    PreparationCancellationPort, PreparationCancellationRequest, PreparationCancellationStore,
+    PreparationHasher, PreparationJournalError, PreparationJournalStore, PreviousInventory,
     SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
     SourcePreparationSpaceBudget, TerminalReleaseBinding, TerminalReleaseCheckpoint,
     TerminalReleaseDirectory, TerminalReleaseOuterRequirement, TerminalReleasePhase,

@@ -33,8 +33,9 @@
 - 启动长期服务或 GUI，修改系统输入法、权限、Keychain、证书、会话、全局配置、`/usr`、`/var`、dpkg、systemd 或 Fcitx profile/autostart。
 - kill、restart、合成按键、自动点击或其他可能干扰用户会话、进程和人工验收的动作。
 - 推送、创建或更新 Pull Request、Release、tag、远端设置，以及任何对外发布、部署或消息发送。
+- 完整验证（全仓门禁或完整专项回归）每轮运行前，必须说明必要性、范围、命令、预计耗时和资源影响，并取得用户对本轮的明确允许；未获允许不得启动，也不得拆分命令绕过。一般开发、收尾或提交要求不构成完整验证授权。
 - 授权只覆盖当前任务中已说明的目标、命令、环境和影响；命令、目标或运行影响发生实质变化时必须重新确认，不沿用历史会话授权。
-- 可直接读写仓库，运行只读 Git、既有格式化、静态检查、测试和 repository-only smoke，并做范围清楚的小型本地提交。
+- 可直接读写仓库，运行只读 Git、既有格式化、静态检查、定向测试和 repository-only smoke，并做范围清楚的小型本地提交；完整验证仍须按上条单独授权。
 - 默认先在沙盒内验证；权限、网络、证书或 PATH 限制导致关键构建或测试失真时，只为必要验证申请最小范围提权，提权不扩大任务授权。
 
 ## 任务文档路由
@@ -84,7 +85,7 @@
 - Rust 执行格式化、check、相关 test / clippy；Go 执行 gofmt 与相关 test；Flutter 执行 dart format、analyze 与相关 test；平台壳覆盖适用 build / smoke，真实行为保留人工或实机证据。
 - 交付时说明实际完成、验证结果、未验证内容和残余风险；没有执行的检查、系统动作或人工验收不得写成通过。
 - 架构、协议、隐私、平台、目录、里程碑或验证口径变化时同步对应真相源；每周重要推进追加 Asia/Shanghai 周志。
-- 文档改动至少运行 `./scripts/check-docs.sh`、`./scripts/check-text-files.sh` 和 `git diff --check`；阶段性或高风险交付再运行 `./scripts/check-repo.sh`。
+- 文档改动至少运行 `./scripts/check-docs.sh`、`./scripts/check-text-files.sh` 和 `git diff --check`；阶段性或高风险交付需要完整门禁时，先请示并获明确允许再运行 `./scripts/check-repo.sh`，未运行须如实标为待验证。
 
 ## Git 与入口维护
 

@@ -25,6 +25,12 @@ static NSString *_Nullable RLXPhaseCode(uint32_t value) {
     case RADISHLEX_INSTALLER_PHASE_COMPLETED: return @"completed";
     case RADISHLEX_INSTALLER_PHASE_RECOVERY_AVAILABLE: return @"recovery_available";
     case RADISHLEX_INSTALLER_PHASE_BLOCKED: return @"blocked";
+    case RADISHLEX_INSTALLER_PHASE_PREPARING_SOURCE: return @"preparing_source";
+    case RADISHLEX_INSTALLER_PHASE_CANCELLATION_REQUESTED: return @"cancellation_requested";
+    case RADISHLEX_INSTALLER_PHASE_CANCELLATION_FINISHING_SOURCE: return @"cancellation_finishing_source";
+    case RADISHLEX_INSTALLER_PHASE_CANCELLATION_PRESERVING: return @"cancellation_preserving";
+    case RADISHLEX_INSTALLER_PHASE_CANCELLATION_AWAITING_QUALIFICATION: return @"cancellation_awaiting_qualification";
+    case RADISHLEX_INSTALLER_PHASE_CANCELLATION_COMPLETED: return @"cancellation_completed";
     default: return nil;
     }
 }
@@ -41,6 +47,10 @@ static NSString *_Nullable RLXActionCode(uint32_t value) {
     case RADISHLEX_INSTALLER_ACTION_RETRY_OPERATION: return @"retry_operation";
     case RADISHLEX_INSTALLER_ACTION_REMOVE_PROGRAMS: return @"remove_programs";
     case RADISHLEX_INSTALLER_ACTION_ABORT_PRE_SWITCH_UPGRADE: return @"abort_pre_switch_upgrade";
+    case RADISHLEX_INSTALLER_ACTION_CONTINUE_PREPARED_UPGRADE: return @"continue_prepared_upgrade";
+    case RADISHLEX_INSTALLER_ACTION_BEGIN_SOURCE_PREPARATION: return @"begin_source_preparation";
+    case RADISHLEX_INSTALLER_ACTION_RESUME_SOURCE_PREPARATION: return @"resume_source_preparation";
+    case RADISHLEX_INSTALLER_ACTION_PRESERVE_PREPARATION_CANCELLATION: return @"preserve_preparation_cancellation";
     default: return nil;
     }
 }
@@ -147,6 +157,10 @@ static uint32_t RLXActionValue(NSString *actionCode) {
         @"retry_operation": @(RADISHLEX_INSTALLER_ACTION_RETRY_OPERATION),
         @"remove_programs": @(RADISHLEX_INSTALLER_ACTION_REMOVE_PROGRAMS),
         @"abort_pre_switch_upgrade": @(RADISHLEX_INSTALLER_ACTION_ABORT_PRE_SWITCH_UPGRADE),
+        @"continue_prepared_upgrade": @(RADISHLEX_INSTALLER_ACTION_CONTINUE_PREPARED_UPGRADE),
+        @"begin_source_preparation": @(RADISHLEX_INSTALLER_ACTION_BEGIN_SOURCE_PREPARATION),
+        @"resume_source_preparation": @(RADISHLEX_INSTALLER_ACTION_RESUME_SOURCE_PREPARATION),
+        @"preserve_preparation_cancellation": @(RADISHLEX_INSTALLER_ACTION_PRESERVE_PREPARATION_CANCELLATION),
     };
     return actions[actionCode].unsignedIntValue ?: UINT32_MAX;
 }
@@ -157,7 +171,11 @@ static uint32_t RLXAuthorizationFlags(NSString *actionCode) {
     }
     uint32_t flags = RADISHLEX_INSTALLER_AUTH_EXPLICIT_CONFIRMATION;
     if ([actionCode isEqualToString:@"remove_programs"] ||
-        [actionCode isEqualToString:@"abort_pre_switch_upgrade"]) {
+        [actionCode isEqualToString:@"abort_pre_switch_upgrade"] ||
+        [actionCode isEqualToString:@"continue_prepared_upgrade"] ||
+        [actionCode isEqualToString:@"begin_source_preparation"] ||
+        [actionCode isEqualToString:@"resume_source_preparation"] ||
+        [actionCode isEqualToString:@"preserve_preparation_cancellation"]) {
         flags |= RADISHLEX_INSTALLER_AUTH_DATA_RETENTION;
     }
     if ([actionCode isEqualToString:@"begin_upgrade"] ||
@@ -165,7 +183,11 @@ static uint32_t RLXAuthorizationFlags(NSString *actionCode) {
         [actionCode isEqualToString:@"confirm_quiescence"] ||
         [actionCode isEqualToString:@"retry_operation"] ||
         [actionCode isEqualToString:@"remove_programs"] ||
-        [actionCode isEqualToString:@"abort_pre_switch_upgrade"]) {
+        [actionCode isEqualToString:@"abort_pre_switch_upgrade"] ||
+        [actionCode isEqualToString:@"continue_prepared_upgrade"] ||
+        [actionCode isEqualToString:@"begin_source_preparation"] ||
+        [actionCode isEqualToString:@"resume_source_preparation"] ||
+        [actionCode isEqualToString:@"preserve_preparation_cancellation"]) {
         flags |= RADISHLEX_INSTALLER_AUTH_NEUTRAL_INPUT_SOURCE;
         flags |= RADISHLEX_INSTALLER_AUTH_MANAGER_CLOSED;
     }

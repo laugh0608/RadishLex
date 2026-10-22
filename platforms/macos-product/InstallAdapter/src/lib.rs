@@ -22,6 +22,7 @@ use radishlex_ime_product_install::{
 use serde::Deserialize;
 
 mod codesign;
+mod continuation;
 mod copy;
 mod manifest;
 mod recovery_evidence;
@@ -363,6 +364,19 @@ impl MacOsProductInstallAdapter {
             &input_method,
             expected.program(ProgramComponent::InputMethod),
         )
+    }
+
+    /// Read-only binding to the same data root as the guard-held coordinator.
+    /// This does not create a state directory or open either business database.
+    pub fn verify_data_root(
+        &self,
+        expected: &InstallRootIdentity,
+    ) -> Result<(), MacOsInstallAdapterError> {
+        self.layout.revalidate()?;
+        if !self.layout.matches_data_root(expected) {
+            return Err(error(MacOsInstallAdapterErrorCode::UnsafeTarget));
+        }
+        Ok(())
     }
 
     pub fn revalidate_target_product(

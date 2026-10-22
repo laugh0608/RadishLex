@@ -373,7 +373,7 @@ fn failed_action_cannot_be_hidden_by_progress_completion_or_existing_diagnostics
                 },
                 manual_prompt: prompt_value(InstallerManualPrompt::None),
             };
-            let failed = project_action_result(
+            let failed = project_action_result::<()>(
                 Err(InstallerBridgeError::Execution(InstallerExecutionError::UpgradeFilesystem(
                     radishlex_ime_product_upgrade::UpgradeFilesystemErrorCode::InterruptedSwitch,
                 ))),
@@ -415,7 +415,12 @@ fn ffi_contract_is_versioned_and_fails_closed_without_release_identity() {
         Some(InstallerAction::AbortPreSwitchUpgrade)
     );
     assert_eq!(action_value(InstallerAction::AbortPreSwitchUpgrade), 9);
-    assert_eq!(decode_action(10), None);
+    assert_eq!(
+        decode_action(10),
+        Some(InstallerAction::ContinuePreparedUpgrade)
+    );
+    assert_eq!(action_value(InstallerAction::ContinuePreparedUpgrade), 10);
+    assert_eq!(decode_action(14), None);
     assert_eq!(
         radishlex_installer_bridge_contract_version(),
         INSTALLER_BRIDGE_CONTRACT_VERSION
@@ -628,3 +633,86 @@ fn create_directory(path: &Path, mode: u32) {
         .expect("create directory");
     fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("directory mode");
 }
+
+#[test]
+fn maintenance_phases_keep_v1_layout_and_encode_only_refresh() {
+    let base = radishlex_macos_installer_driver::inspect_installer_view(
+        "/not-a-real-radishlex-maintenance-root",
+        0,
+        InstallerProductSituation::OlderReleaseInstalled,
+    );
+    for (phase, number) in [
+        (InstallerViewPhase::PreparingSource, 7),
+        (InstallerViewPhase::CancellationRequested, 8),
+        (InstallerViewPhase::CancellationFinishingSource, 9),
+        (InstallerViewPhase::CancellationPreserving, 10),
+        (InstallerViewPhase::CancellationAwaitingQualification, 11),
+        (InstallerViewPhase::CancellationCompleted, 12),
+    ] {
+        let encoded = encode_installer_snapshot(base.with_maintenance(phase));
+        assert_eq!(encoded.phase, number);
+        assert_eq!(encoded.contract_version, 1);
+        assert_eq!(encoded.primary_action, 1);
+        assert_eq!(encoded.secondary_action, 0);
+        assert_eq!(encoded.receipt_state, 0);
+        assert_eq!(encoded.progress_step, 0);
+        assert_eq!(encoded.manual_prompt, 0);
+    }
+    assert_eq!(
+        std::mem::size_of::<RadishLexInstallerBridgeSnapshotV1>(),
+        9 * 4
+    );
+}
+
+#[test]
+fn source_preparation_actions_round_trip_without_changing_the_v1_pod() {
+    let base = radishlex_macos_installer_driver::inspect_installer_view(
+        "/not-a-real-preparation-bridge-root",
+        0,
+        InstallerProductSituation::OlderReleaseInstalled,
+    );
+    for (view, primary, secondary) in [
+        (base.with_source_preparation(false, false), 11, 0),
+        (base.with_source_preparation(true, true), 12, 13),
+        (base.with_source_preparation(true, false), 12, 0),
+        (
+            base.with_source_preparation(true, true)
+                .with_cancellation_preservation(),
+            13,
+            0,
+        ),
+    ] {
+        let encoded = encode_installer_snapshot(view);
+        assert_eq!(encoded.contract_version, 1);
+        assert_eq!(encoded.phase, 7);
+        assert_eq!(
+            (encoded.primary_action, encoded.secondary_action),
+            (primary, secondary)
+        );
+        assert_eq!(
+            (
+                encoded.operation_kind,
+                encoded.receipt_state,
+                encoded.progress_step,
+                encoded.stable_error,
+                encoded.manual_prompt
+            ),
+            (2, 0, 0, 0, 1)
+        );
+        let action = decode_action(primary).unwrap();
+        assert_eq!(action_value(action), primary);
+        assert!(preparation::is_action(action));
+    }
+    assert!(!preparation::is_action(
+        InstallerAction::ContinuePreparedUpgrade
+    ));
+    assert_eq!(decode_action(0), None);
+    assert_eq!(decode_action(14), None);
+    assert_eq!(
+        std::mem::size_of::<RadishLexInstallerBridgeSnapshotV1>(),
+        36
+    );
+}
+
+#[path = "preparation_tests.rs"]
+mod preparation_actions;

@@ -185,6 +185,46 @@ fn reload(fixture: &Fixture) -> (Store, UpgradeProcessGuard) {
     (store, guard)
 }
 
+pub(super) fn upgrade_after_cancellation(
+    fixture: &Fixture,
+    store: PreparationJournalStore,
+    guard: &UpgradeProcessGuard,
+    binding: PreparationBinding,
+) -> Proof {
+    let mut port = Port::new(binding.clone());
+    store
+        .prepare_userdb_source(guard, &mut port, &Hasher)
+        .unwrap();
+    store
+        .archive_previous_upgrade(guard, &mut port, &Hasher)
+        .unwrap();
+    let (v1, mut receipt) = store
+        .handoff_userdb_source(guard, &binding.operation_id, &mut port, &Hasher)
+        .unwrap();
+    v1.resume_userdb_upgrade(
+        guard,
+        &mut receipt,
+        u64::MAX,
+        &mut ProductPort(State::Completed),
+    )
+    .unwrap();
+    let release = Binding {
+        operation_id: binding.operation_id.clone(),
+        installed_release: binding.target_release,
+        installed_product_sha256: binding.target_product_sha256,
+    };
+    let store = Store::attach(v1, guard).unwrap();
+    let mut port = ReleasePort::new(release.clone());
+    store
+        .prepare_terminal_release(guard, &release, &mut port, &Hasher)
+        .unwrap();
+    port.finalize(&fixture.0);
+    store
+        .finish_terminal_release(guard, &binding.operation_id, &mut port, &Hasher)
+        .unwrap()
+        .1
+}
+
 #[test]
 fn all_real_data_terminals_release_only_after_outer_finalization_and_allow_later_wal() {
     for prepared in [false, true] {

@@ -51,6 +51,15 @@ int main(void) {
     RLXRequire(emptyResult.isQuiescent, @"empty root is quiescent");
     RLXRequire(emptyResult.availableBytes > 0,
                @"empty root reports available capacity");
+    struct stat identity;
+    RLXRequire(lstat(dataRoot.fileSystemRepresentation, &identity) == 0,
+               @"read actual root identity");
+    RLXRequire([emptyResult.dataRootIdentity isEqual:@{
+      @"device_id" : @((unsigned long long)identity.st_dev),
+      @"inode" : @((unsigned long long)identity.st_ino),
+      @"owner_id" : @(identity.st_uid),
+      @"mode" : @0700
+    }], @"cancellation observation reports actual root identity");
 
     NSURL *database = [dataRoot URLByAppendingPathComponent:@"userdb.sqlite3"];
     RLXRequire([fileManager createFileAtPath:database.path

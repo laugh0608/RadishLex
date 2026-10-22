@@ -25,11 +25,50 @@ use radishlex_macos_product_install_coordinator::{
 use radishlex_macos_upgrade_coordinator::{MacOsProductPreflightAdapter, MacOsUpgradeAdapterError};
 
 mod bootstrap;
+mod cancellation_authorization;
+mod cancellation_execution;
+mod cancellation_observation;
+mod maintenance_inspection;
+mod preparation_continuation;
+mod prepared_execution;
+pub use prepared_execution::{
+    authorize_prepared_upgrade_resume, continue_prepared_upgrade,
+    inspect_prepared_upgrade_continuation, resume_prepared_upgrade, PreparedUpgradeData,
+    PreparedUpgradeObservation, PreparedUpgradeResumeAuthorization, PreparedUpgradeSummary,
+};
+mod preparation_execution;
+mod preparation_inspection;
+pub use preparation_continuation::{
+    admit_prepared_continuation, authorize_prepared_continuation,
+    PreparedContinuationAuthorization, PreparedContinuationTask,
+};
+pub use preparation_inspection::{inspect_source_preparation, SourcePreparationObservation};
 mod recovery;
 pub use bootstrap::{
     bootstrap_upgrade_receipt, BootstrappedUpgradeReceipt, UpgradeBootstrapError,
     UpgradeBootstrapErrorCode,
 };
+pub use cancellation_authorization::{
+    authorize_cancellation_release, CancellationQuiescenceFailure, CancellationTaskAuthorization,
+    CancellationTaskAuthorizationError, CancellationTaskControl,
+    MacOsCancellationQuiescenceAuthority,
+};
+pub use cancellation_execution::{
+    authorize_cancellation_preservation, finish_preparation_cancellation,
+    preserve_preparation_cancellation, CancellationExecutionError,
+    CancellationPreservationAuthorization,
+};
+pub use cancellation_observation::{
+    CancellationProductObservationFailure, CancellationQuiescenceAuthority,
+    MacOsCancellationProductAuthority,
+};
+pub use preparation_execution::{
+    authorize_preparation_resume, authorize_source_preparation, prepare_upgrade_source,
+    PreparationExecutionError, PreparationTaskAuthorization, PreparationTaskAuthorizationError,
+    PreparationTaskControl,
+};
+mod preparation_rebinding;
+pub use preparation_rebinding::rebind_prepared_upgrade;
 pub use recovery::inspect_installer_view_with_recovery;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -426,7 +465,9 @@ where
     I: InstallerOperationIdSource,
     U: UpgradeCoordinatorPort,
 {
+    reject_dedicated_action(intent.action())?;
     let data_root = data_root.as_ref();
+    maintenance_inspection::require_no_maintenance(install_store)?;
     if intent.action() == InstallerAction::AbortPreSwitchUpgrade {
         return recovery::execute_pre_switch_recovery(
             intent,
@@ -511,12 +552,14 @@ where
     I: InstallerOperationIdSource,
     U: InstallerUpgradeExecution<P>,
 {
+    reject_dedicated_action(intent.action())?;
     if intent.action() == InstallerAction::Refresh || !intent.requires_platform_preflight() {
         return Err(InstallerExecutionError::InvalidIntent);
     }
     let guard = install_store
         .acquire_guard()
         .map_err(|error| InstallerExecutionError::InstallFilesystem(error.code()))?;
+    maintenance_inspection::require_no_maintenance(install_store)?;
     let current = install_store
         .load_guarded(&guard)
         .map_err(|error| InstallerExecutionError::InstallFilesystem(error.code()))?;
@@ -810,3 +853,20 @@ fn summary(receipt: &InstallReceipt) -> Result<InstallerExecutionSummary, Instal
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "cancellation_authorization_fixture.rs"]
+mod cancellation_fixture;
+
+fn reject_dedicated_action(action: InstallerAction) -> Result<(), InstallerExecutionError> {
+    if matches!(
+        action,
+        InstallerAction::ContinuePreparedUpgrade
+            | InstallerAction::BeginSourcePreparation
+            | InstallerAction::ResumeSourcePreparation
+            | InstallerAction::PreservePreparationCancellation
+    ) {
+        return Err(InstallerExecutionError::InvalidIntent);
+    }
+    Ok(())
+}

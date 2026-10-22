@@ -17,6 +17,9 @@ use sha2::{Digest, Sha256};
 use super::*;
 use crate::runner::{HostMode, HostOutput, ProductHostRunner};
 
+#[path = "cancellation_preflight_tests.rs"]
+mod cancellation_preflight;
+
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(1);
 
 struct Fixture {

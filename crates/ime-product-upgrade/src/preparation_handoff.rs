@@ -10,8 +10,35 @@ const PROOF: &str = "preparation.json";
 mod creation;
 #[path = "preparation_handoff_evidence.rs"]
 mod evidence;
+#[path = "preparation_rebinding.rs"]
+mod rebinding;
 
 impl PreparationJournalStore {
+    /// Metadata-only lookup for a task that already names the exact operation.
+    /// The execution path must still validate all physical and logical evidence.
+    pub fn load_preparation_for_operation(
+        &self,
+        guard: &UpgradeProcessGuard,
+        operation: &str,
+        hasher: &impl PreparationHasher,
+    ) -> Result<PreparationReceipt> {
+        if !inventory::valid_id(operation) {
+            return Err(Error::EvidenceChanged);
+        }
+        self.verify_guard(guard)?;
+        self.validate_entries()?;
+        self.reject_staged_record()?;
+        let record = match self.load_guarded(guard)? {
+            Some(record) => record,
+            None => self.read_handoff_proof(operation, hasher)?,
+        };
+        if record.binding().operation_id != operation {
+            return Err(Error::EvidenceChanged);
+        }
+        self.verify_guard(guard)?;
+        Ok(record)
+    }
+
     /// Consume the preparation store and return the same guarded v1 store.
     /// The caller must supply the expected NEW outer operation on every retry.
     /// Success leaves a nonterminal preflighted receipt: it never allows startup.
@@ -59,23 +86,28 @@ impl PreparationJournalStore {
         let history = self.handoff_directory(&record);
         if record.phase() == PreparationPhase::PreviousArchived {
             self.persist(guard, Some(&record), &record)?;
-            self.handoff_move(
-                guard,
-                port,
-                hasher,
-                &record,
-                (
-                    &history.join(RECEIPT_FILE_NAME),
-                    &self.path(RECEIPT_FILE_NAME),
-                ),
-                &intent.receipt_identity,
-                [
-                    Point::HandoffBeforeReceiptRename,
-                    Point::HandoffReceiptRenamed,
-                    Point::HandoffReceiptTargetSynced,
-                    Point::HandoffReceiptSourceSynced,
-                ],
-            )?;
+        }
+        // A recorded HandoffReady is observable after a process restart, but
+        // is not an acknowledgement that the earlier rename reached storage.
+        // Reaffirm the receipt and both parents even after the marker moved.
+        self.handoff_move(
+            guard,
+            port,
+            hasher,
+            &record,
+            (
+                &history.join(RECEIPT_FILE_NAME),
+                &self.path(RECEIPT_FILE_NAME),
+            ),
+            &intent.receipt_identity,
+            [
+                Point::HandoffBeforeReceiptRename,
+                Point::HandoffReceiptRenamed,
+                Point::HandoffReceiptTargetSynced,
+                Point::HandoffReceiptSourceSynced,
+            ],
+        )?;
+        if record.phase() == PreparationPhase::PreviousArchived {
             let mut next = record.clone();
             next.record_handoff(&intent.receipt, intent.receipt_identity.sha256.clone())
                 .map_err(|_| Error::EvidenceChanged)?;
