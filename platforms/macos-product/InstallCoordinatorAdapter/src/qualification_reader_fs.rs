@@ -506,15 +506,21 @@ fn identity_at(parent: RawFd, name: &CString) -> Result<EntryIdentity, ReadError
 }
 
 fn from_stat(stat: libc::stat) -> Result<EntryIdentity, ReadError> {
-    let mode = stat.st_mode as u32;
-    let kind = match mode & libc::S_IFMT as u32 {
-        value if value == libc::S_IFREG as u32 => EntryKind::File,
-        value if value == libc::S_IFDIR as u32 => EntryKind::Directory,
+    let kind = match stat.st_mode & libc::S_IFMT {
+        libc::S_IFREG => EntryKind::File,
+        libc::S_IFDIR => EntryKind::Directory,
         _ => return Err(ReadError::IdentityMismatch),
     };
     if stat.st_size < 0 {
         return Err(ReadError::Malformed);
     }
+    // libc field widths vary by OS and architecture; normalize only here.
+    #[allow(clippy::unnecessary_cast)]
+    let (mode, device, links) = (
+        stat.st_mode as u32,
+        stat.st_dev as u64,
+        stat.st_nlink as u64,
+    );
     #[cfg(target_os = "macos")]
     let (modified, changed) = (
         (stat.st_mtime, stat.st_mtime_nsec),
@@ -527,12 +533,12 @@ fn from_stat(stat: libc::stat) -> Result<EntryIdentity, ReadError> {
     );
     Ok(EntryIdentity {
         kind,
-        device: stat.st_dev as u64,
+        device,
         inode: stat.st_ino,
         owner: stat.st_uid,
         group: stat.st_gid,
         mode,
-        links: stat.st_nlink as u64,
+        links,
         size: stat.st_size as u64,
         modified,
         changed,
@@ -566,7 +572,7 @@ fn validate_ancestor(
     user: u32,
 ) -> Result<(), ReadError> {
     let sticky_temporary = stat.owner == 0
-        && stat.mode & libc::S_ISVTX as u32 != 0
+        && stat.mode & 0o1000 != 0
         && matches!(
             path,
             "/tmp" | "/var/tmp" | "/private/tmp" | "/private/var/tmp"
