@@ -90,7 +90,7 @@
 
 ## 验证入口
 
-2026-10-23 已实施常规质量/可靠性分层及取消 proof 计算去重；仅定向短测，完整新门禁待执行。并发1、nice +19，无强制后台策略。覆盖、测量与限制见[门禁手册](../runbooks/repository-validation.md)，授权见[协作细则](../agent-collaboration.md)。
+2026-10-23 本机 `86fe464` 常规门禁及18项可靠性矩阵通过，共32分14秒；常规约14分34秒，未达5分钟目标，Go race 命中缓存。并发预算1、nice +19；Flutter内部多核峰值仍存在。覆盖、测量与限制见[门禁手册](../runbooks/repository-validation.md)，授权见[协作细则](../agent-collaboration.md)。
 
 ```bash
 ./scripts/check-linux-product-metadata.sh
