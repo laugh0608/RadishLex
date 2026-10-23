@@ -20,8 +20,8 @@
 - 禁止删除分支。
 - 仅允许通过 Pull Request 合并。
 - 单人维护阶段不要求额外审批，但仍要求已解决会话。
-- 仅要求聚合检查 `Candidate Quality` 通过，并启用 strict/up-to-date policy；它会汇总 `Repo Hygiene`、`Repository Baseline`、`Rust Clippy`、`Flutter Manager` 与 `Go Quality` 五个组件结果。
-- `Repo Hygiene` 覆盖文本、文档预算和 PR diff 空白检查；`Repository Baseline` 额外覆盖必需治理文件、Issue Forms、Markdown 相对链接及检查器单测，其余 job 分别覆盖 portable baseline、严格 Rust lint、Flutter format/analyze/test 和 Go vet/race。
+- 仅要求聚合检查 `Candidate Quality` 通过，并启用 strict/up-to-date policy；它汇总共享质量工作流的 `Repo Hygiene`、Linux/macOS `Rust Quality`、`Flutter Manager`、`Go Quality` 与适用 `Recovery Reliability`。
+- `Repo Hygiene` 覆盖文本、文档、治理、相对链接、自检及 PR diff 空白；Rust job 各覆盖对应平台的 Rust 与原生/合成合同，Go 与 Manager 各自负责语言质量。仅明确不适用的可靠性专项允许跳过，失败、取消和缺项均阻断。
 - 允许 `merge` 与 `rebase` 两种合并方式，禁用 `squash`。
 - 管理员仅可通过 Pull Request 方式绕过规则，不开放直接 push。
 
@@ -48,7 +48,7 @@
 
 `PR Checks` 只监听目标为 `dev` 或 `master` 的 Pull Request，并在 PR base/head 范围执行 `git diff --check`。普通分支 push、直接 push 到 `dev`、PR 合并后的 `master` push 和手动 dispatch 都不会触发该工作流。
 
-native macOS bundle 仍使用独立平台门禁，不并入 Ubuntu portable baseline。发布 tag 只触发 `Release Checks`，不重复触发 `PR Checks`。
+原生 macOS 检查进入 macOS job；Ubuntu 不能代替该覆盖。发布 tag 只触发 `Release Checks`，共用质量工作流并强制可靠性专项，不重复触发 PR 工作流，也不替代真实发布资格。详见[门禁手册](../../docs/runbooks/repository-validation.md)。
 
 ## 应用方式
 
@@ -60,7 +60,7 @@ gh api repos/<owner>/<repo>/rulesets --method POST --input .github/rulesets/mast
 
 如果仓库中已存在旧 ruleset，建议改用 `PUT /repos/{owner}/{repo}/rulesets/{ruleset_id}` 更新。
 
-远端 ruleset 只绑定稳定的 `Candidate Quality` context，并启用 strict/up-to-date policy；五个组件及其聚合依赖由仓库基线校验。更新本目录模板不会自动修改 GitHub 远端设置，远端变更仍须独立授权并复核。
+远端 ruleset 只绑定稳定的 `Candidate Quality` context，并启用 strict/up-to-date policy；组件、触发及 fail-closed 聚合由仓库自检验证。更新本目录模板不会自动修改 GitHub 远端设置，远端变更仍须独立授权并复核。
 
 本目录模板还包含 Conventional Commits 的远端校验规则。若现有远端 ruleset 尚未启用该规则，而本次只授权调整 Actions 触发策略或 required checks，应基于远端当前配置构造精确 PUT payload，不要直接用完整模板扩大远端治理范围。
 

@@ -90,7 +90,7 @@
 
 ## 验证入口
 
-默认 Cargo jobs/test threads 为 1，重型验证串行；`check-repo.sh` 自动降载，但不构成 CPU/RSS 硬配额。静态检查前置，workspace 目标/doc-test 各一次，feature/native 保留。覆盖与进程收尾见[门禁手册](../runbooks/repository-validation.md)，资源约束见[协作细则](../agent-collaboration.md)。
+2026-10-23 已实施常规质量/可靠性分层及取消 proof 计算去重；仅定向短测，完整新门禁待执行。并发1、nice +19，无强制后台策略。覆盖、测量与限制见[门禁手册](../runbooks/repository-validation.md)，授权见[协作细则](../agent-collaboration.md)。
 
 ```bash
 ./scripts/check-linux-product-metadata.sh
