@@ -438,11 +438,11 @@ impl ReleaseHistory<'_> {
                 .join(index.operation_id())
                 .join(index.proof_file_name());
             let identity = self.journal.evidence(&path, hasher)?;
-            let record = self.read_cancellation(&path, hasher)?;
-            if self.cancellation_index(&record, hasher)? != *index {
+            let encoded = self.read_cancellation(&path, hasher)?;
+            if self.cancellation_index(&encoded, hasher)? != *index {
                 return Err(Error::EvidenceChanged);
             }
-            self.verify_cancellation_materials(&record, true, None, hasher)?;
+            self.verify_cancellation_materials(&encoded, true, None, hasher)?;
             // A current matching active request is never historical completion.
             let active = self
                 .journal
@@ -460,7 +460,9 @@ impl ReleaseHistory<'_> {
             if self.journal.evidence(&path, hasher)? != identity {
                 return Err(Error::EvidenceChanged);
             }
-            return Ok(LifecycleReleaseReceipt::Cancellation(Box::new(record)));
+            return Ok(LifecycleReleaseReceipt::Cancellation(Box::new(
+                encoded.into_receipt(),
+            )));
         }
         if path_exists(&self.active(RELEASE))?
             && self

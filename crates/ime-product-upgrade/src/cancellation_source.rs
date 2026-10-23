@@ -391,7 +391,7 @@ impl PreparationCancellationStore {
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
         self.verify_bound_materials_readonly(request, hasher)?;
-        progress.validate_request(request)?;
+        progress.encode_for_request(request)?;
         self.verify_slot(Some((REQUEST, progress.request_identity())), hasher)?;
         let family = self.journal.read_family(hasher)?;
         // read_family already checks owner/mode/device/link and inode uniqueness.

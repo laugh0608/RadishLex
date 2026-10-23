@@ -40,10 +40,10 @@ pub(super) enum LifecycleProofReference {
 
 impl ReleaseIndex {
     pub(super) fn for_cancellation(
-        record: &CancellationReleaseReceipt,
+        encoded: &cancellation_release::EncodedCancellationProof<'_>,
         identity: PreparationFileIdentity,
     ) -> Result<Self> {
-        record.validate()?;
+        let record = encoded.receipt();
         let result = Self::V2 {
             operation_id: record.operation_id().to_owned(),
             legacy_outer_operation_id: record.legacy_outer_operation_id().to_owned(),

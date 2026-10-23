@@ -11,6 +11,7 @@ const OUTER_HISTORY: &str = ".radishlex-install-history-v1";
 
 #[path = "cancellation_release_record.rs"]
 mod record;
+pub(super) use record::EncodedCancellationProof;
 pub use record::{CancellationPredecessorKind, CancellationReleaseReceipt};
 #[path = "cancellation_release_evidence.rs"]
 pub(super) mod evidence;
@@ -124,22 +125,23 @@ impl CancellationReleaseStore {
         }
         let path = self.directory(operation).join(CANCELLATION_RELEASE);
         let identity = self.journal.evidence(&path, hasher)?;
-        let proof = self.history().read_cancellation(&path, hasher)?;
+        let encoded = self.history().read_cancellation(&path, hasher)?;
+        let proof = encoded.receipt();
         if proof.operation_id() != operation {
             return Err(Error::EvidenceChanged);
         }
-        self.verify_live_readonly(&proof, Some(&identity), None, hasher)?;
+        self.verify_live_readonly(proof, Some(&identity), None, hasher)?;
         let indexed = self
             .history()
             .load_index(hasher)?
             .as_ref()
             .map(|v| &v.index)
-            == Some(&self.history().cancellation_index(&proof, hasher)?);
+            == Some(&self.history().cancellation_index(&encoded, hasher)?);
         let awaiting_qualification = indexed && !path_exists(&self.active(ARCHIVE))?;
         if self.journal.evidence(&path, hasher)? != identity {
             return Err(Error::EvidenceChanged);
         }
-        Ok((proof, awaiting_qualification))
+        Ok((encoded.into_receipt(), awaiting_qualification))
     }
 
     /// Persist a complete immutable proof, seal the archive and publish the one
@@ -162,7 +164,10 @@ impl CancellationReleaseStore {
         let path = self.directory(operation).join(CANCELLATION_RELEASE);
         let (proof, mut identity) =
             if let Some(identity) = self.history().optional_file(&path, hasher)? {
-                let proof = self.history().read_cancellation(&path, hasher)?;
+                let proof = self
+                    .history()
+                    .read_cancellation(&path, hasher)?
+                    .into_receipt();
                 (proof, Some(identity))
             } else {
                 let archive_path = self.active(ARCHIVE);
@@ -258,7 +263,10 @@ impl CancellationReleaseStore {
         self.validate_active()?;
         let path = self.directory(operation).join(CANCELLATION_RELEASE);
         let identity = self.journal.evidence(&path, hasher)?;
-        let proof = self.history().read_cancellation(&path, hasher)?;
+        let proof = self
+            .history()
+            .read_cancellation(&path, hasher)?
+            .into_receipt();
         if proof.operation_id() != operation {
             return Err(Error::EvidenceChanged);
         }
@@ -313,7 +321,11 @@ impl CancellationReleaseStore {
             .load_index(hasher)?
             .as_ref()
             .map(|v| &v.index)
-            != Some(&self.history().cancellation_index(proof, hasher)?)
+            != Some(
+                &self
+                    .history()
+                    .cancellation_index(&proof.encoded()?, hasher)?,
+            )
         {
             return Err(Error::EvidenceChanged);
         }

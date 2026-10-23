@@ -230,7 +230,9 @@ impl CancellationReleaseStore {
         )?;
         let root = self.journal.store.root.path.join(HISTORY);
         let path = root.join(INDEX);
-        let expected = self.history().cancellation_index(proof, hasher)?;
+        let expected = self
+            .history()
+            .cancellation_index(&proof.encoded()?, hasher)?;
         if let Some(current) = self.history().load_index(hasher)? {
             if current.index == expected {
                 self.sync_file(&path, &current.identity, hasher)?;
