@@ -12,9 +12,6 @@ export CARGO_BUILD_JOBS=1
 export RUST_TEST_THREADS=1
 export GOMAXPROCS=1
 
-# Apply only to the command we are about to launch and its descendants.
-# Do not change priorities or send signals to existing user processes.
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  exec /usr/sbin/taskpolicy -b /usr/bin/nice -n 19 "$@"
-fi
+# Keep CPU courtesy without Darwin background disk/network throttling.
+# Apply only to this command and descendants; never change existing processes.
 exec nice -n 19 "$@"

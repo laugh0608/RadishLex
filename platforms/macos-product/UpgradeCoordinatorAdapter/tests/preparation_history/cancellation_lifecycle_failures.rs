@@ -99,10 +99,20 @@ fn points() -> Vec<RP> {
 }
 
 #[test]
-fn cancellation_lifecycle_all_boundaries_recover_or_retain_unbound_evidence() {
+fn representative_cancellation_release_boundaries_recover_or_retain_unbound_evidence() {
+    check_release_boundaries(vec![RP::ProofCreated, RP::MarkerMoved]);
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_cancellation_lifecycle_all_boundaries_recover_or_retain_unbound_evidence() {
+    check_release_boundaries(points());
+}
+
+fn check_release_boundaries(checkpoints: Vec<RP>) {
     // Internal serial loop: never rebuild the test executable beside children.
     for maintained in [false, true] {
-        for point in points() {
+        for point in checkpoints.iter().copied() {
             for child in [false, true] {
                 let fixture = Fixture::new();
                 preserved(
@@ -231,8 +241,20 @@ fn cancellation_lifecycle_strict_proof_and_locator_reject_invalid_bindings() {
 }
 
 #[test]
-fn cancellation_lifecycle_ancestor_drift_blocks_query_and_new_preparation_without_writes() {
-    for kind in 0..6 {
+fn representative_cancellation_lifecycle_ancestor_drift_blocks_query_and_new_preparation_without_writes(
+) {
+    check_ancestor_drift(2..3);
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_cancellation_lifecycle_ancestor_drift_blocks_query_and_new_preparation_without_writes(
+) {
+    check_ancestor_drift(0..6);
+}
+
+fn check_ancestor_drift(kinds: std::ops::Range<u8>) {
+    for kind in kinds {
         let fixture = Fixture::new();
         preserved(&fixture, Some(State::Completed), 3, true);
         finish(&fixture, NEW);
@@ -320,4 +342,88 @@ fn cancellation_lifecycle_locator_pins_latest_proof_inode_and_bytes() {
     let guard = store.acquire_guard().unwrap();
     assert!(store.load_latest_lifecycle(&guard, &Hasher).is_err());
     assert_eq!(tree(&fixture.0), before);
+}
+
+#[test]
+fn cancellation_proof_codec_preserves_nested_validation_and_canonical_bytes() {
+    let fixture = Fixture::new();
+    preserved(&fixture, None, 0, true);
+    let proof = finish(&fixture, NEW);
+    let canonical = proof.encode().unwrap();
+    let mut direct = serde_json::to_vec(&proof).unwrap();
+    direct.push(b'\n');
+    assert_eq!(direct, canonical);
+    assert_eq!(Proof::decode(&canonical).unwrap(), proof);
+    for (checked, mut direct) in [
+        (
+            proof.archive().encode().unwrap(),
+            serde_json::to_vec(proof.archive()).unwrap(),
+        ),
+        (
+            proof.archive().request().encode().unwrap(),
+            serde_json::to_vec(proof.archive().request()).unwrap(),
+        ),
+        (
+            proof.archive().source().encode().unwrap(),
+            serde_json::to_vec(proof.archive().source()).unwrap(),
+        ),
+        (
+            proof.preparation().encode().unwrap(),
+            serde_json::to_vec(proof.preparation()).unwrap(),
+        ),
+    ] {
+        direct.push(b'\n');
+        assert_eq!(checked, direct);
+    }
+
+    // A caller can deserialize into the public model without using its strict
+    // decoder. encode() must still reject invalid nested values/relationships.
+    let json = serde_json::to_value(&proof).unwrap();
+    for (pointer, changed) in [
+        ("/format", serde_json::json!("invalid")),
+        ("/archive/format", serde_json::json!("invalid")),
+        ("/archive/request/format", serde_json::json!("invalid")),
+        (
+            "/archive/request/preparation/format",
+            serde_json::json!("invalid"),
+        ),
+        ("/archive/source/format", serde_json::json!("invalid")),
+        (
+            "/archive/source/preparation/format",
+            serde_json::json!("invalid"),
+        ),
+        (
+            "/archive/source/request_identity/byte_len",
+            serde_json::json!(0),
+        ),
+        ("/archive/source_identity/byte_len", serde_json::json!(0)),
+        ("/archive_identity/byte_len", serde_json::json!(0)),
+        (
+            "/archive/request/preparation_identity/mode",
+            serde_json::json!(0o640),
+        ),
+        (
+            "/archive/source/source_ready/database/link_count",
+            serde_json::json!(2),
+        ),
+        (
+            "/archive/outer/previous_identity/byte_len",
+            serde_json::json!(0),
+        ),
+    ] {
+        let mut invalid = json.clone();
+        *invalid.pointer_mut(pointer).unwrap() = changed;
+        let invalid: Proof = serde_json::from_value(invalid).unwrap();
+        assert!(invalid.encode().is_err(), "{pointer}");
+        let mut bytes = serde_json::to_vec(&invalid).unwrap();
+        bytes.push(b'\n');
+        assert!(Proof::decode(&bytes).is_err(), "{pointer}");
+    }
+    for bad in [
+        [canonical.as_slice(), b" "].concat(),
+        canonical[..canonical.len() - 1].to_vec(),
+        vec![b' '; 256 * 1024 + 1],
+    ] {
+        assert!(Proof::decode(&bad).is_err());
+    }
 }

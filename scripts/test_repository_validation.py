@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from validation_process import run_command
-from validation_suites import PHASES, ROOT, SUITES, repository_rust_commands, run_suite
+from validation_suites import PHASES, ROOT, SUITES, repository_rust_commands, run_suite, verify_reliability_inventory
 
 
 class ValidationPlanTests(unittest.TestCase):
@@ -25,18 +25,20 @@ class ValidationPlanTests(unittest.TestCase):
         ])
         for command in commands[2:]:
             self.assertIn("--features", command)
-        self.assertEqual(len(commands), 3)
-        self.assertIn("cancellation_archive", commands[2])
+        self.assertEqual(len(commands), 4)
+        self.assertIn("cancellation_archive", commands[3])
         self.assertNotIn("--ignored", sum(commands, []))
 
     def test_standalone_gates_retain_every_phase(self):
-        with patch("validation_suites.sys.platform", "darwin"):
+        with patch("validation_suites.sys.platform", "darwin"), patch("validation_suites.run_reliability_command") as reliability:
             for name, suite in SUITES.items():
                 with self.subTest(name=name), patch("validation_suites.run_command") as run:
                     with contextlib.redirect_stdout(io.StringIO()):
                         run_suite(name)
                     self.assertEqual([call.args[0] for call in run.call_args_list],
-                                     [command for phase in PHASES for command in suite.get(phase, [])])
+                                     [command for phase in PHASES if phase != "reliability" for command in suite.get(phase, [])])
+                    self.assertEqual([call.args[0] for call in reliability.call_args_list], suite.get("reliability", []))
+                    reliability.reset_mock()
                     self.assertTrue(suite["default-tests"])
 
     def test_static_phases_do_not_run_long_tests_or_real_qualification(self):
@@ -50,10 +52,36 @@ class ValidationPlanTests(unittest.TestCase):
 
     def test_non_macos_plan_retains_workspace_without_native_suites(self):
         commands = repository_rust_commands("linux", "tests")
-        self.assertEqual(len(commands), 2)
+        self.assertEqual(len(commands), 3)
         self.assertIn("--workspace", commands[0])
         static = repository_rust_commands("linux", "static")
         self.assertFalse(any("radishlex-macos-" in " ".join(c) for c in static))
+
+    def test_reliability_is_explicit_and_never_selects_child_entries_globally(self):
+        routine = repository_rust_commands("darwin", "tests")
+        self.assertFalse(any("reliability-matrix" in command for command in routine))
+        specialist = repository_rust_commands("darwin", "reliability")
+        self.assertEqual(len(specialist), 2)
+        for command in specialist:
+            self.assertIn("reliability-matrix", command)
+            self.assertEqual(command[-1], "reliability_matrix_")
+            self.assertNotIn("--ignored", command)
+            self.assertNotIn("--workspace", command)
+
+    def test_workspace_lint_has_one_owner_before_platform_feature_variants(self):
+        commands = repository_rust_commands("darwin", "static")
+        workspace = [command for command in commands if "--workspace" in command]
+        self.assertEqual(len(workspace), 1)
+        self.assertIn("clippy", workspace[0])
+
+    def test_empty_or_missing_reliability_inventory_never_passes(self):
+        import json
+        package = "radishlex-macos-installer-executor"
+        expected = json.loads((ROOT / "scripts/reliability-cases.json").read_text())[package]
+        verify_reliability_inventory(package, "\n".join(name + ": test" for name in expected))
+        for listing in ("0 tests", expected[0] + ": test", "unexpected: test"):
+            with self.assertRaises(SystemExit):
+                verify_reliability_inventory(package, listing)
 
     def test_partial_phase_never_claims_complete_gate(self):
         output = io.StringIO()
@@ -89,6 +117,11 @@ class ValidationProcessTests(unittest.TestCase):
 
     def tearDown(self):
         self.temporary.cleanup()
+
+    def test_capture_keeps_child_output_separate_from_runner_status(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = run_command([sys.executable, "-c", "print('owned output')"], self.root, capture=True)
+        self.assertEqual(result, "owned output\n")
 
     def test_success_and_failure_reap_owned_orphan(self):
         for code in (0, 7):

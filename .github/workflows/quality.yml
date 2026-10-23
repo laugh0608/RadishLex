@@ -1,0 +1,171 @@
+name: Shared Quality
+
+on:
+  workflow_call:
+    inputs:
+      reliability:
+        description: Require exhaustive installation and recovery matrices
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# Ordinary concurrency only. No Darwin background I/O throttling.
+env:
+  CARGO_BUILD_JOBS: 1
+  RUST_TEST_THREADS: 1
+  GOMAXPROCS: 1
+  CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  hygiene:
+    name: Repo Hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check hygiene and governance
+        run: ./scripts/check-repo.sh --component hygiene
+      - name: Check PR diff whitespace
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: git diff --check "$BASE_SHA...$HEAD_SHA"
+
+  rust:
+    name: Rust Quality (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/sync-server/go.mod
+          cache-dependency-path: server/sync-server/go.sum
+      - name: Select pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt
+          rustup override set 1.96.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-rust-1.96.0-${{ hashFiles('Cargo.lock', '**/Cargo.toml') }}
+      - name: Require contract tools
+        run: |
+          if ! command -v rg >/dev/null; then
+            if [ "${{ runner.os }}" = Linux ]; then
+              sudo apt-get update
+              sudo apt-get install --yes ripgrep
+            else
+              brew install ripgrep
+            fi
+          fi
+          command -v c++
+      - name: Rust static checks and routine tests
+        run: ./scripts/check-repo.sh --component rust
+      - name: Native and repository contracts
+        run: ./scripts/check-repo.sh --component contracts
+
+  manager:
+    name: Flutter Manager
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          cache: true
+      - name: Resolve Flutter dependencies
+        working-directory: apps/radishlex-manager
+        run: flutter pub get --enforce-lockfile
+      - name: Check Manager
+        run: ./scripts/check-repo.sh --component manager
+
+  go:
+    name: Go Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/sync-server/go.mod
+          cache-dependency-path: server/sync-server/go.sum
+      - name: Vet and race tests
+        run: ./scripts/check-repo.sh --component go
+
+  reliability:
+    name: Recovery Reliability
+    if: inputs.reliability
+    needs: rust
+    runs-on: macos-latest
+    # Specialist budget, not the routine ten-minute performance target.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Select pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt
+          rustup override set 1.96.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-rust-1.96.0-reliability-${{ hashFiles('Cargo.lock', '**/Cargo.toml') }}
+      - name: Exhaustive recovery specialist
+        run: ./scripts/check-repo.sh --component reliability
+
+  aggregate:
+    name: Quality Components
+    if: always()
+    needs: [hygiene, rust, manager, go, reliability]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require every applicable component
+        env:
+          RELIABILITY_REQUIRED: ${{ inputs.reliability }}
+          QUALITY_RESULTS: ${{ toJSON(needs) }}
+        run: python3 scripts/validation_impact.py aggregate

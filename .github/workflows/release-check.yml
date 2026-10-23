@@ -15,52 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  repo-hygiene:
-    name: Release Repo Hygiene
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Check text files
-        shell: bash
-        run: ./scripts/check-text-files.sh
-
-      - name: Check docs
-        shell: bash
-        run: ./scripts/check-docs.sh
-
-  repository-baseline:
-    name: Release Repository Baseline
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: server/sync-server/go.mod
-
-      - name: Install ripgrep
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes ripgrep
-
-      - name: Check repository baseline
-        shell: bash
-        run: ./scripts/check-repo.sh --skip-text-files
+  quality:
+    uses: ./.github/workflows/quality.yml
+    with:
+      reliability: true

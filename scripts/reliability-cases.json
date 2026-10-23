@@ -1,0 +1,24 @@
+{
+  "radishlex-macos-installer-executor": [
+    "preparation_execution::tests::lifecycle::reliability_matrix_cancelled_predecessors_and_repeated_cancellation_reuse_only_proven_outer_original",
+    "prepared_execution::tests::faults::reliability_matrix_every_observed_mutation_boundary_checks_revocation_and_retains_the_original_proof"
+  ],
+  "radishlex-macos-upgrade-coordinator": [
+    "cancellation::reliability_matrix_cancellation_preserves_three_old_terminal_inventories_at_every_archive_position",
+    "cancellation_archive::lifecycle::failures::reliability_matrix_cancellation_lifecycle_all_boundaries_recover_or_retain_unbound_evidence",
+    "cancellation_archive::lifecycle::failures::reliability_matrix_cancellation_lifecycle_ancestor_drift_blocks_query_and_new_preparation_without_writes",
+    "cancellation_archive::lifecycle::reliability_matrix_cancellation_lifecycle_continuous_cancellations_keep_null_and_legacy_data_predecessors",
+    "cancellation_archive::lifecycle::reliability_matrix_cancellation_lifecycle_requires_qualification_and_preserves_originals",
+    "cancellation_archive::reliability_matrix_every_archive_boundary_revokes_authority_and_survives_process_exit",
+    "cancellation_archive::reliability_matrix_preserves_cancellation_materials_and_outer_without_releasing_gate",
+    "handoff::reliability_matrix_authority_loss_at_every_boundary_preserves_evidence_and_only_resumes_bound_objects",
+    "handoff::reliability_matrix_subprocess_exit_at_each_boundary_reloads_under_a_fresh_guard",
+    "reliability_matrix_authority_loss_at_every_archive_boundary_preserves_and_reloads_exactly",
+    "reliability_matrix_process_exit_at_every_archive_boundary_reopens_with_new_guard",
+    "terminal_release::failures::reliability_matrix_authorization_loss_at_each_release_boundary_preserves_or_resumes_exact_objects",
+    "terminal_release::failures::reliability_matrix_process_exit_at_each_release_boundary_reloads_from_disk",
+    "terminal_release::predecessor::cancellation_released::reliability_matrix_cancellation_lifecycle_v1_and_v2_then_cancellation_then_new_upgrade_release",
+    "terminal_release::predecessor::reliability_matrix_released_predecessor_authority_loss_reloads_the_same_index_and_proof",
+    "terminal_release::predecessor::reliability_matrix_released_predecessor_process_exit_recovers_from_disk_without_rearchiving"
+  ]
+}

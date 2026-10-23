@@ -9,6 +9,8 @@ description = "Manifest-bound macOS host adapter for RadishLex product data upgr
 
 [features]
 default = []
+# Test selection only; never changes production behavior.
+reliability-matrix = []
 qualification-harness = []
 
 [lib]

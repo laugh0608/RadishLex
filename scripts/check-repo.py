@@ -11,7 +11,7 @@ from typing import Any
 
 from repository_governance import check_community_governance, check_markdown_links
 from validation_process import run_command as run_validation_command
-from validation_suites import repository_rust_commands, run_suite
+from validation_suites import repository_rust_commands, run_suite, run_reliability_command
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -393,6 +393,10 @@ REQUIRED_FILES = [
     "scripts/check-text-files.sh",
     "scripts/validation_process.py",
     "scripts/validation_suites.py",
+    "scripts/validation_impact.py",
+    "scripts/reliability-cases.json",
+    "scripts/test_repository_impact.py",
+    ".github/workflows/quality.yml",
     "scripts/test_repository_validation.py",
     "tests/fixtures/sync-deployment-evidence-valid.txt",
     "apps/radishlex-manager/README.md",
@@ -407,10 +411,10 @@ REQUIRED_FILES = [
 ]
 PR_QUALITY_COMPONENTS = {
     "Repo Hygiene",
-    "Repository Baseline",
-    "Rust Clippy",
+    "Rust Quality",
     "Flutter Manager",
     "Go Quality",
+    "Recovery Reliability",
 }
 REQUIRED_STATUS_CHECKS = {"Candidate Quality"}
 CONVENTIONAL_COMMIT_PATTERN = "^(feat|fix|docs|refactor|test|chore|ci|build|perf|revert)(\\([a-z0-9._/-]+\\))?!?: .+"
@@ -577,20 +581,7 @@ def check_macos_product_metadata() -> None:
     run_command([str(REPO_ROOT / "scripts/check-macos-product-metadata.sh")])
 
 
-def check_product_install_core() -> None:
-    run_suite("product-install-core", "native")
 
-
-def check_macos_install_adapter() -> None:
-    if sys.platform != "darwin":
-        return
-    run_suite("macos-install-adapter", "native")
-
-
-def check_macos_install_coordinator() -> None:
-    if sys.platform != "darwin":
-        return
-    run_suite("macos-install-coordinator", "native")
 
 
 def check_macos_installer() -> None:
@@ -621,20 +612,11 @@ def check_linux_deb_artifact() -> None:
     run_command([str(REPO_ROOT / "scripts/check-linux-deb-artifact.sh")])
 
 
-def check_linux_package_transaction() -> None:
-    run_command([str(REPO_ROOT / "scripts/check-linux-package-transaction.sh")])
-
-
-def check_linux_startup_gate() -> None:
-    run_command([str(REPO_ROOT / "scripts/check-linux-startup-gate.sh")])
 
 
 def check_linux_l6_contract() -> None:
     run_command([str(REPO_ROOT / "scripts/check-linux-l6-contract.sh")])
 
-
-def check_linux_l6_controller() -> None:
-    run_command([str(REPO_ROOT / "scripts/check-linux-l6-controller.sh")])
 
 
 def check_linux_l6_release_pair() -> None:
@@ -693,43 +675,33 @@ def check_ruleset_and_workflows() -> None:
         raise SystemExit("ruleset must not require extra approval during single-maintainer stage")
 
     pr_workflow = read_text(".github/workflows/pr-check.yml")
-    if not pr_workflow.startswith("name: PR Checks\n"):
-        raise SystemExit("pr-check workflow must use the PR Checks name")
-    for context in PR_QUALITY_COMPONENTS | REQUIRED_STATUS_CHECKS:
-        if f"name: {context}" not in pr_workflow:
-            raise SystemExit(f"pr-check workflow is missing job name: {context}")
-    if "push:" in pr_workflow or "workflow_dispatch:" in pr_workflow:
-        raise SystemExit("pr-check workflow must only run for pull requests")
-    if "pull_request:" not in pr_workflow:
-        raise SystemExit("pr-check workflow must run for pull requests")
-    for target_branch in ("dev", "master"):
-        if f"      - {target_branch}\n" not in pr_workflow:
-            raise SystemExit(f"pr-check workflow is missing target branch: {target_branch}")
-    if "      - main\n" in pr_workflow:
-        raise SystemExit("pr-check workflow must not run for main pull requests")
-    if "git diff --check" not in pr_workflow:
-        raise SystemExit("pr-check workflow must check PR diff whitespace")
-
-    candidate_quality_needs = """    needs:
-      - repo-hygiene
-      - repository-baseline
-      - rust-clippy
-      - flutter-manager
-      - go-quality
-"""
-    if candidate_quality_needs not in pr_workflow:
-        raise SystemExit("pr-check Candidate Quality dependencies drifted")
-
+    quality_workflow = read_text(".github/workflows/quality.yml")
     release_workflow = read_text(".github/workflows/release-check.yml")
-    forbidden_release_triggers = ("pull_request:", "branches:", "workflow_dispatch:")
-    if any(trigger in release_workflow for trigger in forbidden_release_triggers):
-        raise SystemExit("release-check workflow must only run for release tags")
+    for context in PR_QUALITY_COMPONENTS:
+        if f"name: {context}" not in quality_workflow:
+            raise SystemExit(f"shared quality workflow is missing {context}")
+    for phrase in ("name: PR Checks", "pull_request:", "      - dev", "      - master",
+                   "name: Candidate Quality", "needs: [plan, quality]",
+                   "./.github/workflows/quality.yml", "validation_impact.py plan",
+                   'QUALITY_RESULT: ${{ needs.quality.result }}',
+                   '[ "$QUALITY_RESULT" = success ]'):
+        if phrase not in pr_workflow:
+            raise SystemExit(f"PR workflow contract missing: {phrase}")
+    if "push:" in pr_workflow or "workflow_dispatch:" in pr_workflow:
+        raise SystemExit("PR Checks must only run for pull requests")
+    for phrase in ("workflow_call:", "validation_impact.py aggregate", "if: always()",
+                   'QUALITY_RESULTS: ${{ toJSON(needs) }}',
+                   "if: inputs.reliability", "type: boolean", "default: true"):
+        if phrase not in quality_workflow:
+            raise SystemExit(f"shared quality contract missing: {phrase}")
     for tag_pattern in ('"v*-dev"', '"v*-test"', '"v*-release"'):
-        if f"      - {tag_pattern}\n" not in release_workflow:
-            raise SystemExit(f"release-check workflow is missing tag pattern: {tag_pattern}")
-    for context in ("Release Repo Hygiene", "Release Repository Baseline"):
-        if f"name: {context}" not in release_workflow:
-            raise SystemExit(f"release-check workflow is missing job name: {context}")
+        if tag_pattern not in release_workflow:
+            raise SystemExit(f"release workflow is missing {tag_pattern}")
+    for phrase in ("./.github/workflows/quality.yml", "reliability: true"):
+        if phrase not in release_workflow:
+            raise SystemExit(f"release quality contract missing: {phrase}")
+    if any(trigger in release_workflow for trigger in ("pull_request:", "branches:", "workflow_dispatch:")):
+        raise SystemExit("Release Checks must only run for release tags")
 
 
 def iter_repository_paths() -> list[Path]:
@@ -755,13 +727,6 @@ def check_path_budget() -> None:
             )
 
 
-def check_rust_workspace() -> None:
-    for command in repository_rust_commands(sys.platform, "tests"):
-        run_command(command)
-
-
-def check_go_server() -> None:
-    run_command(["go", "test", "./..."], cwd=REPO_ROOT / "server" / "sync-server")
 
 
 def check_deployment_evidence() -> None:
@@ -803,75 +768,109 @@ def check_sync_local_https() -> None:
     run_script("check-sync-server-local-https.py", ["--self-test"])
 
 
+COMPONENTS = ("hygiene", "rust", "contracts", "go", "manager", "reliability")
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run RadishLex repository baseline checks.")
-    parser.add_argument("--skip-text-files", action="store_true", help="Skip text hygiene checks.")
-    parser.add_argument("--skip-docs", action="store_true", help="Skip documentation budget checks.")
-    parser.add_argument("--skip-rust", action="store_true", help="Skip Rust workspace checks.")
-    parser.add_argument("--skip-go", action="store_true", help="Skip Go server checks.")
-    parser.add_argument("--plan", action="store_true", help="Show phases and Rust coverage without running checks.")
+    parser = argparse.ArgumentParser(description="RadishLex quality components; reliability is an explicit specialist.")
+    parser.add_argument("--component", choices=COMPONENTS)
+    parser.add_argument("--plan", action="store_true", help="Show command ownership without executing validation.")
     return parser.parse_args()
 
 
-def main() -> int:
-    started = time.monotonic()
-    args = parse_args()
-    print("Validation: serial low-impact execution; no cached results or resume.", flush=True)
-    print("Order: hygiene/contracts -> Rust static checks -> native/Linux/Go -> workspace targets/doc-tests -> feature tests.", flush=True)
-    print("Previous macOS baseline: Installer ~29 min, upgrade history ~60 min; previously each ran twice. Allow 90-120 min plus cold compilation until remeasured.", flush=True)
-    if args.plan:
-        for phase in ("static", "tests"):
-            print(f"Rust {phase}:")
-            for command in repository_rust_commands(sys.platform, phase):
-                print("  " + " ".join(command))
-        print("Native/platform contracts remain mandatory; --plan executes nothing.")
-        return 0
-
-    if not args.skip_text_files:
-        run_script("check-text-files.py", [str(REPO_ROOT)])
-    if not args.skip_docs:
-        run_script("check-docs.py", [str(REPO_ROOT)])
-
+def check_hygiene() -> None:
+    run_script("check-text-files.py", [str(REPO_ROOT)])
+    run_script("check-docs.py", [str(REPO_ROOT)])
     check_required_files()
     check_repository_governance()
     check_repository_checker_tests()
     check_collaboration_docs()
     check_license_wording()
+    check_ruleset_and_workflows()
+    check_path_budget()
+
+
+def check_contracts() -> None:
     check_manager_product_runtime_contract()
-    if not args.skip_rust:
-        for command in repository_rust_commands(sys.platform, "static"):
-            run_command(command)
     check_macos_product_metadata()
-    check_product_install_core()
-    check_macos_install_adapter()
-    check_macos_install_coordinator()
     check_macos_installer()
     check_macos_release_carrier()
     check_macos_upgrade_preflight()
     check_linux_fcitx5()
     check_linux_product_layout()
     check_linux_deb_artifact()
-    check_linux_package_transaction()
-    check_linux_startup_gate()
+    # Rust defaults belong to the workspace; the L6 feature variant belongs
+    # to Rust quality. L6 contract already owns controller Python checks.
     check_linux_l6_contract()
-    check_linux_l6_controller()
     check_linux_l6_release_pair()
     check_linux_l6_maintenance_refresh()
-    check_ruleset_and_workflows()
-    check_path_budget()
+    run_script("linux-product/test_startup_gate_order.py")
     check_deployment_evidence()
     check_sync_deployment_hardening()
     check_sync_connection_health()
     check_sync_local_https()
-    if not args.skip_go:
-        check_go_server()
-    if not args.skip_rust:
-        check_rust_workspace()
 
-    if any((args.skip_text_files, args.skip_docs, args.skip_rust, args.skip_go)):
-        print("Partial repository checks passed; skipped checks prevent a full baseline result.")
+
+def run_component(name: str) -> None:
+    if name == "hygiene":
+        check_hygiene()
+    elif name == "rust":
+        for phase in ("static", "tests"):
+            for command in repository_rust_commands(sys.platform, phase):
+                run_command(command)
+    elif name == "contracts":
+        check_contracts()
+    elif name == "go":
+        directory = REPO_ROOT / "server/sync-server"
+        unformatted = run_validation_command(["gofmt", "-l", "."], directory, capture=True)
+        if unformatted:
+            raise SystemExit(f"Go formatting differs:\n{unformatted}")
+        run_command(["go", "vet", "./..."], directory)
+        run_command(["go", "test", "-race", "./..."], directory)
+    elif name == "manager":
+        directory = REPO_ROOT / "apps/radishlex-manager"
+        run_command(["dart", "format", "--output=none", "--set-exit-if-changed", "."], directory)
+        run_command(["flutter", "analyze", "--no-pub"], directory)
+        run_command(["flutter", "test", "--no-pub"], directory)
+    elif name == "reliability":
+        for command in repository_rust_commands(sys.platform, "reliability-static"):
+            run_command(command)
+        for command in repository_rust_commands(sys.platform, "reliability"):
+            run_reliability_command(command)
     else:
-        print("Repository baseline passed.")
+        raise ValueError(name)
+    print(f"Quality component {name} passed.", flush=True)
+
+
+def main() -> int:
+    started = time.monotonic()
+    args = parse_args()
+    selected = (args.component,) if args.component else COMPONENTS[:-1]
+    if args.plan:
+        print("Selected components: " + ", ".join(selected))
+        print("Reliability: explicit specialist; required by affected PRs and release candidates.")
+        phases = []
+        if "rust" in selected:
+            phases += ["static", "tests"]
+        if "reliability" in selected:
+            phases += ["reliability-static", "reliability"]
+        for phase in phases:
+            print(f"Rust {phase}:")
+            for command in repository_rust_commands(sys.platform, phase):
+                print("  " + " ".join(command))
+        if "hygiene" in selected:
+            print("Hygiene: text/docs/governance/checker self-tests.")
+        if "contracts" in selected:
+            print("Contracts: native macOS plus repository-only Linux/packaging/sync contracts.")
+        if "go" in selected:
+            print("Go: format/vet/race once.")
+        if "manager" in selected:
+            print("Manager: format/analyze/test, no dependency resolution.")
+        return 0
+    for component in selected:
+        run_component(component)
+    if not args.component:
+        print("Routine repository gate passed; reliability and real-system qualification are separate.")
     print(f"Repository checks elapsed: {time.monotonic() - started:.2f}s", flush=True)
     return 0
 

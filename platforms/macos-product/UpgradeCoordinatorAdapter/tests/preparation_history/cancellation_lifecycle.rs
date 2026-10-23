@@ -150,15 +150,29 @@ fn cancel_next(fixture: &Fixture, operation: &str, previous_data: Option<&str>) 
 }
 
 #[test]
-fn cancellation_lifecycle_requires_qualification_and_preserves_originals() {
-    for state in [
-        None,
-        Some(State::Completed),
-        Some(State::AbortedPreserved),
-        Some(State::RolledBack),
-    ] {
-        for stage in [0, 2, 5] {
-            for new_outer in [false, true] {
+fn cancellation_release_requires_qualification_and_preserves_originals() {
+    check_qualification_cases(&[None, Some(State::RolledBack)], &[0, 5], &[true]);
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_cancellation_lifecycle_requires_qualification_and_preserves_originals() {
+    check_qualification_cases(
+        &[
+            None,
+            Some(State::Completed),
+            Some(State::AbortedPreserved),
+            Some(State::RolledBack),
+        ],
+        &[0, 2, 5],
+        &[false, true],
+    );
+}
+
+fn check_qualification_cases(states: &[Option<State>], stages: &[u8], outers: &[bool]) {
+    for &state in states {
+        for &stage in stages {
+            for &new_outer in outers {
                 let fixture = Fixture::new();
                 preserved(&fixture, state, stage, new_outer);
                 let request = fs::read(fixture.state("preparation-cancellation.json")).unwrap();
@@ -216,13 +230,25 @@ fn cancellation_lifecycle_requires_qualification_and_preserves_originals() {
 }
 
 #[test]
-fn cancellation_lifecycle_continuous_cancellations_keep_null_and_legacy_data_predecessors() {
-    for state in [
+fn representative_cancellation_lifecycle_continuous_cancellations_keep_null_and_legacy_data_predecessors(
+) {
+    check_continuous_cancellations(&[None]);
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_cancellation_lifecycle_continuous_cancellations_keep_null_and_legacy_data_predecessors(
+) {
+    check_continuous_cancellations(&[
         None,
         Some(State::Completed),
         Some(State::AbortedPreserved),
         Some(State::RolledBack),
-    ] {
+    ]);
+}
+
+fn check_continuous_cancellations(states: &[Option<State>]) {
+    for &state in states {
         let fixture = Fixture::new();
         preserved(&fixture, state, 3, true);
         finish(&fixture, NEW);

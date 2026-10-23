@@ -7,6 +7,11 @@ repository.workspace = true
 license-file = "../../../LICENSE"
 description = "Restartable isolated executor for authorized RadishLex macOS Installer intents."
 
+[features]
+default = []
+# Test selection only; never changes production behavior.
+reliability-matrix = []
+
 [lib]
 name = "radishlex_macos_installer_executor"
 path = "src/lib.rs"

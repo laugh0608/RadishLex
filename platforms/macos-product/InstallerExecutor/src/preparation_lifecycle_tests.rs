@@ -241,13 +241,25 @@ fn released_v1_and_v2_predecessors_preserve_history_after_new_learning() {
 }
 
 #[test]
-fn cancelled_predecessors_and_repeated_cancellation_reuse_only_proven_outer_original() {
-    for data in [
+fn representative_cancelled_predecessors_and_repeated_cancellation_reuse_only_proven_outer_original(
+) {
+    check_cancelled_predecessors(&[None]);
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_cancelled_predecessors_and_repeated_cancellation_reuse_only_proven_outer_original(
+) {
+    check_cancelled_predecessors(&[
         None,
         Some(UpgradeState::Completed),
         Some(UpgradeState::AbortedPreserved),
         Some(UpgradeState::RolledBack),
-    ] {
+    ]);
+}
+
+fn check_cancelled_predecessors(states: &[Option<UpgradeState>]) {
+    for &data in states {
         let fixture = Fixture::new();
         if let Some(state) = data {
             fixture.legacy(state);

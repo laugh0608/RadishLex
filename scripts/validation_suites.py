@@ -1,12 +1,8 @@
-"""One command inventory for standalone and repository macOS/core gates.
-
-The repository runs default Rust targets once via workspace --all-targets and
---doc. Feature-specific tests and native checks stay explicit. Phase execution
-is partial and cannot print a full-gate success message.
-"""
+"""Command ownership for routine quality, reliability and standalone gates."""
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -71,7 +67,14 @@ SUITES = {
         ],
     },
 }
-PHASES = ("static", "default-tests", "extra-tests", "native")
+RELIABILITY_FILTER = "reliability_matrix_"
+SUITES["macos-installer"]["reliability"] = [
+    cargo("test", INSTALLER[1], "--features", "reliability-matrix", "--lib", RELIABILITY_FILTER),
+]
+SUITES["macos-upgrade-coordinator"]["reliability"] = [
+    cargo("test", UPGRADE, "--features", "reliability-matrix", "--test", "preparation_history", RELIABILITY_FILTER),
+]
+PHASES = ("static", "default-tests", "extra-tests", "native", "reliability")
 
 
 def available_suites(platform: str) -> list[str]:
@@ -80,17 +83,46 @@ def available_suites(platform: str) -> list[str]:
 
 def repository_rust_commands(platform: str, phase: str) -> list[list[str]]:
     if phase == "static":
-        return [["cargo", "fmt", "--all", "--", "--check"],
-                clippy("radishlex-ime-userdb", "--all-targets", "--features", "synthetic-schema-observer"),
-                clippy("radishlex-ime-sync", "--all-targets")] + [
-            command for name in available_suites(platform) for command in SUITES[name].get("static", [])
+        commands = [
+            ["cargo", "fmt", "--all", "--", "--check"],
+            ["cargo", "clippy", "--locked", "--workspace", "--all-targets", "--", "-D", "warnings"],
+            clippy("radishlex-ime-userdb", "--all-targets", "--features", "synthetic-schema-observer"),
+            clippy("radishlex-linux-product-install", "--all-targets", "--features", "l6-acceptance-checkpoints"),
         ]
+        if platform == "darwin":
+            commands += [
+                clippy(INSTALL, "--features", "qualification-harness", "--test", "cancellation_archive"),
+                clippy(UPGRADE, "--features", "qualification-harness", "--all-targets"),
+                cargo("test", UPGRADE, "--features", "qualification-harness", "--no-run"),
+            ]
+        return commands
     if phase == "tests":
         return [["cargo", "test", "--locked", "--workspace", "--all-targets"],
-                ["cargo", "test", "--locked", "--workspace", "--doc"]] + [
+                ["cargo", "test", "--locked", "--workspace", "--doc"],
+                cargo("test", "radishlex-linux-product-install", "--features", "l6-acceptance-checkpoints")] + [
             command for name in available_suites(platform) for command in SUITES[name].get("extra-tests", [])
         ]
+    if phase == "reliability":
+        return [command for name in ("macos-installer", "macos-upgrade-coordinator")
+                for command in SUITES[name]["reliability"]]
+    if phase == "reliability-static":
+        return [clippy(package, "--all-targets", "--features", "reliability-matrix")
+                for package in (INSTALLER[1], UPGRADE)]
     raise ValueError(f"unknown repository phase: {phase}")
+
+
+def verify_reliability_inventory(package: str, listing: str) -> None:
+    expected = set(json.loads((ROOT / "scripts/reliability-cases.json").read_text())[package])
+    observed = {line.removesuffix(": test") for line in listing.splitlines() if line.endswith(": test")}
+    if not expected or observed != expected:
+        raise SystemExit(f"reliability parent inventory mismatch for {package}: missing={sorted(expected-observed)}, unexpected={sorted(observed-expected)}")
+
+
+def run_reliability_command(command: list[str]) -> None:
+    package = command[command.index("-p") + 1]
+    listing = run_command([*command, "--", "--list"], ROOT, capture=True)
+    verify_reliability_inventory(package, listing or "")
+    run_command(command, ROOT)
 
 
 def run_suite(name: str, phase: str = "all") -> None:
@@ -102,7 +134,10 @@ def run_suite(name: str, phase: str = "all") -> None:
             raise SystemExit("invalid qualification marker")
     for selected in PHASES if phase == "all" else (phase,):
         for command in SUITES[name].get(selected, []):
-            run_command(command, ROOT)
+            if selected == "reliability":
+                run_reliability_command(command)
+            else:
+                run_command(command, ROOT)
     print(f"{name}: {'gate passed' if phase == 'all' else phase + ' phase passed (partial gate)' }.", flush=True)
 
 

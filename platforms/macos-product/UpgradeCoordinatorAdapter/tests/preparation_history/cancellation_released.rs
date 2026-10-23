@@ -103,7 +103,9 @@ fn cancellation_archive_keeps_v1_and_v2_released_history_and_index_unchanged() {
     }
 }
 
+#[cfg(feature = "reliability-matrix")]
 struct ReleaseAdmission;
+#[cfg(feature = "reliability-matrix")]
 impl radishlex_ime_product_upgrade::CancellationReleasePort for ReleaseAdmission {
     fn confirm_authority_and_quiescence(
         &mut self,
@@ -115,8 +117,10 @@ impl radishlex_ime_product_upgrade::CancellationReleasePort for ReleaseAdmission
     }
 }
 
+#[cfg(feature = "reliability-matrix")]
 #[test]
-fn cancellation_lifecycle_v1_and_v2_then_cancellation_then_new_upgrade_release() {
+fn reliability_matrix_cancellation_lifecycle_v1_and_v2_then_cancellation_then_new_upgrade_release()
+{
     use radishlex_ime_product_upgrade::CancellationReleaseStore;
     for legacy in [true, false] {
         for state in [State::Completed, State::AbortedPreserved, State::RolledBack] {

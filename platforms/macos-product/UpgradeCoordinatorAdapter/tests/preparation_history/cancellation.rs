@@ -32,8 +32,10 @@ impl CancellationSourcePort for Admission {
     }
 }
 
+#[cfg(feature = "reliability-matrix")]
 #[test]
-fn cancellation_preserves_three_old_terminal_inventories_at_every_archive_position() {
+fn reliability_matrix_cancellation_preserves_three_old_terminal_inventories_at_every_archive_position(
+) {
     for state in [State::Completed, State::AbortedPreserved, State::RolledBack] {
         for stage in 0..3 {
             let fixture = Fixture::new();
