@@ -7,12 +7,8 @@ impl ReleaseHistory<'_> {
         path: &Path,
         hasher: &impl PreparationHasher,
     ) -> Result<EncodedCancellationProof<'static>> {
-        let identity = self.journal.evidence(path, hasher)?;
-        let proof = EncodedCancellationProof::decode(self.journal.read_history_bytes(path)?)?;
-        if self.journal.evidence(path, hasher)? != identity {
-            return Err(Error::EvidenceChanged);
-        }
-        Ok(proof)
+        let (_, bytes) = self.journal.read_verified_history(path, hasher)?;
+        EncodedCancellationProof::decode(bytes)
     }
     pub(in super::super) fn cancellation_index(
         &self,
@@ -192,9 +188,6 @@ impl ReleaseHistory<'_> {
             }
             for (slot, identity) in SLOTS.iter().zip(&archive.previous_files) {
                 let path = paths[2].join(slot_name(*slot));
-                if self.optional_file(&path, hasher)? != *identity {
-                    return Err(Error::EvidenceChanged);
-                }
                 if *slot == Slot::Receipt {
                     self.verify_bytes(
                         &path,
@@ -202,6 +195,8 @@ impl ReleaseHistory<'_> {
                         &receipt.encode().map_err(|_| Error::EvidenceChanged)?,
                         hasher,
                     )?;
+                } else if self.optional_file(&path, hasher)? != *identity {
+                    return Err(Error::EvidenceChanged);
                 }
             }
             if proof.previous_index.is_none() {
@@ -245,10 +240,8 @@ impl ReleaseHistory<'_> {
         bytes: &[u8],
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
-        if self.journal.evidence(path, hasher)? != *identity
-            || self.journal.read_history_bytes(path)? != bytes
-            || self.journal.evidence(path, hasher)? != *identity
-        {
+        let (actual, observed) = self.journal.read_verified_history(path, hasher)?;
+        if actual != *identity || observed != bytes {
             return Err(Error::EvidenceChanged);
         }
         Ok(())
@@ -317,12 +310,11 @@ impl CancellationReleaseStore {
         let encoded = proof.encoded()?;
         let directory = self.directory(proof.operation_id());
         let path = directory.join(CANCELLATION_RELEASE);
-        if self.history().optional_file(&path, hasher)?.as_ref() != identity {
-            return Err(Error::EvidenceChanged);
-        }
         if let Some(identity) = identity {
             self.history()
                 .verify_bytes(&path, identity, encoded.bytes(), hasher)?;
+        } else if path_exists(&path)? {
+            return Err(Error::EvidenceChanged);
         }
         for path in [
             directory.join(PROOF_TEMP),

@@ -357,9 +357,8 @@ impl PreparationCancellationStore {
         } else if path_exists(&self.journal.path(PREPARATION_SNAPSHOT))? {
             return Err(Error::EvidenceChanged);
         }
-        let inventory = self.journal.load_previous_inventory(prep, hasher)?;
         self.journal
-            .verify_inventory_objects(&inventory, hasher, Some(prep))?;
+            .load_verified_previous_inventory(prep, hasher)?;
         if self.journal.evidence(&self.journal.path(JOURNAL), hasher)?
             != *request.preparation_identity()
         {

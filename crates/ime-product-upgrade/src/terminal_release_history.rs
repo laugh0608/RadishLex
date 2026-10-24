@@ -19,12 +19,8 @@ impl ReleaseHistory<'_> {
         path: &Path,
         hasher: &impl PreparationHasher,
     ) -> Result<TerminalReleaseReceipt> {
-        let identity = self.journal.evidence(path, hasher)?;
-        let result = TerminalReleaseReceipt::decode(&self.journal.read_history_bytes(path)?)?;
-        if self.journal.evidence(path, hasher)? != identity {
-            return Err(Error::EvidenceChanged);
-        }
-        Ok(result)
+        let (_, bytes) = self.journal.read_verified_history(path, hasher)?;
+        TerminalReleaseReceipt::decode(&bytes)
     }
     pub(super) fn verify_directories(
         &self,
@@ -329,14 +325,12 @@ impl ReleaseHistory<'_> {
             return Err(Error::EvidenceChanged);
         }
         let path = root.join(INDEX);
-        let Some(identity) = self.optional_file(&path, hasher)? else {
+        if !path_exists(&path)? {
             return Ok(None);
-        };
-        let index: ReleaseIndex = decode(&self.journal.read_history_bytes(&path)?)?;
-        index.validate()?;
-        if self.journal.evidence(&path, hasher)? != identity {
-            return Err(Error::EvidenceChanged);
         }
+        let (identity, bytes) = self.journal.read_verified_history(&path, hasher)?;
+        let index: ReleaseIndex = decode(&bytes)?;
+        index.validate()?;
         Ok(Some(PreviousIndex { identity, index }))
     }
     pub(super) fn index_for(
@@ -437,9 +431,9 @@ impl ReleaseHistory<'_> {
             let path = root
                 .join(index.operation_id())
                 .join(index.proof_file_name());
-            let identity = self.journal.evidence(&path, hasher)?;
-            let encoded = self.read_cancellation(&path, hasher)?;
-            if self.cancellation_index(&encoded, hasher)? != *index {
+            let (identity, bytes) = self.journal.read_verified_history(&path, hasher)?;
+            let encoded = cancellation_release::EncodedCancellationProof::decode(bytes)?;
+            if ReleaseIndex::for_cancellation(&encoded, identity.clone())? != *index {
                 return Err(Error::EvidenceChanged);
             }
             self.verify_cancellation_materials(&encoded, true, None, hasher)?;
@@ -478,12 +472,13 @@ impl ReleaseHistory<'_> {
         let operation = root.join(index.operation_id());
         self.journal.history_directory(&operation)?;
         let path = operation.join(RELEASE);
-        let identity = self.journal.evidence(&path, hasher)?;
-        let record = self.read_release(&path, hasher)?;
-        if self.index_for(&record, hasher)? != *index {
+        let (identity, bytes) = self.journal.read_verified_history(&path, hasher)?;
+        let record = TerminalReleaseReceipt::decode(&bytes)?;
+        if record.phase != TerminalReleasePhase::ReleaseReady
+            || ReleaseIndex::for_terminal(&record, identity.sha256.clone())? != *index
+        {
             return Err(Error::EvidenceChanged);
         }
-        record.validate()?;
         self.verify_directories(&record, false)?;
         self.verify_files(&record, hasher, true)?;
         self.verify_preparation(&record, hasher)?;

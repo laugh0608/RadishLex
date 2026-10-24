@@ -186,12 +186,44 @@ impl PreparationJournalStore {
     ) -> Result<PreviousInventory> {
         self.checkpoint(guard, port, hasher, record, checkpoint)?;
         self.verify_prepared(record, hasher)?;
-        let inventory = self.load_previous_inventory(record, hasher)?;
-        self.verify_inventory_files(&inventory, hasher, Some(record))?;
+        self.validate_entries()?;
+        let inventory = self.load_verified_previous_inventory(record, hasher)?;
         self.verify_guard(guard)?;
         if self.load_guarded(guard)?.as_ref() != Some(record) {
             return Err(Error::EvidenceChanged);
         }
+        Ok(inventory)
+    }
+
+    /// Load and physically verify once within this observation window. Callers
+    /// must first validate their own active-slot whitelist. A released load
+    /// already resolves every ancestor/material and rechecks the latest index;
+    /// do not immediately repeat that complete traversal via verify_inventory_objects.
+    pub(super) fn load_verified_previous_inventory(
+        &self,
+        record: &PreparationReceipt,
+        hasher: &impl PreparationHasher,
+    ) -> Result<PreviousInventory> {
+        if record.previous_release_index_identity().is_some() {
+            let next = self
+                .store
+                .root
+                .path
+                .join(HISTORY)
+                .join(&record.binding().operation_id);
+            if !record.archived_slots().is_empty() || path_exists(&next)? {
+                return Err(Error::EvidenceChanged);
+            }
+            self.verify_empty_v1_slots()?;
+            let inventory = self.load_previous_inventory(record, hasher)?;
+            self.verify_empty_v1_slots()?;
+            if path_exists(&next)? {
+                return Err(Error::EvidenceChanged);
+            }
+            return Ok(inventory);
+        }
+        let inventory = self.load_previous_inventory(record, hasher)?;
+        self.verify_inventory_objects(&inventory, hasher, Some(record))?;
         Ok(inventory)
     }
 
@@ -224,13 +256,11 @@ impl PreparationJournalStore {
         let expected = record
             .previous_inventory_identity()
             .ok_or(Error::EvidenceChanged)?;
-        if self.evidence(&path, hasher)? != *expected {
+        let (identity, bytes) = self.read_verified_history(&path, hasher)?;
+        if identity != *expected {
             return Err(Error::EvidenceChanged);
         }
-        let inventory = PreviousInventory::decode(&self.read_history_bytes(&path)?)?;
-        if self.evidence(&path, hasher)? != *expected {
-            return Err(Error::EvidenceChanged);
-        }
+        let inventory = PreviousInventory::decode(&bytes)?;
         inventory.verify_context(self, record)?;
         self.verify_history_directories(&inventory, true)?;
         Ok(inventory)

@@ -290,8 +290,8 @@ impl PreparationJournalStore {
         }
         // Physical predecessor proof is required before SQLite writes as well
         // as before archive renames; a product port cannot waive this evidence.
-        let inventory = self.load_previous_inventory(record, hasher)?;
-        self.verify_inventory_files(&inventory, hasher, Some(record))?;
+        self.validate_entries()?;
+        self.load_verified_previous_inventory(record, hasher)?;
         self.verify_guard(guard)?;
         if self.read_record()?.as_ref().map(|value| &value.receipt) != Some(record) {
             return Err(Error::EvidenceChanged);

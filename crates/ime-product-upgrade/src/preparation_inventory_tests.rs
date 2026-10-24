@@ -38,6 +38,124 @@ impl PreparationHasher for SyntheticHash {
         Ok(result)
     }
 }
+
+#[test]
+fn verified_history_read_binds_bytes_and_digest_in_one_bounded_observation() {
+    let fixture = Fixture::new();
+    let (store, _guard) = fixture.open();
+    let path = fixture.0.join("bounded-proof.json");
+    let bytes = b"synthetic canonical proof\n";
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)
+        .unwrap();
+    file.write_all(bytes).unwrap();
+    let (identity, observed) = store.read_verified_history(&path, &SyntheticHash).unwrap();
+    assert_eq!(observed, bytes);
+    assert_eq!(identity, store.evidence(&path, &SyntheticHash).unwrap());
+    // A later observation must not adopt the earlier result.
+    fs::write(&path, b"changed proof\n").unwrap();
+    assert_ne!(
+        store
+            .read_verified_history(&path, &SyntheticHash)
+            .unwrap()
+            .0,
+        identity
+    );
+    fs::write(&path, vec![b'x'; MAX_PREPARATION_RECEIPT_BYTES]).unwrap();
+    assert_eq!(
+        store
+            .read_verified_history(&path, &SyntheticHash)
+            .unwrap()
+            .1
+            .len(),
+        MAX_PREPARATION_RECEIPT_BYTES
+    );
+    fs::write(&path, vec![b'x'; MAX_PREPARATION_RECEIPT_BYTES + 1]).unwrap();
+    assert_eq!(
+        store.read_verified_history(&path, &SyntheticHash),
+        Err(Error::EvidenceChanged)
+    );
+    struct FailedHash;
+    impl PreparationHasher for FailedHash {
+        fn sha256(&self, _: &mut dyn Read) -> std::io::Result<[u8; 32]> {
+            Err(std::io::Error::other("synthetic hash failure"))
+        }
+    }
+    fs::write(&path, bytes).unwrap();
+    assert_eq!(
+        store.read_verified_history(&path, &FailedHash),
+        Err(Error::Io)
+    );
+}
+
+#[test]
+fn verified_history_read_rejects_drift_during_hash_and_partial_consumption() {
+    struct DriftHash<'a> {
+        path: &'a Path,
+        retained: &'a Path,
+        kind: u8,
+    }
+    impl PreparationHasher for DriftHash<'_> {
+        fn sha256(&self, source: &mut dyn Read) -> std::io::Result<[u8; 32]> {
+            if self.kind == 6 {
+                return Ok([0; 32]);
+            }
+            let digest = SyntheticHash.sha256(source)?;
+            match self.kind {
+                0 => {
+                    // Same bytes, new inode.
+                    let bytes = fs::read(self.path)?;
+                    fs::rename(self.path, self.retained)?;
+                    let mut file = OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .mode(0o600)
+                        .open(self.path)?;
+                    file.write_all(&bytes)?;
+                }
+                1 => fs::write(self.path, b"different proof")?,
+                2 => fs::set_permissions(self.path, fs::Permissions::from_mode(0o644))?,
+                3 => fs::hard_link(self.path, self.retained)?,
+                4 => {
+                    fs::rename(self.path, self.retained)?;
+                    std::os::unix::fs::symlink(self.retained, self.path)?;
+                }
+                5 => fs::remove_file(self.path)?,
+                _ => unreachable!(),
+            }
+            Ok(digest)
+        }
+    }
+    for kind in 0..7 {
+        let fixture = Fixture::new();
+        let (store, _guard) = fixture.open();
+        let path = fixture.0.join("bounded-proof.json");
+        let retained = fixture.0.join("retained-proof.json");
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)
+            .unwrap();
+        file.write_all(b"synthetic canonical proof\n").unwrap();
+        assert_eq!(
+            store.read_verified_history(
+                &path,
+                &DriftHash {
+                    path: &path,
+                    retained: &retained,
+                    kind
+                }
+            ),
+            Err(Error::EvidenceChanged),
+            "kind {kind}"
+        );
+    }
+}
+
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {
