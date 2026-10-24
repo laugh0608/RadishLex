@@ -61,7 +61,7 @@ class ValidationPlanTests(unittest.TestCase):
         routine = repository_rust_commands("darwin", "tests")
         self.assertFalse(any("reliability-matrix" in command for command in routine))
         specialist = repository_rust_commands("darwin", "reliability")
-        self.assertEqual(len(specialist), 2)
+        self.assertEqual(len(specialist), 3)
         for command in specialist:
             self.assertIn("reliability-matrix", command)
             self.assertEqual(command[-1], "reliability_matrix_")
@@ -76,12 +76,22 @@ class ValidationPlanTests(unittest.TestCase):
 
     def test_empty_or_missing_reliability_inventory_never_passes(self):
         import json
-        package = "radishlex-macos-installer-executor"
-        expected = json.loads((ROOT / "scripts/reliability-cases.json").read_text())[package]
-        verify_reliability_inventory(package, "\n".join(name + ": test" for name in expected))
-        for listing in ("0 tests", expected[0] + ": test", "unexpected: test"):
-            with self.assertRaises(SystemExit):
-                verify_reliability_inventory(package, listing)
+        inventory = json.loads((ROOT / "scripts/reliability-cases.json").read_text())
+        for package, targets in inventory.items():
+            for target, expected in targets.items():
+                verify_reliability_inventory(package, target, "\n".join(name + ": test" for name in expected))
+                for listing in ("0 tests", expected[0] + ": test", "unexpected: test"):
+                    with self.assertRaises(SystemExit):
+                        verify_reliability_inventory(package, target, listing)
+
+    def test_reliability_targets_match_the_entire_manifest(self):
+        import json
+        inventory = json.loads((ROOT / "scripts/reliability-cases.json").read_text())
+        expected = {(package, target) for package, targets in inventory.items() for target in targets}
+        commands = repository_rust_commands("darwin", "reliability")
+        actual = [(c[c.index("-p") + 1], c[c.index("--test") + 1] if "--test" in c else "lib") for c in commands]
+        self.assertEqual(set(actual), expected)
+        self.assertEqual(len(actual), len(expected))
 
     def test_partial_phase_never_claims_complete_gate(self):
         output = io.StringIO()

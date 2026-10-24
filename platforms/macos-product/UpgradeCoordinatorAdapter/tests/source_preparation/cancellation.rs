@@ -265,55 +265,127 @@ fn assert_restart(fixture: &Fixture, prep: &PreparationReceipt, point: CancelPoi
     );
 }
 
+// Persistence boundaries are phase-independent; normal coverage exercises all
+// eleven once and every other phase at the durable request boundary. The full
+// remaining phase × write interactions belong to reliability. The disjoint
+// union is the original cross-product, with exactly the same assertions.
+fn cancellation_cases(interactions_only: bool) -> Vec<(PreparationPhase, CancelPoint)> {
+    PHASES
+        .into_iter()
+        .flat_map(|phase| {
+            CANCEL_POINTS
+                .into_iter()
+                .filter(move |point| {
+                    let representative =
+                        phase == PreparationPhase::Reserved || *point == CancelPoint::Recorded;
+                    representative != interactions_only
+                })
+                .map(move |point| (phase, point))
+        })
+        .collect()
+}
+
 #[test]
-fn cancellation_each_authority_loss_keeps_request_or_blocks_unbound_temp() {
+fn cancellation_boundary_selection_retains_all_phases_and_persistence_points() {
+    let cases = cancellation_cases(false);
+    assert_eq!(cases.len(), 15);
+    for phase in PHASES {
+        assert!(cases.contains(&(phase, CancelPoint::Recorded)));
+    }
+    for point in CANCEL_POINTS {
+        assert!(cases.contains(&(PreparationPhase::Reserved, point)));
+    }
+    let interactions = cancellation_cases(true);
+    assert_eq!(interactions.len(), 40);
     for phase in PHASES {
         for point in CANCEL_POINTS {
-            let fixture = Fixture::new();
-            fixture.populate();
-            let (store, guard, _) = at_phase(&fixture, phase);
-            let prep = store.load_guarded(&guard).unwrap().unwrap();
-            let before = protected(&fixture);
-            let mut port = CancelPort::new(prep.clone());
-            port.fail = Some(point);
-            let cancel = PreparationCancellationStore::attach(store, &guard).unwrap();
-            assert_eq!(
-                cancel.request_cancellation(
-                    &guard,
-                    &prep.binding().operation_id,
-                    &mut port,
-                    &MacOsPreparationHasher
-                ),
-                Err(SourcePreparationError::AuthorityNotProven),
+            assert_ne!(
+                cases.contains(&(phase, point)),
+                interactions.contains(&(phase, point)),
                 "{phase:?} {point:?}"
             );
-            drop(guard);
-            assert_restart(&fixture, &prep, point);
-            assert_preserved(&before);
         }
     }
 }
 
 #[test]
-fn cancellation_each_process_exit_reloads_exactly_or_preserves_interrupted_files() {
-    for phase in PHASES {
-        for point in CANCEL_POINTS {
-            let fixture = Fixture::new();
-            fixture.populate();
-            let (store, guard, _) = at_phase(&fixture, phase);
-            let prep = store.load_guarded(&guard).unwrap().unwrap();
-            let before = protected(&fixture);
-            drop(guard);
-            let status = Command::new(std::env::current_exe().unwrap())
-                .args(["--exact", "cancellation::cancellation_child", "--ignored"])
-                .env("RADISHLEX_CANCELLATION_TEST_ROOT", &fixture.0)
-                .env("RADISHLEX_CANCELLATION_TEST_POINT", format!("{point:?}"))
-                .status()
-                .unwrap();
-            assert_eq!(status.code(), Some(76), "{phase:?} {point:?}");
-            assert_restart(&fixture, &prep, point);
-            assert_preserved(&before);
-        }
+fn representative_cancellation_each_authority_loss_keeps_request_or_blocks_unbound_temp() {
+    check_cancellation_each_authority_loss_keeps_request_or_blocks_unbound_temp(
+        cancellation_cases(false),
+    );
+}
+
+#[test]
+fn representative_cancellation_each_process_exit_reloads_exactly_or_preserves_interrupted_files() {
+    check_cancellation_each_process_exit_reloads_exactly_or_preserves_interrupted_files(
+        cancellation_cases(false),
+    );
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_cancellation_each_authority_loss_keeps_request_or_blocks_unbound_temp() {
+    check_cancellation_each_authority_loss_keeps_request_or_blocks_unbound_temp(
+        cancellation_cases(true),
+    );
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_cancellation_each_process_exit_reloads_exactly_or_preserves_interrupted_files(
+) {
+    check_cancellation_each_process_exit_reloads_exactly_or_preserves_interrupted_files(
+        cancellation_cases(true),
+    );
+}
+
+fn check_cancellation_each_authority_loss_keeps_request_or_blocks_unbound_temp(
+    cases: impl IntoIterator<Item = (PreparationPhase, CancelPoint)>,
+) {
+    for (phase, point) in cases {
+        let fixture = Fixture::new();
+        fixture.populate();
+        let (store, guard, _) = at_phase(&fixture, phase);
+        let prep = store.load_guarded(&guard).unwrap().unwrap();
+        let before = protected(&fixture);
+        let mut port = CancelPort::new(prep.clone());
+        port.fail = Some(point);
+        let cancel = PreparationCancellationStore::attach(store, &guard).unwrap();
+        assert_eq!(
+            cancel.request_cancellation(
+                &guard,
+                &prep.binding().operation_id,
+                &mut port,
+                &MacOsPreparationHasher
+            ),
+            Err(SourcePreparationError::AuthorityNotProven),
+            "{phase:?} {point:?}"
+        );
+        drop(guard);
+        assert_restart(&fixture, &prep, point);
+        assert_preserved(&before);
+    }
+}
+
+fn check_cancellation_each_process_exit_reloads_exactly_or_preserves_interrupted_files(
+    cases: impl IntoIterator<Item = (PreparationPhase, CancelPoint)>,
+) {
+    for (phase, point) in cases {
+        let fixture = Fixture::new();
+        fixture.populate();
+        let (store, guard, _) = at_phase(&fixture, phase);
+        let prep = store.load_guarded(&guard).unwrap().unwrap();
+        let before = protected(&fixture);
+        drop(guard);
+        let status = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "cancellation::cancellation_child", "--ignored"])
+            .env("RADISHLEX_CANCELLATION_TEST_ROOT", &fixture.0)
+            .env("RADISHLEX_CANCELLATION_TEST_POINT", format!("{point:?}"))
+            .status()
+            .unwrap();
+        assert_eq!(status.code(), Some(76), "{phase:?} {point:?}");
+        assert_restart(&fixture, &prep, point);
+        assert_preserved(&before);
     }
 }
 

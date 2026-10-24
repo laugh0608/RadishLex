@@ -129,6 +129,48 @@ fn points(phase: PreparationPhase) -> Vec<FinishPoint> {
     points
 }
 
+// MaintenanceIntent exercises all persistence and maintenance boundaries. Each
+// other phase is separately interrupted after its source-ready proof is sealed;
+// all five successful/idempotent phase contracts are also covered below.
+fn finishing_cases(interactions_only: bool) -> Vec<(PreparationPhase, FinishPoint)> {
+    PHASES
+        .into_iter()
+        .flat_map(|phase| {
+            points(phase)
+                .into_iter()
+                .filter(move |point| {
+                    let representative = phase == PreparationPhase::MaintenanceIntent
+                        || *point == FinishPoint::SourceReady;
+                    representative != interactions_only
+                })
+                .map(move |point| (phase, point))
+        })
+        .collect()
+}
+
+#[test]
+fn finishing_boundary_selection_retains_each_phase_and_write_maintenance_points() {
+    let cases = finishing_cases(false);
+    assert_eq!(cases.len(), 35);
+    for phase in PHASES {
+        assert!(cases.contains(&(phase, FinishPoint::SourceReady)));
+    }
+    for point in points(PreparationPhase::MaintenanceIntent) {
+        assert!(cases.contains(&(PreparationPhase::MaintenanceIntent, point)));
+    }
+    let interactions = finishing_cases(true);
+    assert_eq!(interactions.len(), 100);
+    for phase in PHASES {
+        for point in points(phase) {
+            assert_ne!(
+                cases.contains(&(phase, point)),
+                interactions.contains(&(phase, point)),
+                "{phase:?} {point:?}"
+            );
+        }
+    }
+}
+
 #[test]
 fn source_finishing_preserves_all_five_phase_contracts_and_never_releases() {
     for phase in PHASES {
@@ -230,25 +272,41 @@ fn resume(fixture: &Fixture, request: PreparationCancellationRequest) {
 }
 
 #[test]
-fn source_finishing_authority_loss_at_each_phase_and_checkpoint_preserves_or_resumes() {
-    for phase in PHASES {
-        for point in points(phase) {
-            let fixture = Fixture::new();
-            child(&fixture.0, "wal");
-            let (store, guard, mut port) = requested(&fixture, phase);
-            let immutable = frozen(&fixture);
-            port.fail = Some(point);
-            assert_eq!(
-                store.finish_source(&guard, &mut port, &MacOsPreparationHasher),
-                Err(SourcePreparationError::AuthorityNotProven),
-                "{phase:?} {point:?}"
-            );
-            assert!(port.seen.contains(&point));
-            assert_preserved(&immutable);
-            drop(guard);
-            resume(&fixture, port.request);
-            assert_preserved(&immutable);
-        }
+fn representative_source_finishing_authority_loss_at_each_phase_and_checkpoint_preserves_or_resumes(
+) {
+    check_source_finishing_authority_loss_at_each_phase_and_checkpoint_preserves_or_resumes(
+        finishing_cases(false),
+    );
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_source_finishing_authority_loss_at_each_phase_and_checkpoint_preserves_or_resumes(
+) {
+    check_source_finishing_authority_loss_at_each_phase_and_checkpoint_preserves_or_resumes(
+        finishing_cases(true),
+    );
+}
+
+fn check_source_finishing_authority_loss_at_each_phase_and_checkpoint_preserves_or_resumes(
+    cases: impl IntoIterator<Item = (PreparationPhase, FinishPoint)>,
+) {
+    for (phase, point) in cases {
+        let fixture = Fixture::new();
+        child(&fixture.0, "wal");
+        let (store, guard, mut port) = requested(&fixture, phase);
+        let immutable = frozen(&fixture);
+        port.fail = Some(point);
+        assert_eq!(
+            store.finish_source(&guard, &mut port, &MacOsPreparationHasher),
+            Err(SourcePreparationError::AuthorityNotProven),
+            "{phase:?} {point:?}"
+        );
+        assert!(port.seen.contains(&point));
+        assert_preserved(&immutable);
+        drop(guard);
+        resume(&fixture, port.request);
+        assert_preserved(&immutable);
     }
 }
 
@@ -280,20 +338,34 @@ fn exit_with_recovery(fixture: &Fixture, point: FinishPoint, recovery_only: bool
 }
 
 #[test]
-fn source_finishing_real_process_exit_matrix_reacquires_guard_and_resumes() {
-    for phase in PHASES {
-        for point in points(phase) {
-            let fixture = Fixture::new();
-            child(&fixture.0, "wal");
-            let (store, guard, port) = requested(&fixture, phase);
-            let immutable = frozen(&fixture);
-            drop(guard);
-            drop(store);
-            exit_at(&fixture, point);
-            assert_preserved(&immutable);
-            resume(&fixture, port.request);
-            assert_preserved(&immutable);
-        }
+fn representative_source_finishing_real_process_exit_matrix_reacquires_guard_and_resumes() {
+    check_source_finishing_real_process_exit_matrix_reacquires_guard_and_resumes(finishing_cases(
+        false,
+    ));
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_source_finishing_real_process_exit_matrix_reacquires_guard_and_resumes() {
+    check_source_finishing_real_process_exit_matrix_reacquires_guard_and_resumes(finishing_cases(
+        true,
+    ));
+}
+
+fn check_source_finishing_real_process_exit_matrix_reacquires_guard_and_resumes(
+    cases: impl IntoIterator<Item = (PreparationPhase, FinishPoint)>,
+) {
+    for (phase, point) in cases {
+        let fixture = Fixture::new();
+        child(&fixture.0, "wal");
+        let (store, guard, port) = requested(&fixture, phase);
+        let immutable = frozen(&fixture);
+        drop(guard);
+        drop(store);
+        exit_at(&fixture, point);
+        assert_preserved(&immutable);
+        resume(&fixture, port.request);
+        assert_preserved(&immutable);
     }
 }
 

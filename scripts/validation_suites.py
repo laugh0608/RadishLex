@@ -72,7 +72,8 @@ SUITES["macos-installer"]["reliability"] = [
     cargo("test", INSTALLER[1], "--features", "reliability-matrix", "--lib", RELIABILITY_FILTER),
 ]
 SUITES["macos-upgrade-coordinator"]["reliability"] = [
-    cargo("test", UPGRADE, "--features", "reliability-matrix", "--test", "preparation_history", RELIABILITY_FILTER),
+    cargo("test", UPGRADE, "--features", "reliability-matrix", "--test", target, RELIABILITY_FILTER)
+    for target in ("preparation_history", "source_preparation")
 ]
 PHASES = ("static", "default-tests", "extra-tests", "native", "reliability")
 
@@ -111,17 +112,18 @@ def repository_rust_commands(platform: str, phase: str) -> list[list[str]]:
     raise ValueError(f"unknown repository phase: {phase}")
 
 
-def verify_reliability_inventory(package: str, listing: str) -> None:
-    expected = set(json.loads((ROOT / "scripts/reliability-cases.json").read_text())[package])
+def verify_reliability_inventory(package: str, target: str, listing: str) -> None:
+    expected = set(json.loads((ROOT / "scripts/reliability-cases.json").read_text())[package][target])
     observed = {line.removesuffix(": test") for line in listing.splitlines() if line.endswith(": test")}
     if not expected or observed != expected:
-        raise SystemExit(f"reliability parent inventory mismatch for {package}: missing={sorted(expected-observed)}, unexpected={sorted(observed-expected)}")
+        raise SystemExit(f"reliability parent inventory mismatch for {package}/{target}: missing={sorted(expected-observed)}, unexpected={sorted(observed-expected)}")
 
 
 def run_reliability_command(command: list[str]) -> None:
     package = command[command.index("-p") + 1]
+    target = command[command.index("--test") + 1] if "--test" in command else "lib"
     listing = run_command([*command, "--", "--list"], ROOT, capture=True)
-    verify_reliability_inventory(package, listing or "")
+    verify_reliability_inventory(package, target, listing or "")
     run_command(command, ROOT)
 
 
