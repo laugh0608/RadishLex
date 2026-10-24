@@ -46,9 +46,9 @@
 | 连续取消与历史漂移 | 无前驱连续取消；同字节 inode 替换后零写入拒绝 | 全前驱组合、六种祖先漂移、混合 v1/v2 生命周期 |
 | 归档/handoff/terminal release | 普通主路径、冲突、身份漂移及既有恢复测试 | 原全边界授权丢失、全进程退出和 released-predecessor 矩阵 |
 
-`scripts/reliability-cases.json` 固定18个穷举父测试（Executor 2、升级历史16）；执行前先发现清单并严格对照，空选择、漏项或新增未登记项均失败，防止过滤器误写后零测试假绿。专项用 `cargo test ... --features reliability-matrix ... reliability_matrix_` 精确选择父测试；普通测试不重复执行。ignored 子进程入口仍由父测试通过 `--exact` 调用，禁止全 workspace `--ignored` 或 `--all-features`。真实 qualification-harness、observer 三项容量实验仍按各自合同处理，不能借可靠性 feature 自动启动。
+`scripts/reliability-cases.json` 按包与 target 固定22个专项父测试（Executor/lib 2、升级/preparation_history 16、升级/source_preparation 4）；执行前逐 target 发现并严格对照，空选择、漏项或新增未登记项均失败。新增 source_preparation 的4项只执行常规层之外的阶段交互组合，与常规层合起来覆盖原完整矩阵。专项用 `cargo test ... --features reliability-matrix ... reliability_matrix_` 精确选择父测试；普通父测试不重复执行。ignored 子进程入口仍由父测试通过 `--exact` 调用，禁止全 workspace `--ignored` 或 `--all-features`。真实 qualification-harness、observer 三项容量实验仍按各自合同处理，不能借可靠性 feature 自动启动。
 
-历史 fixture 的普通后续学习由80条减为1条，每个样本仍独立创建。80条记录保留为专门回归，明确断言源库长度与旧 receipt 不同，且历史核验、81个活动词与 tombstone 保留。不得通过共享可变 fixture、缓存 hash、省略 fsync 或减少生产实物核验提速。
+历史 fixture 的普通后续学习由80条减为1条，每个样本仍独立创建。80条记录保留为专门回归，明确断言源库长度与旧 receipt 不同，且历史核验、81个活动词与 tombstone 保留。不得通过共享可变 fixture、跨观察窗口复用 hash 或历史链核验成功、省略 fsync 或跳过必要实物核验提速。
 
 ### 取消 proof 的计算复用
 
@@ -56,7 +56,7 @@
 
 该内部类型不保存文件身份、摘要或目录观察，不跨检查点替代实物核验。公共编码/解码仍完整拒绝无效嵌套对象、非 canonical 内容及超限材料；持久化格式、256 KiB 上限、授权/资格、guard、hash、owner/mode/link、fsync、原件保留与恢复顺序不变。每个检查点仍重新读取实物；历史 proof/索引的前后身份及最新 locator 复核保留。
 
-`load_previous_inventory` 与 `verify_inventory_objects` 在 released 前驱路径确有再次遍历历史链的情况；这两次都是可观察文件状态的检查，期间还调用外部 hasher，不能把它们按纯函数去重。当前只消除同次调用内不变模型的重复编码/结构校验，不缓存历史链核验成功。定向测试继续覆盖同字节 inode 替换、旧祖先漂移、hash 期间索引替换、回调篡改、资格拒绝和真实退出后的新 guard 恢复。
+前述纯计算优化之后，2026-10-24 又合并同一观察窗口内的重复实物核验，见下节。这里的“观察窗口”止于当前验证调用，绝不跨授权回调、写入、重启或后续调用复用结果。历史链仍逐祖先验证，没有引入跨窗口的信任缓存。
 
 2026-10-23 对同一连续取消代表用例作宿主机 ABBA 对照，两种固定二进制各2样本，均为并发1、nice +19、独立合成目录，不含编译或采样器：
 
@@ -66,6 +66,37 @@
 | 平均CPU | 18.537秒 | 7.430秒 | 59.9% |
 
 原始输出、二进制 SHA-256、独立样本与环境约束见本机 `/private/tmp/rlxcpu-8bj3cqiu/comparison-final.json` 和同目录 `compare-final.py`；本机临时证据不随仓库分发。该结果仅对应 `representative_cancellation_lifecycle_continuous_cancellations_keep_null_and_legacy_data_predecessors` 的现有代表选择，不是完整前驱矩阵或整仓门禁耗时。深历史仍需逐项核验；整仓常规、完整可靠性和 CI 的最终耗时及 Linux 运行结果待另行验证。
+
+### 观察窗口与隐藏矩阵收敛（2026-10-24）
+
+`PreparationJournalStore::read_verified_history` 将有256 KiB上限的 proof、locator、inventory 与字节比对统一为一次有界读取：读取前检查私有 pathname 和打开 descriptor，读取同一 descriptor，对实际读取的字节调用 SHA-256，检查完整消费及 descriptor/pathname 的前后 identity、mtime/ctime。摘要直接绑定解码/比对的字节，拒绝增长、缩短、同字节新 inode、权限/link、符号链接和删除漂移；hash/read 错误仍传播。SQLite与任意大小的数据文件仍使用流式 `evidence`，没有把数据库复制进该缓冲区。
+
+历史 `resolve_one` 直接使用该次严格读取的摘要派生索引，材料核验结束后的 proof 身份复核仍保留。`load_verified_previous_inventory` 为取消请求、源库准备检查点、归档检查点和维护只读观察一次加载完整前驱；released 路径不再紧接着通过 `verify_inventory_objects` 重走相同历史链。绑定 context、最新 locator 的末次复核、前后 v1 空槽及新 operation 目录拒绝、guard 和各材料检查仍在；非 released 路径继续验证全部 inventory objects。外层回调前后仍分别执行新的验证；此变化不把任一文件核验成功作为后续检查点的依据。
+
+跨层责任按下表区分，避免把相同持久化原语的所有阶段笛卡尔积隐含在常规父测试中：
+
+| 责任 | 常规层 | 可靠性补充与保留理由 |
+| --- | --- | --- |
+| 有界证明读取 | 核心单测覆盖字节/摘要绑定、超限、hash期间漂移和未消费完整输入 | 上层继续验证实际SHA-256、目录关系和重启；不以合成digest单测替代集成 |
+| 取消请求持久化 | Reserved 的11个检查点 + 其余4阶段的 Recorded；返回失败/真实退出各15场景 | 每种故障模式补齐其余40个阶段×检查点交互；每种模式两层合计55，原断言共110场景完整保留 |
+| 取消 source finishing | MaintenanceIntent 的31个写入/维护/语义检查点 + 其余4阶段 SourceReady；两种故障模式各35场景；五阶段成功/幂等及 hot-journal 保留 | 每种模式再补100个交互，每种模式两层合计135，原270场景完整保留 |
+| 历史/lifecycle | proof/locator绑定、祖先漂移、学习/tombstone、最新索引末次复核、取消后再升级 | 原16个历史矩阵保持；这是跨操作链的约束，不由单文件持久化测试替代 |
+| Executor程序/data衔接 | 11个程序/data切换检查点及2种结果×7个失败恢复点仍保留 | 涉及独立外层程序恢复与组合终态，不能仅因下层也检查guard/hash而删除；原2个mutation/lifecycle矩阵保持 |
+
+四个 source_preparation 父测试原来在常规层暗含380场景，现在常规100 + 可靠性交互280。选择合同测试逐个检查每个原组合恰好归属一层，既不缺项也不重叠；原场景执行器与所有断言共用，fixture仍每个场景独立创建。`source_finishing` 的恢复进度22场景是 hot-journal 特有分支，继续保留，没有并入普通写入覆盖后删掉。独立完整专项包含 default-tests 和 reliability 两阶段；单独 reliability 阶段的280组合不能声称自身覆盖380组合。
+
+同机同一连续取消用例，未改变测试步骤或断言，固定计数探针二进制ABBA各2样本；并发1、nice +19、每次独立合成目录、不含编译，未同时运行其他本批构建/重测：
+
+| 指标 | 窗口合并前 | 合并后 | 减少 |
+| --- | --- | --- | --- |
+| 平均墙钟 | 7.824674秒 | 6.503900秒 | 16.9% |
+| 平均CPU | 6.819863秒 | 5.539001秒 | 18.8% |
+| SHA-256调用 | 63,385 | 35,891 | 43.4% |
+| 参与hash字节 | 1,092,024,395 | 917,073,404 | 16.0% |
+
+计数通过 `PreparationHasher` 包装器委托原 `MacOsPreparationHasher` 并累计实际读取字节；包括文件及内存canonical输入，不是磁盘物理读取量。用例包含3次取消、后续升级/terminal release及查询；嵌套span不能相加。前后两次样本的hash次数/字节分别一致。本机证据 `/private/tmp/rlxobserve-6kegny8y/` 内 `comparison.json`、`summary.json`、`compile-command.json`、`tests/` 与 `compare.py` 保存原始输出、参数、探针及二进制SHA-256；诊断前基线探针来自 `/private/tmp/rlxwhy-4lyasvhh/`。这是同用例的运行时收益，与常规测试选择调整分开计量，不能外推整仓耗时。
+
+22个定向集成测试全部通过（含六类祖先漂移、hash期间最新索引替换、callback篡改、真实退出/新guard、hot-journal、16类released材料漂移）；两个新增核心读取单测通过。变更后的常规选择及22项专项发现清单另行复验；本轮未运行完整常规门禁、完整可靠性、CI、Linux宿主或实机资格，不能继承上轮完整通过结论。剩余约0.917 GB hash输入、SQLite等价核验、持久化与Executor真实组合成本仍需按调用窗口继续分析；5分钟目标尚未验收。
 
 ## CI 触发与聚合
 
