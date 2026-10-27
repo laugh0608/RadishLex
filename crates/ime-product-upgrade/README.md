@@ -238,4 +238,6 @@ cargo clippy -p radishlex-ime-product-upgrade --all-targets -- -D warnings
 
 `CancellationReleaseReceipt` 是独立 `radishlex-cancellation-release-v1` 不可变证明，绑定 `preserved` 原件、请求/源库/准备/旧 outer/私有材料、可空真实 data receipt 和精确前驱索引。`prepare_cancellation_release` 将证明保存为历史 `cancellation-release.json`，保留原 archive，再发布唯一 v2 索引；请求 marker 仍活动。`finish_cancellation_release` 只有在 `CancellationReleasePort` 逐检查点证明 `QualifiedSource` 时才最后移出原请求并同步/回读；旧程序资格不成立即阻断。macOS 产品组合层与取消 Executor 已实现该 port 的 guard/程序/授权接线；独立旧程序资格提供者仍缺失，没有默认放行实现，合成测试不证明产品可取消。
 
+`CancellationReleaseStore::verify_cancellation_observation` 在调用方连续持有的 inner guard 下只读核验精确 pending proof、source family 与完整历史；不打开原库 SQLite，不发布记录或移动 marker。outer guard、程序身份、静止及任务授权由产品层另外复验。`PreparationHasher::before_read` 为有界原始记录读取预留预算，参数为零时检查元数据遍历；流式 hash 仍由实现逐块控制，默认 hook 保持既有事务调用行为。该接口不生成取消资格，生产观察合同见[源 schema 观察](../../docs/remediation/macos-source-schema-observation-contract.md)。
+
 `load_latest_lifecycle` 返回 `LifecycleReleaseReceipt::Terminal` 或 `Cancellation`，核验完整祖先链。无索引而有历史、未知类型/版本、活动 marker、错误前驱、循环和实物身份漂移拒绝；原 `load_latest_release` 只返回真实数据终态。取消后新准备分别绑定 lifecycle 证明、旧 outer 和实际 data（可空），复用已封存材料，不改写 v1 历史，也不把取消 ID 写成新 v1 data 前驱。详细文件顺序、资格边界与矩阵见[取消兼容设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。

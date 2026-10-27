@@ -44,7 +44,7 @@
 
 `CancellationArchiveAuthority` 为专用取消封存协调器提供真实 outer guard 校验、共同 data root、source/target release/manifest 绑定以及 `ime-product-install` 的严格回执核验。旧回执必须是匹配 source 的合法终态，新回执可空或精确匹配无 artifact 的 `prepared`；活动槽暂缺时仍核验已绑定原件，不能以普通 `persist` 倒退覆盖。回调前后验证 guard，并要求 `CancellationProductAuthority` fresh 证明源程序、静止和当前授权。
 
-此桥已由 Installer Executor 的取消任务组合实际双 bundle 观察、专用 native 预检和任务授权；Bridge/UI action 仍未开放。`tests/cancellation_archive.rs` 使用隔离目录、真实双 guard/回执和合成产品观察，普通安装协调门禁以 `qualification-harness --test cancellation_archive` 精确运行此目标；不会运行需要真实载体环境的其他资格目标。取消 `preserved` 仍保留内层阻断 marker，完整释放由下述独立 authority 承接。
+此桥已由 Installer Executor 的取消任务组合实际双 bundle 观察、专用 native 预检和任务授权；Bridge action `13` 已接取消保存，最终释放仍未开放。`tests/cancellation_archive.rs` 使用隔离目录、真实双 guard/回执和合成产品观察，普通安装协调门禁以 `qualification-harness --test cancellation_archive` 精确运行此目标；不会运行需要真实载体环境的其他资格目标。取消 `preserved` 仍保留内层阻断 marker，完整释放由下述独立 authority 承接。
 
 ## 取消释放的双 guard 与资格绑定
 
@@ -54,4 +54,10 @@
 
 资格回调后再次观察产品/静止，并在两类外部回调前后复验 outer guard 和活动回执；数据核心继续复验源 family、证明及全部材料。`failure()` 保留最近一次 authority 回调的具体失败类别，调用方仍须优先处理核心错误。marker 已移动后的失败不报告成功；重载必须重新取得 guard 和资格，不能凭 marker 缺失认定完成。
 
-`tests/cancellation_release/` 纳入既有 `cancellation_archive` 测试目标，覆盖维护前后、outer 创建前后、错 root/双 guard/产品/证明/schema、各 marker 检查点资格失效、回调期间 outer/源库漂移、产品复验失败与移动后恢复。这些测试中的资格与静止观察仍为合成。Executor 已组合安装适配器的程序实物观察、专用 native 静止/容量预检和可撤销任务授权，并提供分别保留材料与最终释放的双锁任务入口；独立旧程序资格提供者及 Bridge/action 尚缺，不能开放取消按钮。具体调用边界见 [Executor 说明](../InstallerExecutor/README.md#准备取消任务)。
+`tests/cancellation_release/` 纳入既有 `cancellation_archive` 测试目标，覆盖维护前后、outer 创建前后、错 root/双 guard/产品/证明/schema、各 marker 检查点资格失效、回调期间 outer/源库漂移、产品复验失败与移动后恢复。这些测试中的资格与静止观察仍为合成。Executor 已组合安装适配器的程序实物观察、专用 native 静止/容量预检和可撤销任务授权，并提供分别保留材料与最终释放的双锁任务入口；独立旧程序资格提供者尚缺，不能开放最终取消按钮；保存动作 `13` 不释放 marker。具体调用边界见 [Executor 说明](../InstallerExecutor/README.md#准备取消任务)。
+
+## 源 schema 观察与证据 reader
+
+macOS `source_schema::review_evidence_with_source_schema` 是独立的资源编排入口：先由只读 reader 初审可信完整 pack，再从连续双 guard、完整取消 proof 与当前任务取得精确源 family。原库只读字节，SQLite 仅访问固定当前用户 Caches 域下新建的私有 DB/WAL 副本；备份属性、身份/hash、关闭和精确清理均成功后，内部不可序列化的观察能力才一次性绑定 reader 请求。源路径从 store 派生，没有裸 schema 或任意源路径构造入口。
+
+userdb 的默认关闭 `schema-observer` feature 与合成 fixture feature 分离，精确 layout profile 不等于历史版本兼容性。当前 catalog 为空，编排在任何源/任务/Caches 访问前拒绝；没有 issuer 或最终资格转换。实现只经合成数据定向验证，完整验收与真实使用仍待独立条件；生命周期、预算、残留和验证事实以[观察合同](../../../docs/remediation/macos-source-schema-observation-contract.md)为准。
