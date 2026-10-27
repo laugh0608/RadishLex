@@ -7,7 +7,7 @@ mod model;
 mod store;
 mod sync_decode;
 
-#[cfg(feature = "synthetic-schema-observer")]
+#[cfg(feature = "schema-observer")]
 pub mod schema_observer;
 
 pub use error::{UserDbError, UserDbResult};

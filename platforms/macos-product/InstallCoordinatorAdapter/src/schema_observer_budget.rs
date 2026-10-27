@@ -1,4 +1,4 @@
-//! Fixed budgets for the synthetic-only observer; these are not OS quotas.
+//! Fixed observer budgets; the synthetic host shares them. These are not OS quotas.
 
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -10,13 +10,14 @@ pub(super) const MIB: u64 = 1024 * 1024;
 pub(super) const MAX_READ: u64 = 3 * 1024 * MIB;
 pub(super) const MAX_WRITE: u64 = 256 * MIB;
 pub(super) const MAX_SCRATCH: u64 = 272 * MIB;
+#[cfg(test)]
 pub(super) const MAX_BATCH: u64 = 544 * MIB;
 pub(super) const MIN_FREE: u64 = 1024 * MIB;
 pub(super) const BLOCK_SIZE: usize = 64 * 1024;
 static NEXT_CALL: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum BudgetError {
+pub enum BudgetError {
     LimitExceeded,
     Cancelled,
     Deadline,
@@ -38,6 +39,7 @@ pub(super) enum Phase {
 pub(super) struct ObservationControl {
     call_id: u64,
     revoked: Arc<AtomicBool>,
+    task_active: Arc<dyn Fn() -> bool + Send + Sync>,
     work_end: Instant,
     end: Instant,
 }
@@ -64,15 +66,27 @@ impl ObservationControl {
         Ok(Self {
             call_id,
             revoked: Arc::new(AtomicBool::new(false)),
+            task_active: Arc::new(|| true),
             work_end: end - Duration::from_secs(10),
             end,
         })
+    }
+
+    pub(super) fn enter_task(
+        task_end: Instant,
+        task_active: Arc<dyn Fn() -> bool + Send + Sync>,
+    ) -> Result<Self, BudgetError> {
+        let mut control = Self::enter(task_end)?;
+        control.task_active = task_active;
+        control.check_work()?;
+        Ok(control)
     }
 
     pub(super) fn call_id(&self) -> u64 {
         self.call_id
     }
 
+    #[cfg(test)]
     pub(super) fn revoke(&self) {
         self.revoked.store(true, Ordering::Release);
     }
@@ -89,7 +103,7 @@ impl ObservationControl {
                 Err(BudgetError::Deadline)
             };
         }
-        if self.revoked.load(Ordering::Acquire) {
+        if self.revoked.load(Ordering::Acquire) || !(self.task_active)() {
             return Err(BudgetError::Cancelled);
         }
         if now >= self.work_end {
@@ -120,6 +134,7 @@ impl ObserverBudget {
         self.control.clone()
     }
 
+    #[cfg(test)]
     pub(super) fn counters(&self) -> (u64, u64) {
         (self.read, self.written)
     }

@@ -186,6 +186,31 @@ impl<'a> MacOsCancellationQuiescenceAuthority<'a> {
     pub fn failure(&self) -> Option<CancellationQuiescenceFailure> {
         self.failure
     }
+
+    #[cfg(target_os = "macos")]
+    pub(super) fn schema_task_control(
+        &self,
+        proof: &CancellationReleaseReceipt,
+        source: &ProductArtifactIdentity,
+    ) -> Result<
+        radishlex_macos_product_install_coordinator::source_schema::SchemaTaskControl,
+        radishlex_macos_product_install_coordinator::source_schema::ObservationError,
+    > {
+        use radishlex_macos_product_install_coordinator::source_schema::{
+            ObservationError, SchemaTaskControl,
+        };
+        if !self.authorization.verify(proof, source) {
+            return Err(ObservationError::TaskAuthorization);
+        }
+        // Capture the same grant, not a new task or renewed expiration. Owner
+        // drop/revoke is visible to byte-copy and SQLite progress checkpoints.
+        let active = self.authorization.grant.active.clone();
+        let expires = self.authorization.grant.expires;
+        Ok(SchemaTaskControl::new(
+            expires,
+            Arc::new(move || active.load(Ordering::SeqCst) && Instant::now() < expires),
+        ))
+    }
 }
 
 impl CancellationQuiescenceAuthority for MacOsCancellationQuiescenceAuthority<'_> {

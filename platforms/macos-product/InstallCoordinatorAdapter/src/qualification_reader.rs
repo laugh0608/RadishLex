@@ -165,6 +165,8 @@ pub struct EvidenceReview {
     files: Vec<EvidenceFileObservation>,
     cases: Vec<CaseReview>,
     request: Option<RequestReviewBinding>,
+    #[cfg(target_os = "macos")]
+    schema_observation: Option<crate::source_schema::SourceSchemaReview>,
 }
 
 impl EvidenceReview {
@@ -182,6 +184,8 @@ impl EvidenceReview {
             files: Vec::new(),
             cases: Vec::new(),
             request: None,
+            #[cfg(target_os = "macos")]
+            schema_observation: None,
         }
     }
     pub fn status(&self) -> ReviewStatus {
@@ -219,6 +223,17 @@ impl EvidenceReview {
     }
     pub fn request_binding(&self) -> Option<&RequestReviewBinding> {
         self.request.as_ref()
+    }
+    #[cfg(target_os = "macos")]
+    pub fn schema_observation(&self) -> Option<&crate::source_schema::SourceSchemaReview> {
+        self.schema_observation.as_ref()
+    }
+    #[cfg(target_os = "macos")]
+    pub(crate) fn attach_schema_observation(
+        &mut self,
+        observation: crate::source_schema::SourceSchemaReview,
+    ) {
+        self.schema_observation = Some(observation);
     }
 }
 
@@ -447,6 +462,8 @@ fn inspect(
         files,
         cases,
         request: request_binding,
+        #[cfg(target_os = "macos")]
+        schema_observation: None,
     })
 }
 

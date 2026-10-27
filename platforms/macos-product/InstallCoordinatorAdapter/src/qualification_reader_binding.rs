@@ -26,6 +26,25 @@ pub struct CancellationEvidenceRequest {
 }
 
 impl CancellationEvidenceRequest {
+    /// Only the private producer can supply this consumed observation. There is
+    /// deliberately no schema integer, JSON or reusable observation constructor.
+    #[cfg(target_os = "macos")]
+    pub(crate) fn with_observation(
+        proof: &CancellationReleaseReceipt,
+        source: &ProductArtifactIdentity,
+        target: &ProductArtifactIdentity,
+        observation: crate::source_schema::SourceSchemaObservation,
+        call_id: u64,
+    ) -> Result<(Self, crate::source_schema::SourceSchemaReview), ReadError> {
+        let mut request = Self::new(proof, source, target)?;
+        let (schema, metadata) = observation.consume(proof, source, target, call_id)?;
+        if request.schema.is_some_and(|previous| previous != schema) {
+            return Err(ReadError::SchemaUnsupported);
+        }
+        request.schema = Some(schema);
+        Ok((request, metadata))
+    }
+
     pub fn new(
         proof: &CancellationReleaseReceipt,
         source: &ProductArtifactIdentity,

@@ -93,6 +93,22 @@ impl<Q: CancellationQuiescenceAuthority> CancellationReleaseProductAuthority
     }
 }
 
+#[cfg(target_os = "macos")]
+impl radishlex_macos_product_install_coordinator::source_schema::SourceSchemaAuthority
+    for MacOsCancellationProductAuthority<'_, crate::MacOsCancellationQuiescenceAuthority<'_>>
+{
+    fn schema_task_control(
+        &self,
+        proof: &CancellationReleaseReceipt,
+        source: &ProductArtifactIdentity,
+    ) -> Result<
+        radishlex_macos_product_install_coordinator::source_schema::SchemaTaskControl,
+        radishlex_macos_product_install_coordinator::source_schema::ObservationError,
+    > {
+        self.quiescence.schema_task_control(proof, source)
+    }
+}
+
 /// Verify both installed bundles, the sealed target and the physical root.
 pub(super) fn verify_cancellation_programs(
     programs: &MacOsProductInstallAdapter,

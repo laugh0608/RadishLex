@@ -6,12 +6,11 @@
 mod capture;
 #[path = "schema_observer_fs_crash_tests.rs"]
 mod crash_tests;
-#[path = "schema_observer_fs_posix.rs"]
-mod posix;
+use crate::source_schema::filesystem::posix;
 #[path = "schema_observer_fs_tests.rs"]
 mod tests;
 use super::schema_observer_budget::{
-    BudgetError, ObserverBudget, Phase, BLOCK_SIZE, MAX_BATCH, MAX_SCRATCH, MIB, MIN_FREE,
+    ObserverBudget, Phase, BLOCK_SIZE, MAX_BATCH, MAX_SCRATCH, MIB,
 };
 pub(crate) use capture::CapturedCopy;
 pub(crate) use posix::{clear_fault, inject_fault, FsOperation};
@@ -33,27 +32,7 @@ const FAMILY: [&str; 4] = [
 ];
 const CHUNK: usize = BLOCK_SIZE;
 const CONTROL_RECORD_RESERVE: u64 = 2 * 16 * 1024;
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum FsError {
-    ScratchOccupied,
-    Identity,
-    Changed,
-    Missing,
-    UnknownEntry,
-    Io,
-    Close,
-    Unlink,
-    Capacity,
-    BatchStopped,
-    ScratchRetained,
-    Retained(Box<FsError>),
-    Budget(BudgetError),
-}
-impl From<BudgetError> for FsError {
-    fn from(value: BudgetError) -> Self {
-        Self::Budget(value)
-    }
-}
+pub(crate) use crate::source_schema::filesystem::FsError;
 
 struct Directory {
     file: Option<File>,

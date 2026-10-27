@@ -19,6 +19,10 @@ use radishlex_ime_product_upgrade::{
 use radishlex_ime_userdb::UserDb;
 use std::io::{Read, Write};
 
+#[cfg(target_os = "macos")]
+#[path = "source_schema_request_tests.rs"]
+mod source_schema_tests;
+
 const OLD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const OPERATION: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
@@ -128,6 +132,13 @@ struct CoreProof {
 }
 impl CoreProof {
     fn new(source: &ProductArtifactIdentity, point: PreparationPoint) -> Self {
+        Self::with_observer_fixture(source, point, false)
+    }
+    fn with_observer_fixture(
+        source: &ProductArtifactIdentity,
+        point: PreparationPoint,
+        observer_fixture: bool,
+    ) -> Self {
         let path = fs::canonicalize(std::env::temp_dir())
             .unwrap()
             .join(format!(
@@ -136,7 +147,12 @@ impl CoreProof {
                 SEQUENCE.fetch_add(1, Ordering::Relaxed)
             ));
         DirBuilder::new().mode(0o700).create(&path).unwrap();
-        drop(UserDb::open(path.join("userdb.sqlite3")).unwrap());
+        if observer_fixture {
+            use radishlex_ime_userdb::schema_observer::{create_synthetic_fixture, FixtureKind};
+            create_synthetic_fixture(&path, FixtureKind::MainOnly).unwrap();
+        } else {
+            drop(UserDb::open(path.join("userdb.sqlite3")).unwrap());
+        }
         assert_eq!(UserDb::supported_schema_version(), 9);
         let target = ProductArtifactIdentity::new(
             source.product_id(),
