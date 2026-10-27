@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-10-18（合成 observer 与门禁优化已提交，完整仓库门禁通过）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
+- 复核：2026-10-27（成本归因、生产资格方案审查及常规/22项可靠性完整验收完成）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -78,9 +78,11 @@
 
 同锁程序/data/终态执行、进展态恢复和接续 action `10` 已接线。初始准入仅接 `prepared/preflighted`；推进态和终态封存重新绑定精确 outer/preparation/data 或 release，并取得四项确认、最多 5 分钟且可撤销的任务授权。`10` 只处理完整交接/封存，普通 bootstrap 空前驱限制保持，不能用它开始源库准备或取消。
 
-2026-10-17 已接通 `11–13`；准备完成另行确认 `10`，取消保存保留最后 marker。[A1 路径隔离被拒绝](../remediation/macos-source39-qualification-plan.md)，材料冻结、不复跑；Q2 阻塞，不复制/启动旧程序。[资格证据 reader](../remediation/macos-cancellation-qualification-reader-contract.md)已提交；生产目录为空，未接 issuer。[schema observer](../remediation/macos-source-schema-observation-contract.md)仅合成实现已提交，末次 Clippy 与完整门禁已通过，未接 reader。门禁已去除 macOS 默认长矩阵重复，结果见[本周接续记录](../devlogs/2026-W42.md#2026-10-18门禁优化与合成-observer-接续)。**下一步先讨论 Q2 隔离、独立程序资格与生产观察生命周期方案**；真实运行证据、生产 schema 与策略新鲜度仍缺，最终取消关闭，WAL/pager 内部断电与 B 段退出仍开放。
+2026-10-17 已接通 `11–13`；准备完成另行确认 `10`，取消保存保留最后 marker。[A1 路径隔离被拒绝](../remediation/macos-source39-qualification-plan.md)，材料冻结、不复跑；Q2 阻塞，不复制/启动旧程序。[资格证据 reader](../remediation/macos-cancellation-qualification-reader-contract.md)已提交；生产目录为空，未接 issuer。[schema observer](../remediation/macos-source-schema-observation-contract.md)仅合成实现已提交，当批 Clippy 与完整门禁通过，未接 reader。**下一步审阅独立程序资格与生产观察生命周期候选方案**；真实运行证据、生产 schema 与策略新鲜度仍缺，最终取消关闭，WAL/pager 内部断电与 B 段退出仍开放。
 
-新升级真正完成后才继续客户端身份与 composition 隐私实测，不直接重试 40。冻结 macOS 39/40、用户数据、Linux/UTM 与系统动作均不在本批范围；实机动作仍须另行明确目标与授权。10-09 的待办由本批承接，历史交接保留在[2026-W41](../devlogs/2026-W41.md#2026-10-09明日事项)。
+新升级真正完成后才继续客户端身份与 composition 隐私实测，不直接重试 40。冻结 macOS 39/40、用户数据、Linux/UTM 与系统动作均不在本批范围；实机动作仍须另行明确目标与授权。
+
+2026-10-27：成本诊断与本轮验证收口，常规/可靠性均通过，5分钟目标未达。下一步审阅 Q2 准入、生产副本生命周期与策略新鲜度候选，未开放生产能力。记录见[2026-W44](../devlogs/2026-W44.md)。
 
 ## Linux M5 系统操作下一步（顺位不变，2026-09-05 复核）
 
@@ -90,7 +92,7 @@
 
 ## 验证入口
 
-2026-10-23 本机 `86fe464` 常规门禁及18项可靠性矩阵通过，共32分14秒；常规约14分34秒，未达5分钟目标，Go race 命中缓存。并发预算1、nice +19；Flutter内部多核峰值仍存在。覆盖、测量与限制见[门禁手册](../runbooks/repository-validation.md)，授权见[协作细则](../agent-collaboration.md)。 10-24核验/矩阵优化仅定向通过，完整门禁待验，未推送。
+2026-10-27：`2c08320`及当批文档快照的常规五组件、22项可靠性通过，耗时14分10.94秒/17分55.40秒，合计32分6.34秒，未超20/45分钟预算。无失败或重跑，5分钟目标未达；Go race五包命中缓存。并发预算1、nice +19，Flutter多核峰值仍在。结果见[周志](../devlogs/2026-W44.md)，规则见[门禁手册](../runbooks/repository-validation.md)与[协作细则](../agent-collaboration.md)。收尾仅文档检查，未推送；真实资格与容量实验未执行。
 
 ```bash
 ./scripts/check-linux-product-metadata.sh
@@ -120,4 +122,4 @@ git diff --check
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
 - [Linux L6 Debian package matrix runbook](../runbooks/linux-l6-package-matrix.md)
 - [Linux L6 收敛与本地资产生命周期](../runbooks/linux-l6-asset-lifecycle.md)
-- [本周周志](../devlogs/2026-W43.md)
+- [本周周志](../devlogs/2026-W44.md)
