@@ -262,7 +262,7 @@ impl PreparationJournalStore {
         }
         let inventory = PreviousInventory::decode(&bytes)?;
         inventory.verify_context(self, record)?;
-        self.verify_history_directories(&inventory, true)?;
+        self.verify_history_directories(&inventory, true, hasher)?;
         Ok(inventory)
     }
 
@@ -288,6 +288,7 @@ impl PreparationJournalStore {
         &self,
         inventory: &PreviousInventory,
         sealed: bool,
+        hasher: &impl PreparationHasher,
     ) -> Result<()> {
         let paths = inventory.paths(self)?;
         let expected = inventory
@@ -300,6 +301,7 @@ impl PreparationJournalStore {
             }
         }
         for entry in fs::read_dir(&paths[1]).map_err(|_| Error::Io)? {
+            hasher.before_read(0).map_err(|_| Error::Io)?;
             let entry = entry.map_err(|_| Error::Io)?;
             let name = entry.file_name();
             if name != "data" && name != INVENTORY && (sealed || name != "inventory.json.tmp") {
@@ -310,6 +312,7 @@ impl PreparationJournalStore {
             }
         }
         for entry in fs::read_dir(&paths[2]).map_err(|_| Error::Io)? {
+            hasher.before_read(0).map_err(|_| Error::Io)?;
             let entry = entry.map_err(|_| Error::Io)?;
             if !SLOTS
                 .iter()
@@ -347,7 +350,7 @@ impl PreparationJournalStore {
             return self.verify_released_inventory(inventory, hasher);
         }
         let history = if inventory.directories.is_some() {
-            self.verify_history_directories(inventory, record.is_some())?;
+            self.verify_history_directories(inventory, record.is_some(), hasher)?;
             Some(inventory.paths(self)?[2].clone())
         } else {
             None

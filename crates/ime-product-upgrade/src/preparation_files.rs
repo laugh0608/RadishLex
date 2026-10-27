@@ -14,10 +14,14 @@ impl PreparationJournalStore {
         path: &Path,
         hasher: &impl PreparationHasher,
     ) -> Result<(PreparationFileIdentity, Vec<u8>)> {
+        hasher.before_read(0).map_err(|_| Error::Io)?;
         let before = self.private_metadata(path)?;
         if before.len() > MAX_PREPARATION_RECEIPT_BYTES as u64 {
             return Err(Error::EvidenceChanged);
         }
+        hasher
+            .before_read(MAX_PREPARATION_RECEIPT_BYTES as u64 + 1)
+            .map_err(|_| Error::Io)?;
         let mut file = File::open(path).map_err(|_| Error::Io)?;
         if stamp(&file.metadata().map_err(|_| Error::Io)?) != stamp(&before) {
             return Err(Error::EvidenceChanged);
@@ -57,6 +61,7 @@ impl PreparationJournalStore {
         path: &Path,
         hasher: &impl PreparationHasher,
     ) -> Result<PreparationFileIdentity> {
+        hasher.before_read(0).map_err(|_| Error::Io)?;
         let before = self.private_metadata(path)?;
         let mut file = File::open(path).map_err(|_| Error::Io)?;
         if stamp(&file.metadata().map_err(|_| Error::Io)?) != stamp(&before) {

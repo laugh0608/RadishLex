@@ -176,7 +176,7 @@ impl TerminalReleaseStore {
                     return Err(Error::EvidenceChanged);
                 }
             }
-            self.history().verify_directories(record, true)?;
+            self.history().verify_directories(record, true, hasher)?;
             self.history().verify_files(record, hasher, false)?;
             self.history().verify_runtime(record, hasher)?;
             self.history().verify_preparation(record, hasher)?;

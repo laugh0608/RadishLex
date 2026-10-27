@@ -59,6 +59,7 @@ impl ReleaseHistory<'_> {
             }
         }
         for entry in fs::read_dir(&root).map_err(|_| Error::Io)? {
+            hasher.before_read(0).map_err(|_| Error::Io)?;
             let entry = entry.map_err(|_| Error::Io)?;
             let name = entry.file_name();
             if name == INDEX || name == INDEX_TEMP {
@@ -79,6 +80,7 @@ impl ReleaseHistory<'_> {
             "cancelled-outer.json",
         ];
         for entry in fs::read_dir(&directory).map_err(|_| Error::Io)? {
+            hasher.before_read(0).map_err(|_| Error::Io)?;
             let entry = entry.map_err(|_| Error::Io)?;
             if !allowed.iter().any(|v| entry.file_name() == *v)
                 && temporary.map(|v| v.0) != Some(entry.path().as_path())
@@ -178,6 +180,7 @@ impl ReleaseHistory<'_> {
                 }
             }
             for entry in fs::read_dir(&paths[2]).map_err(|_| Error::Io)? {
+                hasher.before_read(0).map_err(|_| Error::Io)?;
                 let entry = entry.map_err(|_| Error::Io)?;
                 if !SLOTS
                     .iter()
@@ -211,7 +214,8 @@ impl ReleaseHistory<'_> {
                 inventory.files = archive.previous_files.clone();
                 inventory.directories = archive.previous_directories.clone();
                 inventory.verify_context(self.journal, prep)?;
-                self.journal.verify_history_directories(&inventory, true)?;
+                self.journal
+                    .verify_history_directories(&inventory, true, hasher)?;
                 self.verify_bytes(
                     &paths[1].join(INVENTORY),
                     prep.previous_inventory_identity()
@@ -383,6 +387,7 @@ impl CancellationReleaseStore {
             for entry in
                 fs::read_dir(self.journal.store.root.path.join(HISTORY)).map_err(|_| Error::Io)?
             {
+                hasher.before_read(0).map_err(|_| Error::Io)?;
                 let name = entry.map_err(|_| Error::Io)?.file_name();
                 if name != INDEX
                     && name != INDEX_TEMP

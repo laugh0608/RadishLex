@@ -184,7 +184,7 @@ impl TerminalReleaseStore {
             {
                 return Err(Error::EvidenceChanged);
             }
-            self.history().verify_directories(next, false)?;
+            self.history().verify_directories(next, false, hasher)?;
             self.history().verify_files(next, hasher, false)?;
             self.history().verify_runtime(next, hasher)?;
             self.history().verify_preparation(next, hasher)?;

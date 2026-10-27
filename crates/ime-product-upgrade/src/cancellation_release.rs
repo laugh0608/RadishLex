@@ -86,6 +86,27 @@ impl CancellationReleaseStore {
         self.validate_active()?;
         Ok(self.journal.store.acquire_directory_guard()?)
     }
+
+    /// Verify a persisted pending proof and its physical source/history under
+    /// the existing inner guard. This entry has no mutation port and performs
+    /// no SQLite open, equivalence query, fsync or marker release. The outer
+    /// guard, installed products and task authorization belong to the caller.
+    pub fn verify_cancellation_observation(
+        &self,
+        guard: &UpgradeProcessGuard,
+        expected: &CancellationReleaseReceipt,
+        hasher: &impl PreparationHasher,
+    ) -> Result<()> {
+        hasher.before_read(0).map_err(|_| Error::Io)?;
+        self.journal.verify_guard(guard)?;
+        let (actual, _) = self.inspect_pending(expected.operation_id(), hasher)?;
+        if actual != *expected {
+            return Err(Error::EvidenceChanged);
+        }
+        self.journal.verify_guard(guard)?;
+        hasher.before_read(0).map_err(|_| Error::Io)?;
+        Ok(())
+    }
     fn history(&self) -> ReleaseHistory<'_> {
         ReleaseHistory {
             journal: &self.journal,

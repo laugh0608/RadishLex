@@ -22,6 +22,15 @@ pub use cancellation::{
 /// Implementations must propagate read failures and never return a partial hash.
 pub trait PreparationHasher {
     fn sha256(&self, source: &mut dyn Read) -> std::io::Result<[u8; 32]>;
+
+    /// Reserve a bounded raw read before it starts, or check current authority
+    /// before a metadata/enumeration step when `maximum_bytes` is zero.
+    /// Existing transaction hashers need no budget; observation hosts override
+    /// this hook and retain their precise cancellation/limit failure separately.
+    /// Hash implementations remain responsible for chunk checks on streams.
+    fn before_read(&self, _maximum_bytes: u64) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
