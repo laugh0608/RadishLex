@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-11-01（`90e7717`常规及22项可靠性完整通过，真实资格仍未闭合）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
+- 复核：2026-11-01（`90e7717`完整自动验收通过，Q2/策略新鲜度路线复审完成、待边界决策）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -80,9 +80,10 @@
 
 `11–13` 已接新准备、续跑和取消保存，最后 marker 保留。[reader](../remediation/macos-cancellation-qualification-reader-contract.md) 与 [schema observer](../remediation/macos-source-schema-observation-contract.md) 的生产库、备份标记/ACL窗口及panic保留修复在`90e7717`常规及22项可靠性通过；catalog为空、issuer未接。[A1](../remediation/macos-source39-qualification-plan.md)材料冻结，Q2/真实运行及观察、策略新鲜度、WAL/pager断电与B段退出仍开放。
 
-1. **本批自动验收已收口**：`90e7717`常规及适用可靠性通过；后续性能诊断仅由新明确热点触发。本机常规5分钟目标未达、常规CI10分钟未实测，不以此无限延期产品方案。
-2. **优先审阅Q2与策略新鲜度**：独立source39正常双程序运行、真实源观察及新鲜批准仍是分别成立的门槛，库实现与自动通过不生成资格。失败材料保留、旧reader已删材料不补建，历史具体syscall仍未知；结果见[周志](../devlogs/2026-W44.md)。
-3. 门禁收口后继续审阅 Q2 与策略新鲜度；不直接重试 40，新升级完成后才继续客户端身份与 composition 隐私实测。真实 39/40、用户数据、Linux/UTM、容量实验及系统动作均需另行明确范围与授权。
+1. **自动验收已收口**：本机常规5分钟未达、CI10分钟未测；性能诊断由新热点触发，不无限延期产品方案。
+2. **Q2先决策环境**：同账户/会话内仍无已证明路径。先选实际独立图形登录环境，再分隔离验证、副本核验、完整矩阵授权；不默认建账户/guest。
+3. **随后决策新鲜来源**：reader合同已补验证计划。离线目录、签名票据、防降级状态不能证明当前未撤销。逐检查点认证仅为建议，先批信任/撤销/隐私合同再做定向与八点组合验证，不默认新增服务/密钥设施。
+4. 运行证据、源schema/profile与新鲜度分别成立后才审issuer；最终取消关闭、不直接重试40。材料保留见[周志](../devlogs/2026-W44.md)。系统/实机/容量另行授权；边界不变则资格阻塞，M5顺位不变。
 
 ## Linux M5 系统操作下一步（顺位不变，2026-09-05 复核）
 
