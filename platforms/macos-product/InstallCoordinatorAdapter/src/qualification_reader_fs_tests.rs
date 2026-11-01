@@ -1,7 +1,7 @@
 use super::*;
 use std::fs::{self, DirBuilder, OpenOptions};
 use std::io::Write;
-use std::os::unix::fs::{symlink, DirBuilderExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{symlink, DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -11,6 +11,7 @@ static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 struct Fixture {
     holder: PathBuf,
     root: PathBuf,
+    holder_identity: (u64, u64, u32, u32),
 }
 
 impl Fixture {
@@ -25,9 +26,19 @@ impl Fixture {
             NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
         ));
         DirBuilder::new().mode(0o700).create(&holder).unwrap();
+        let meta = fs::symlink_metadata(&holder).unwrap();
+        let holder_identity = (meta.dev(), meta.ino(), meta.uid(), meta.mode());
+        eprintln!(
+            "synthetic reader fs fixture created: {} {holder_identity:?}",
+            holder.display()
+        );
         let root = holder.join("pack");
         DirBuilder::new().mode(0o700).create(&root).unwrap();
-        Self { holder, root }
+        Self {
+            holder,
+            root,
+            holder_identity,
+        }
     }
 
     fn file(&self, relative: &str, bytes: &[u8]) {
@@ -50,8 +61,41 @@ impl Fixture {
 
 impl Drop for Fixture {
     fn drop(&mut self) {
+        if std::thread::panicking() {
+            eprintln!(
+                "synthetic reader fs fixture retained after panic: {}",
+                self.holder.display()
+            );
+            return;
+        }
+        let meta = fs::symlink_metadata(&self.holder).unwrap();
+        assert_eq!(
+            (meta.dev(), meta.ino(), meta.uid(), meta.mode()),
+            self.holder_identity
+        );
         fs::remove_dir_all(&self.holder).unwrap();
     }
+}
+
+#[test]
+fn planned_panic_preserves_reader_filesystem_fixture() {
+    let mut saved = None;
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let fixture = Fixture::new();
+        fixture.file("synthetic.bin", b"planned panic evidence");
+        saved = Some((fixture.holder.clone(), fixture.holder_identity));
+        panic!("planned synthetic filesystem-fixture panic");
+    }));
+    assert!(result.is_err());
+    let (holder, expected) = saved.unwrap();
+    assert_eq!(
+        fs::read(holder.join("pack/synthetic.bin")).unwrap(),
+        b"planned panic evidence"
+    );
+    let meta = fs::symlink_metadata(&holder).unwrap();
+    assert_eq!((meta.dev(), meta.ino(), meta.uid(), meta.mode()), expected);
+    // Planned fault, exact fresh fixture only; never adopt an unknown residue.
+    fs::remove_dir_all(holder).unwrap();
 }
 
 fn control() -> ReadControl {

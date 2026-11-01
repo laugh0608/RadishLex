@@ -110,6 +110,7 @@ impl Caches {
         ));
         DirBuilder::new().mode(0o700).create(&path).unwrap();
         let meta = fs::symlink_metadata(&path).unwrap();
+        eprintln!("synthetic observer caches created: {}", path.display());
         Self {
             path,
             node: (meta.dev(), meta.ino()),
