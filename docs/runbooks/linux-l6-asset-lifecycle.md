@@ -2,6 +2,8 @@
 
 本文固定 M5-P05B 的收敛退出口径、当前 UTM 资产账本、保留/归档/删除建议和未来安全清理控制器边界。读者是准备收口 Linux L6 或维护本地 UTM 资产的维护者。本文不授权启动、克隆、注销、删除或清理任何 VM、快照、guest 数据、host evidence，也不把账面磁盘占用表述为实际可回收空间。
 
+2026-11-01：[交付基线审计](../remediation/linux-m5-delivery-baseline-audit.md)确认当前build40/Rime合同不属于旧38 pair，maintenance refresh也不能替代新包。本文原Move/物化与配额顺序继续约束旧partial，历史账本不代表本轮live观察；新source/pair与当前候选验收另行建立，不能套用旧记录。当前仓库任务先设计新基线，系统动作仍逐步授权，不默认增加guest或清理partial。
+
 ## 1. 收敛判断
 
 P05B 不再把八个 crash checkpoint 全部执行为真实系统阻塞项。八个场景仍由 committed matrix、compile-isolated acceptance controller、checkpoint/resume 合同、fake runner 和 canonical evidence schema 完整覆盖；真实系统只保留三个具有不同恢复边界的代表场景：
