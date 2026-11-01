@@ -160,6 +160,175 @@ fn sql_error(error: BudgetError) -> ObserverError {
     }
 }
 
+fn acl_sibling_change(
+    point: posix::diagnostics::Checkpoint,
+    read: fn(&File) -> Result<(), FsError>,
+) {
+    let fixture = Fixture::new(FixtureKind::MainOnly);
+    let directory = File::open(&fixture.caches).unwrap();
+    let sibling = fixture.caches.join("planned-sibling");
+    let created = sibling.clone();
+    let hook = posix::diagnostics::install(point, &directory, move || {
+        DirBuilder::new().mode(0o700).create(created).unwrap();
+    });
+    let result = read(&directory);
+    assert!(hook.fired());
+    assert_eq!(result, Ok(()), "directory entry churn is not an ACL change");
+    let meta = fs::symlink_metadata(&sibling).unwrap();
+    assert!(meta.is_dir() && meta.mode() & 0o7777 == 0o700);
+    fs::remove_dir(sibling).unwrap();
+    close(directory).unwrap();
+    fixture.finish();
+}
+
+#[test]
+fn private_directory_acl_accepts_unrelated_entry_churn() {
+    acl_sibling_change(
+        posix::diagnostics::Checkpoint::PrivateAclRead,
+        posix::reject_acl,
+    );
+}
+
+#[test]
+fn ancestor_acl_accepts_unrelated_entry_churn() {
+    acl_sibling_change(
+        posix::diagnostics::Checkpoint::AncestorAclRead,
+        posix::reject_grant_acl,
+    );
+}
+
+#[test]
+fn ancestor_open_reports_changes_without_adopting_the_path() {
+    let fixture = Fixture::new(FixtureKind::MainOnly);
+    let directory = File::open(&fixture.root).unwrap();
+    let sibling = fixture.root.join("planned-sibling");
+    let created = sibling.clone();
+    let hook = posix::diagnostics::install(
+        posix::diagnostics::Checkpoint::AncestorOpened,
+        &directory,
+        move || {
+            DirBuilder::new().mode(0o700).create(created).unwrap();
+        },
+    );
+    let chain = Chain::open(&fixture.caches, fixture.identity.owner_id, &budget());
+    assert!(hook.fired());
+    assert!(matches!(chain, Err(FsError::Changed)));
+    fs::remove_dir(sibling).unwrap();
+    close(directory).unwrap();
+    fixture.finish();
+}
+
+fn install_synthetic_acl(file: &File, tag: i32) {
+    use std::ffi::c_void;
+    use std::os::fd::AsRawFd;
+    extern "C" {
+        fn acl_init(count: libc::c_int) -> *mut c_void;
+        fn acl_create_entry(acl: *mut *mut c_void, entry: *mut *mut c_void) -> libc::c_int;
+        fn acl_set_tag_type(entry: *mut c_void, tag: libc::c_int) -> libc::c_int;
+        fn acl_set_qualifier(entry: *mut c_void, qualifier: *const c_void) -> libc::c_int;
+        fn acl_get_permset(entry: *mut c_void, permissions: *mut *mut c_void) -> libc::c_int;
+        fn acl_add_perm(permissions: *mut c_void, permission: libc::c_int) -> libc::c_int;
+        fn acl_set_fd(fd: libc::c_int, acl: *mut c_void) -> libc::c_int;
+        fn acl_free(object: *mut c_void) -> libc::c_int;
+    }
+    let subject = [0x17u8; 16]; // Fictional UUID, never a user/contact lookup.
+    let mut entry = std::ptr::null_mut();
+    let mut permissions = std::ptr::null_mut();
+    // SAFETY: new synthetic fd only; live owned ACL/output pointers, Darwin
+    // ALLOW=1, DENY=2 and READ_DATA=1<<1. Only the new fixture is changed.
+    unsafe {
+        let mut acl = acl_init(1);
+        assert!(!acl.is_null());
+        assert_eq!(acl_create_entry(&mut acl, &mut entry), 0);
+        assert_eq!(acl_set_tag_type(entry, tag), 0);
+        assert_eq!(acl_set_qualifier(entry, subject.as_ptr().cast()), 0);
+        assert_eq!(acl_get_permset(entry, &mut permissions), 0);
+        assert_eq!(acl_add_perm(permissions, 1 << 1), 0);
+        assert_eq!(acl_set_fd(file.as_raw_fd(), acl), 0);
+        assert_eq!(acl_free(acl), 0);
+    }
+}
+
+#[test]
+fn directory_acl_grants_between_observations_are_rejected() {
+    for (point, read) in [
+        (
+            posix::diagnostics::Checkpoint::PrivateAclRead,
+            posix::reject_acl as fn(&File) -> Result<(), FsError>,
+        ),
+        (
+            posix::diagnostics::Checkpoint::AncestorAclRead,
+            posix::reject_grant_acl,
+        ),
+    ] {
+        let fixture = Fixture::new(FixtureKind::MainOnly);
+        let directory = File::open(&fixture.caches).unwrap();
+        let changed = directory.try_clone().unwrap();
+        let hook = posix::diagnostics::install(point, &directory, move || {
+            install_synthetic_acl(&changed, 1)
+        });
+        assert!(read(&directory).is_err());
+        assert!(hook.fired());
+        close(directory).unwrap();
+        fixture.finish();
+    }
+}
+
+#[test]
+fn directory_mode_drift_during_acl_query_is_rejected() {
+    let fixture = Fixture::new(FixtureKind::MainOnly);
+    let directory = File::open(&fixture.caches).unwrap();
+    let changed = directory.try_clone().unwrap();
+    let hook = posix::diagnostics::install(
+        posix::diagnostics::Checkpoint::PrivateAclRead,
+        &directory,
+        move || {
+            changed
+                .set_permissions(fs::Permissions::from_mode(0o750))
+                .unwrap();
+        },
+    );
+    assert!(posix::reject_acl(&directory).is_err());
+    assert!(hook.fired());
+    directory
+        .set_permissions(fs::Permissions::from_mode(0o700))
+        .unwrap();
+    close(directory).unwrap();
+    fixture.finish();
+}
+
+#[test]
+fn deny_only_acl_is_allowed_only_for_ancestors() {
+    let fixture = Fixture::new(FixtureKind::MainOnly);
+    let directory = File::open(&fixture.caches).unwrap();
+    install_synthetic_acl(&directory, 2);
+    assert_eq!(posix::reject_grant_acl(&directory), Ok(()));
+    assert!(posix::reject_acl(&directory).is_err());
+    close(directory).unwrap();
+    fixture.finish();
+}
+
+#[test]
+fn source_file_content_drift_during_acl_query_is_rejected() {
+    let fixture = Fixture::new(FixtureKind::MainOnly);
+    let database = File::open(fixture.source.join(FAMILY[0])).unwrap();
+    let mut writer = fs::OpenOptions::new()
+        .write(true)
+        .open(fixture.source.join(FAMILY[0]))
+        .unwrap();
+    let hook = posix::diagnostics::install(
+        posix::diagnostics::Checkpoint::PrivateAclRead,
+        &database,
+        move || {
+            writer.write_all(b"x").unwrap();
+        },
+    );
+    assert!(posix::reject_acl(&database).is_err());
+    assert!(hook.fired());
+    close(database).unwrap();
+    fixture.finish();
+}
+
 #[test]
 fn evidence_source_and_cache_overlap_fail_before_copy_creation() {
     let fixture = Fixture::new(FixtureKind::MainOnly);

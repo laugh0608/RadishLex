@@ -91,8 +91,18 @@ impl Chain {
             let parent = value.file()?;
             let before = posix::ancestor_identity_at(parent, name)?;
             let file = posix::open_ancestor(parent, name)?;
+            #[cfg(test)]
+            posix::diagnostics::reached(posix::diagnostics::Checkpoint::AncestorOpened, &file);
             let id = identity(&file)?;
             if before != id {
+                #[cfg(test)]
+                posix::diagnostics::failure(
+                    "ancestor open identity",
+                    &FsError::Changed,
+                    None,
+                    Some(&before),
+                    Some(&id),
+                );
                 return Err(FsError::Changed);
             }
             value.nodes.push(Anchor {
@@ -135,9 +145,25 @@ impl Chain {
                 || (temporary && (current.owner != 0 || current.mode & 0o7777 != 0o1777))
                 || (!temporary && current.mode & 0o7022 != 0)
             {
+                #[cfg(test)]
+                posix::diagnostics::failure(
+                    "chain directory identity",
+                    &FsError::Identity,
+                    None,
+                    Some(&node.id),
+                    Some(&current),
+                );
                 return Err(FsError::Identity);
             }
-            posix::reject_grant_acl(&node.file)?;
+            let acl = posix::reject_grant_acl(&node.file);
+            #[cfg(test)]
+            if let Err(error) = &acl {
+                eprintln!(
+                    "synthetic chain ACL checkpoint: path={} error={error:?}",
+                    physical.display()
+                );
+            }
+            acl?;
             if index > 0
                 && !posix::ancestor_identity_at(
                     &self.nodes[index - 1].file,

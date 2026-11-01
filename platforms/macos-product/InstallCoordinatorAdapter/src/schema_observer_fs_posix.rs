@@ -8,6 +8,10 @@ use std::fs::File;
 use std::mem::MaybeUninit;
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
 
+#[cfg(test)]
+#[path = "schema_observer_fs_diagnostics.rs"]
+pub(crate) mod diagnostics;
+
 /// Single-threaded, deterministic synthetic failure injection. It cannot change
 /// an input path, install a process hook, or affect another test thread.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -84,6 +88,7 @@ pub(crate) fn name(value: &str) -> Result<CString, FsError> {
     }
     CString::new(value).map_err(|_| FsError::Identity)
 }
+#[cfg_attr(test, track_caller)]
 fn owned(fd: i32) -> Result<File, FsError> {
     if fd < 0 {
         return Err(last_error());
@@ -91,12 +96,19 @@ fn owned(fd: i32) -> Result<File, FsError> {
     // SAFETY: successful open/openat returns a fresh owned descriptor.
     Ok(unsafe { File::from_raw_fd(fd) })
 }
+#[cfg_attr(test, track_caller)]
 pub(crate) fn last_error() -> FsError {
-    match std::io::Error::last_os_error().raw_os_error() {
+    let errno = std::io::Error::last_os_error().raw_os_error();
+    let error = match errno {
         Some(libc::ENOENT) => FsError::Missing,
         Some(libc::EEXIST) => FsError::ScratchOccupied,
         _ => FsError::Io,
+    };
+    #[cfg(test)]
+    if !matches!(&error, FsError::Missing | FsError::ScratchOccupied) {
+        diagnostics::failure("posix syscall", &error, errno, None, None);
     }
+    error
 }
 pub(crate) fn close(file: File) -> Result<(), FsError> {
     let injected = fail(FsOperation::Close);
@@ -287,6 +299,38 @@ pub(crate) fn validate(
     Ok(id)
 }
 pub(crate) fn reject_acl(file: &File) -> Result<(), FsError> {
+    let before = identity(file)?;
+    private_acl_sample(file)?;
+    if before.directory() {
+        // Two fixed policy observations, not retry-until-success. A new grant
+        // between them must reject even though directory timestamps may move.
+        private_acl_sample(file)?;
+    }
+    let after = identity(file)?;
+    if !acl_identity_matches(&before, &after) {
+        #[cfg(test)]
+        diagnostics::failure(
+            "private ACL window",
+            &FsError::Changed,
+            None,
+            Some(&before),
+            Some(&after),
+        );
+        return Err(FsError::Changed);
+    }
+    Ok(())
+}
+
+fn acl_identity_matches(before: &Identity, after: &Identity) -> bool {
+    if before.directory() {
+        before.same_node(after)
+    } else {
+        // Source files retain size, link and exact timestamp protection.
+        before == after
+    }
+}
+
+fn private_acl_sample(file: &File) -> Result<(), FsError> {
     use std::ffi::c_void;
     extern "C" {
         fn acl_get_fd(fd: libc::c_int) -> *mut c_void;
@@ -301,12 +345,22 @@ pub(crate) fn reject_acl(file: &File) -> Result<(), FsError> {
     let before = identity(file)?;
     // SAFETY: acl_get_fd borrows a valid descriptor and returns an owned ACL.
     let acl = unsafe { acl_get_fd(file.as_raw_fd()) };
+    let query_errno = std::io::Error::last_os_error().raw_os_error();
+    #[cfg(test)]
+    diagnostics::reached(diagnostics::Checkpoint::PrivateAclRead, file);
     if acl.is_null() {
-        if std::io::Error::last_os_error().raw_os_error() == Some(libc::ENOENT)
-            && identity(file)? == before
-        {
+        let after = identity(file)?;
+        if query_errno == Some(libc::ENOENT) && acl_identity_matches(&before, &after) {
             return Ok(());
         }
+        #[cfg(test)]
+        diagnostics::failure(
+            "private ACL query/identity",
+            &FsError::Io,
+            query_errno,
+            Some(&before),
+            Some(&after),
+        );
         return Err(FsError::Io);
     }
     // SAFETY: ACL is live; validation and lookup borrow it before freeing once.
@@ -324,14 +378,45 @@ pub(crate) fn reject_acl(file: &File) -> Result<(), FsError> {
     if freed != 0 {
         return Err(FsError::Close);
     }
-    if valid && result == -1 && error == Some(libc::EINVAL) && identity(file)? == before {
+    let after = identity(file)?;
+    if valid && result == -1 && error == Some(libc::EINVAL) && acl_identity_matches(&before, &after)
+    {
         return Ok(());
     }
+    #[cfg(test)]
+    diagnostics::failure(
+        "private ACL policy/identity",
+        &FsError::Identity,
+        error,
+        Some(&before),
+        Some(&after),
+    );
     Err(FsError::Identity)
 }
 /// Ancestors may carry macOS' usual deny-delete ACL. Grant entries are rejected
 /// conservatively; dedicated private directories/files still require no ACL.
 pub(crate) fn reject_grant_acl(file: &File) -> Result<(), FsError> {
+    let before = identity(file)?;
+    ancestor_acl_sample(file)?;
+    if before.directory() {
+        ancestor_acl_sample(file)?;
+    }
+    let after = identity(file)?;
+    if !acl_identity_matches(&before, &after) {
+        #[cfg(test)]
+        diagnostics::failure(
+            "ancestor ACL window",
+            &FsError::Changed,
+            None,
+            Some(&before),
+            Some(&after),
+        );
+        return Err(FsError::Changed);
+    }
+    Ok(())
+}
+
+fn ancestor_acl_sample(file: &File) -> Result<(), FsError> {
     use std::ffi::c_void;
     extern "C" {
         fn acl_get_fd(fd: libc::c_int) -> *mut c_void;
@@ -347,12 +432,22 @@ pub(crate) fn reject_grant_acl(file: &File) -> Result<(), FsError> {
     let before = identity(file)?;
     // SAFETY: live descriptor; returned ACL is owned by this scope.
     let acl = unsafe { acl_get_fd(file.as_raw_fd()) };
+    let query_errno = std::io::Error::last_os_error().raw_os_error();
+    #[cfg(test)]
+    diagnostics::reached(diagnostics::Checkpoint::AncestorAclRead, file);
     if acl.is_null() {
-        return if std::io::Error::last_os_error().raw_os_error() == Some(libc::ENOENT)
-            && identity(file)? == before
-        {
+        let after = identity(file)?;
+        return if query_errno == Some(libc::ENOENT) && acl_identity_matches(&before, &after) {
             Ok(())
         } else {
+            #[cfg(test)]
+            diagnostics::failure(
+                "ancestor ACL query/identity",
+                &FsError::Identity,
+                query_errno,
+                Some(&before),
+                Some(&after),
+            );
             Err(FsError::Identity)
         };
     }
@@ -388,8 +483,27 @@ pub(crate) fn reject_grant_acl(file: &File) -> Result<(), FsError> {
     if unsafe { acl_free(acl) } != 0 {
         return Err(FsError::Close);
     }
-    if identity(file)? != before {
+    let after = identity(file)?;
+    if !acl_identity_matches(&before, &after) {
+        #[cfg(test)]
+        diagnostics::failure(
+            "ancestor ACL identity",
+            &FsError::Changed,
+            None,
+            Some(&before),
+            Some(&after),
+        );
         return Err(FsError::Changed);
+    }
+    #[cfg(test)]
+    if let Err(error) = &result {
+        diagnostics::failure(
+            "ancestor ACL policy",
+            error,
+            None,
+            Some(&before),
+            Some(&after),
+        );
     }
     result
 }

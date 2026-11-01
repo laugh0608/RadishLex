@@ -1,6 +1,6 @@
 # macOS 无 snapshot 源 schema 观察合同
 
-本文供 userdb、升级核心与 macOS 产品协调层维护者审阅，限定准备取消时缺少 snapshot schema 的观察来源、请求绑定、失效与验收条件。状态：**2026-10-27 实现生产观察库；11-01 按授权补强备份标记及路径绑定，8+1项定向测试、单包check/Clippy通过。修复后完整常规的备份回归通过，但reader观察`Filesystem(Io)`与layout捕获`Identity`两项失败，可靠性未启动，未重跑；完整验收未通过，详见[当周记录](../devlogs/2026-W44.md)。生产 catalog 为空、issuer 未接入，不提供生产资格。** 历史通过不覆盖本批；未操作冻结资产、真实库、账户或会话。
+本文供 userdb、升级核心与 macOS 产品协调层维护者审阅，限定准备取消时缺少 snapshot schema 的观察来源、请求绑定、失效与验收条件。状态：**11-01 完整常规曾在reader的`Io`及layout的`Identity`失败。随后补齐panic保留及检查点，确定性复现并修复持有目录ACL窗口的条目时间戳误判；16个不同父用例的两组定向验证及单包check/Clippy通过，新的完整验收待批准，详见[当周记录](../devlogs/2026-W44.md)。生产 catalog 为空、issuer 未接入，不提供生产资格。** 历史通过不覆盖本批；未操作冻结资产、真实库、账户或会话。
 
 上游为[资格证据 reader 合同](macos-cancellation-qualification-reader-contract.md)及[准备取消兼容合同](macos-preparation-cancellation-compatibility.md)。本设计不改变 v1/v2 回执、action `10–13`、双 guard/gate 或最终 marker；生产目录为空，issuer 未接入。设计源码定位基线为 `ad15bf7`，仅合成实施参数提交为 `ee6a11b`。
 
@@ -274,6 +274,10 @@ Apple 的[备份排除属性](https://developer.apple.com/documentation/foundati
 每次核验前后要求pathname与持有句柄的device/inode/owner/mode一致，拒绝缺失、符号链接和错绑；在Foundation有效属性读取两侧分别核验标记，读取前显式清除URL资源缓存。scratch目录身份沿用`Chain`的same-node合同，不把ctime/size当作目录身份；namespace仍由原guard及条目清单复验，源DB/WAL的完整时间戳、hash与身份检查不变。新增标记读取属于有固定上限的native元数据观察，原3 GiB文件内容计费范围不变，不能据此声称统计了全部OS IO。
 
 本批修复授权仅覆盖这项核验及新建合成fixture：新增原生调用为生产只读`fgetxattr`、CFData/plist解析与cache-clear；`fsetxattr`仅用于测试亲自创建目录的预定异常标记注入。没有新增依赖、公开ABI、资格提供者、系统安装或原始用户库访问。历史间歇失败的完整机制仍未知，确定性的标记/绑定回归不冒充其根因证据。
+
+同日ACL窗口修复沿用既有原生调用：对已经持有的目录句柄，以same-node核验device/inode/owner/mode，允许无关条目引起的size/link/mtime/ctime变化；固定执行两次有效ACL策略观察，任一次未知/错误/扩权立即拒绝，不重试到成功。私有目录必须无ACL，可信祖先只允许deny-only；源文件仍比较完整size/link及mtime/ctime，源family/目录的独立复验不变。初次祖先stat/open的全身份准入未放宽，路径替换和身份变化继续拒绝。
+
+检查点、errno及前后identity诊断和定点回调仅在`cfg(test)`编译，回调限当前测试线程、精确fd身份、单次触发；生产没有新增日志、任意路径入口或系统hook。reader的证据包、core proof及文件系统fixture在panic展开时保留并输出合成根，成功清理前核对原根身份；构造期间也提前登记新根。计划内panic回归只在确认快照与身份未变后拆除自己登记的对象，不能用于清理历史失败。旧reader已被原Drop删除的材料不补建；本批未取得历史失败当时的具体syscall，不能将可复现机制外推为所有旧样本的唯一根因。
 
 ### 核心复验、预算与处置
 
