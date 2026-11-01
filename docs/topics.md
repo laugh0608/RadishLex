@@ -47,7 +47,7 @@
 
 | 主要归属 | 子专题 / 原来源 | 接续任务与关闭依据 |
 | --- | --- | --- |
-| 安装、升级与产品载体 | [M5 基线审计](remediation/linux-m5-delivery-baseline-audit.md)、[source-first 合同](remediation/linux-m5-source-first-contract.md) | B1–B6、S/R/T 与 V1–V5 保留。先审 source / 新 pair、实际构建与资源资格，再形成新候选连续 L6、产品行为及独立 P05C；实现当前暂停，不能因地图登记自动启动 |
+| 安装、升级与产品载体 | [M5 基线审计](remediation/linux-m5-delivery-baseline-audit.md)、[source-first 合同](remediation/linux-m5-source-first-contract.md) | B1–B6、S/R/T 与 V1–V5 保留。先审 source / 新 pair、实际构建与资源资格，再形成新候选连续 L6、产品行为及独立 P05C；装配与收证入口见[source-first runbook](runbooks/linux-source-first-assembly.md)，实现、自动验证与真实资格分别判断；执行顺位只读current |
 | 安装、升级与产品载体 | [macOS WAL 升级恢复](remediation/macos-wal-upgrade-recovery-2026-09.md)、[源库准备](remediation/macos-wal-source-preparation-design.md)、[取消兼容](remediation/macos-preparation-cancellation-compatibility.md) | 程序 / 数据恢复与 action 10–13 的原范围、B 段及最终取消缺口；[联合验收](runbooks/macos-rev01-rev02-acceptance.md)与周志，不设置为 Linux M5 的新增退出前置 |
 | 安装、升级与产品载体 | [source39 资格](remediation/macos-source39-qualification-plan.md)、[schema 观察](remediation/macos-source-schema-observation-contract.md)、[资格 reader](remediation/macos-cancellation-qualification-reader-contract.md) | Q2、F0、W0、catalog / issuer 与真实程序资格各自满足原条件；合成结果和方案不能解除当前冻结现场与最终取消关闭状态 |
 | 质量、供应链与发布 | [产品审阅 REV](remediation/product-review-2026-09.md) | 跨输入、隐私、数据、安装和工具链的整合审阅；每项关闭条件在原专题，具体修复由对应能力主线承担，不复制第二张状态表 |
@@ -56,7 +56,7 @@ M5 审计中旧 VM 数量、路径与 Move/adopt 候选是当时的资源输入�
 
 ## 近期工作的阅读链
 
-1. source-first：current → 基线审计 B1 → source-first 的 S/R/T、首批范围和 V1/V2；当前暂停继续有效，V3–V5 另有环境和运行前置。
+1. source-first：current → 基线审计 B1 → source-first 的 S/R/T、首批范围和 V1/V2；装配/seed/target入口见runbook，V3–V5另有环境、材料审阅和运行前置，当前授权只读current。
 2. 构建与资源：current 的系统停止线 → B2/B3 → 源码锁、实际 L1–L5 与新 source 资格；不把旧 pair 声明或路径迁移当新 target 通过。
 3. M5 产品收口：source / pair 资格 → 代表 crash 与连续 L6 → 当前候选隐私 / 学习 / 删除 / 重启 → 独立 P05C → 原 M5 退出审阅；不把分散证据拼成一个 session。
 4. 后置支线：macOS 资格 / WAL、输入质量或性能、同步开放和后续平台各沿 current 与原路线图的进入条件；本批不新建任务优先级或放宽门禁。

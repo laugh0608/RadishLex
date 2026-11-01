@@ -1,6 +1,6 @@
 # Linux M5 交付基线与剩余门槛审计
 
-本文面向 Linux 产品、构建与验收维护者，记录回归 M5 主线后的候选、源码约束、证据缺口和串行顺序。状态：**2026-11-01 仓库审计完成，[source-first合同](linux-m5-source-first-contract.md)已成稿待实施批准；新交付基线尚未建立，未构建或实机核验候选。** 本文不授权修改冻结 pair、扩大 VM 预算、启动/移动 guest、安装、发布或下载依赖。执行优先级见 [current](../status/current.md)，长期退出标准见[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)。
+本文面向 Linux 产品、构建与验收维护者，记录回归 M5 主线后的候选、源码约束、证据缺口和串行顺序。状态：**2026-11-01 仓库审计完成，[source-first合同](linux-m5-source-first-contract.md)已批准，V1/V2及装配/seed/target仓库实现已提交，完整自动验证通过；新交付基线尚未建立，未构建或实机核验候选。** 本文不授权修改冻结 pair、扩大 VM 预算、启动/移动 guest、安装、发布或下载依赖。执行优先级见 [current](../status/current.md)，长期退出标准见[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)。
 
 ## 审计结论
 
@@ -8,7 +8,7 @@
 
 1. M5-P01–P04、P05A 的历史结果保留；P05B 已有包/事务/startup gate 和自动合同，但第三个代表 crash、连续 L6 与独立 P05C 未闭合。
 2. 当前产品元数据为 `26.7.1+40-2`；冻结 L6 是 `38-1 → 38-2`。不能用新代码直接接旧 pair，也不能把旧 pair 的历史结果当作 REV-01/REV-02 新候选资格。
-3. 当前实现没有通用的新 pair 生成入口：旧 builder 固定 source commit、包与 evidence 字节；maintenance refresh 只更新维护程序，禁止产品元数据变化。新基线需要先设计 source 首次建立与终态锚定，再形成同合同相邻 revision pair。[生产 maintenance CLI](../../platforms/linux-product/src/system/host.rs)的 `install` 接受 target-only `.deb`/evidence，不依赖 pair record；可用此既有事务建立 source，避免“必须先有完整pair才能取得source锚点”的循环。这里只确认源码入口存在，未执行安装。
+3. 审计起点尚无新 pair 生成入口（后续实现见执行顺序）：旧 builder 固定 source commit、包与 evidence 字节；maintenance refresh 只更新维护程序，禁止产品元数据变化。新基线需要先设计 source 首次建立与终态锚定，再形成同合同相邻 revision pair。[生产 maintenance CLI](../../platforms/linux-product/src/system/host.rs)的 `install` 接受 target-only `.deb`/evidence，不依赖 pair record；可用此既有事务建立 source，避免“必须先有完整pair才能取得source锚点”的循环。这里只确认源码入口存在，未执行安装。
 4. macOS Q2、F0、最终取消、WAL 内部故障宿主及 W0 不作为 Linux M5 的默认前置；保留其未关闭状态、guard/gate 和冻结现场。共享隐私与 SQLite 修复则必须由新的 Linux 实际载体复验。
 
 ## 候选与兼容边界
@@ -51,7 +51,7 @@
 | --- | --- | --- |
 | B1 新交付链未建立 | build40 不是旧 pair target；当前也没有新 source 终态锚点 | 独立的新 source-first 合同、实际 source `.deb`/evidence、已安装 terminal 与精确身份、clean descendant target；旧 JSON、source 常量和原证据保持 |
 | B2 实际构建/依赖资格未知 | 本轮未进入 Debian13 ARM64 builder；现有本机门禁不能替代目标产物 | 明确现有 builder、离线依赖可用性、Rust/Flutter/CMake/librime/Fcitx 工具版本、双 FFI/addon/Manager/rootfs/ELF/`.deb` L1–L5 及实际 SQLite 身份；缺工具时先报告，不自动安装/下载 |
-| B3 guest 资源与第三 crash | 历史账本为5个 managed 锚点加1个 stopped partial，已到6台预算；partial仅为壳，不是S2副本，状态未本轮复验 | 先按现有 case 另批原生 UI Move、adopt、物化、start/input-preflight/crash/exact resume/stop；形成可追溯终态后才按授权退休并取得下一 disposable 配额。不能默认再建guest或重跑clone |
+| B3 guest 资源与第三 crash | 历史项目预算已满，partial仍非S2；本机目录已整理，旧路径控制不可直接沿用，当前资产以current及本机README为准 | 先只读审迁后路径/身份绑定与新pair资源方案；旧case收口与新pair三类代表crash分别界定、逐步授权，不自动Move/adopt、物化、启动、退休、扩容或重跑clone |
 | B4 连续 L6 | 六类 operation 现有分散证据不能拼成连续 session；两项已闭合 crash 也不覆盖新 pair | 同一新 guest、同一获准 pair 的 install→upgrade→repair→rollback→remove→reinstall；包含实际载体、receipt/dpkg/process、双端startup正负、dependency/font、XDG保留、断网与reboot。必须明确旧 crash 证据适用域及新 pair 的代表 crash 覆盖，不自动平移 |
 | B5 当前 Linux 产品行为 | P04历史实测早于REV修复，当前候选真实隐私/学习/质量复验不足 | 对实际新产品覆盖Wayland主路径、X11适用回归、跨上下文隐私与普通恢复、多session、候选/commit、本地学习/删除/tombstone、Manager同库/重启；只用合成数据，不把安装维护的XDG零写入场景混作学习场景 |
 | B6 P05C与退出 | P05B未收口，独立实机验收未完成 | 另一独立guest授权验收、必要常规和全部适用专项、残余限制与M5退出审阅；不扩张为八个真实crash全跑或公开发布 |
@@ -60,10 +60,10 @@ REV-06 的根 Rust 1.80 声明与近期依赖 MSRV 不一致仍开放。新 buil
 
 ## 执行顺序
 
-审计后已完成[source-first合同](linux-m5-source-first-contract.md)，固定S构建/R审阅/T后继、source seed、锚点字段、新pair及V1–V5验证范围，待实施批准。下列顺序仍约束真实交付链；当前不能直接运行旧 pair builder，不扩展跨 Rime/schema 迁移，不新建通用验收框架。
+审计后已批准[source-first合同](linux-m5-source-first-contract.md)，固定S构建/R审阅/T后继、source seed、锚点字段、新pair及V1–V5范围。`fde0ecb`与`8800142`已交付仓库准入、单artifact装配、seed材料归集和target编排，并取得完整自动通过；真实ARM64构建与V3–V5仍未执行。入口见[装配runbook](../runbooks/linux-source-first-assembly.md)，提交本身不构成受审source锚点。下列顺序仍约束真实交付链；当前不能直接运行旧 pair builder，不扩展跨 Rime/schema 迁移，不新建通用验收框架。
 
-1. **固定新基线方案**：明确 source候选/冻结时点、首次 source 包生成及终态取证方式、新 pair/case 与旧合同的隔离、target相邻revision和谱系、证据引用、失败保留及每步预算。真实 source 证据未产生前不编造 anchor，不写占位哈希给 builder；实施前审阅具体代码/文件范围。
-2. **落实环境资格与资源路径**：仓库可先审设计；真正查询或改动 builder/VM须独立授权。现有资产边界下，下一允许申请的系统动作仍只有旧 partial 的原生 UI Move；后续 adopt/物化/启动/旧第三crash/stop/退休分段授权。若该环境链受阻，记录具体 blocker，不自动扩建框架、创建替代clone、删除未终结partial或提高预算。
+1. **固定新基线方案**：明确 source候选/冻结时点、首次 source 包生成及终态取证方式、新 pair/case 与旧合同的隔离、target相邻revision和谱系、证据引用、失败保留及每步预算。真实source证据未产生前不编造anchor，不写占位哈希给builder；仓库实现已完成，接续先审具体S候选及证据计划。
+2. **落实环境资格与资源路径**：仓库可先审设计；真正查询或改动 builder/VM须独立授权。目录整理后遵循[本机README](/Users/luobo/VirtualMachines/README.md)，日常复用Debian13-ARM64/Windows11-ARM64、干净基线仅备份；必要独立seed/L6/P05C环境先论证资源与隔离，不自动创建。旧partial控制须先审迁后绑定，不能沿用旧Move顺序直接执行。若该环境链受阻，记录具体 blocker，不自动扩建框架、创建替代clone、删除未终结partial或提高预算。
 3. **建立新 source**：在获准现有构建环境形成L1–L5合格的当前合同包，冻结精确字节与构建提交；在获准新合成根/guest取得 source 首次安装终态及身份。执行中无需第二台并发VM；builder与测试guest角色和顺序在实际资源申请中固定。source未合格则不构建pair target。
 4. **形成新 pair 并执行 P05B**：source作为不可重建输入；由clean descendant形成相邻revision target、production maintenance/verifier与编译隔离的acceptance，逐侧actual `.deb`核验。新case先做匹配定向合同，完整L6/专项另批；再执行B4与B5，不将旧profile结果标成新候选通过。
 5. **P05C与退出**：P05B完整后，另批独立guest验收。关闭必要隐私/数据/安装缺口后审M5退出；Android/Windows/iOS、真实用户同步和公开发布不提前启动。

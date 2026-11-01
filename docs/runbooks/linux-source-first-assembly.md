@@ -42,7 +42,9 @@ receipt report的非摘要facts必须与Rust结果完全相同；root/staging材
 
 collector核验S verifier实际文件/ELF和source在Git中的S metadata/锁/配方、读取窗口内全部私有材料、source包/evidence及执行器前后identity/hash，再生成12个脱敏附件和seed.evidence.json，复用closed-seed/guest-host一致性核验并独占发布。raw receipt及私有材料留原根，work另保留private inventory摘要与raw-material-review=required。错误、panic或发布后同步失败均保留已产生材料，没有R生产锚点自动生成。
 
-## 本轮仓库验证计划
+## 首次仓库定向验证计划与执行记录
+
+以下保留初批计划和失败诊断；后续批准的复验及完整自动结果按时间记录在后续小节。仓库实现已提交`8800142`，不因本节命令仍列出而自动重跑；下一执行顺位只读current。
 
 当前轮只首次执行新增PipelineTests及Rust source_seed_五个用例，串行，各预算最多5分钟；不重放上一批41项，不执行全仓/可靠性或Linux实际构建。Python模块为`scripts/linux-product/test_source_first_pipeline.py`；所有合成目录/日志保留，命令执行器仅用本轮新建的假工具和一次打印文本的Python子进程。Rust用例只用FakeDpkg，保留全新合成根，用户数据触碰计数为0。
 

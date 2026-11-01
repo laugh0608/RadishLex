@@ -116,6 +116,10 @@
 
 测试 profile 仍只优化 sha2 0.10.9 和升级核心，保留 debug assertions/overflow checks；生产 profile 不变。runner 记录每条命令耗时及30秒心跳。POSIX 正常、失败或中断后只回收本命令进程组；非 POSIX 不能声明同等进程树保证。HTTP fixture 持有实际服务 Child，正常及失败均收尾。
 
+监护证据根的私有`umask 077`与被测子进程环境分开设置；子进程沿用本轮批准的构建/测试口径（本机既有口径为`022`），启动前记录实际nice、umask及并发值。监护不得因继承私有证据权限改变被测fixture语义；失败先核对环境及材料，不自动改权限或重跑。采样不等于CPU/RSS硬限额。
+
+fixture在panic时应保留并输出新建根；成功清理只覆盖自身登记的合成材料。Linux startup的`TestSite`已按此保留，macOS reader/observer的诊断与保留范围见对应合同；历史已被旧Drop清理的现场如实标缺失，不补建冒充原件。
+
 不清理未知目录、失败证据或冻结现场。中断保留未完成结论；不恢复旧进程或用旧日志接续成功。
 
 ## 调整后的验证

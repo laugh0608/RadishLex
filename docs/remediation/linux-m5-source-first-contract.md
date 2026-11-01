@@ -1,6 +1,6 @@
 # Linux M5 source-first 交付基线合同
 
-本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。状态：**2026-11-01 合同已批准，首批已提交；新编排27项定向通过；本批完整常规及22项可靠性通过，V3–V5未执行；没有新包、source 锚点或新 pair 资格。** 上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
+本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。状态：**2026-11-01 合同已批准，`fde0ecb`/`8800142`已提交准入与装配/seed/target仓库实现；本批完整常规及22项可靠性通过，V3–V5未执行；没有新包、source 锚点或新 pair 资格。** 上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
 
 ## 目标与边界
 
@@ -89,9 +89,9 @@ raw receipt（现有限额64KiB）和必要系统原文仅在获准的私有现�
 
 首版采用**显式新profile + 新命名的仓库声明**，保留旧38 pair、`SOURCE_COMMIT/SOURCE_CHAIN_ANCHOR`、refresh及历史case原样。不把旧工具放宽为接受任意外部JSON/public key，也不自动寻找“最新通过”的seed。
 
-- 拟议candidate声明只定义本合同的版本/平台/seed要求，允许源包构建与准入材料采集；它没有source锚点，不能进入pair target构建。
-- 拟议baseline声明只在R阶段、真实材料审阅后产生，含上述source锚点及目标相邻revision约束；这是首版唯一可供新pair入口采用的来源。两类声明分别严格解析，不能将缺anchor当作首次路径。
-- 新profile及portable格式拟命名为 `debian13-arm64-source-first-v1` / `radishlex-linux-source-seed-evidence-v1` / `radishlex-linux-source-first-pair-evidence-v1`；本轮开始实现严格格式；格式存在不代表生产许可。
+- candidate声明（`packaging/linux/source-first-candidate.json`）只定义本合同的版本/平台/seed要求，允许源包构建与准入材料采集；它没有source锚点，不能进入pair target构建。
+- baseline声明（`packaging/linux/source-first-baseline.json`，尚不存在）只在R阶段、真实材料审阅后产生，含上述source锚点及目标相邻revision约束；这是首版唯一可供新pair入口采用的来源。两类声明分别严格解析，不能将缺anchor当作首次路径。
+- 新profile及portable格式分别为 `debian13-arm64-source-first-v1` / `radishlex-linux-source-seed-evidence-v1` / `radishlex-linux-source-first-pair-evidence-v1`；仓库已实现严格解析，格式存在不代表生产许可。
 
 上述baseline profile与既有matrix profile分开：复用`debian13-arm64-ephemeral-v1`的六operation、八自动crash、路径/字体/startup合同及acceptance evidence编码，不改其格式。新case另绑定baseline、真实pair摘要和精确执行器；digest未产生前不填占位case，旧case不能因共享matrix profile而认领新pair。
 
@@ -109,7 +109,7 @@ source seed和新pair的portable JSON沿用canonical UTF-8 pretty JSON加末尾�
 
 证据清单记录输入前后identity/hash，闭合全部必需文件，不扫描未知根补齐成功材料。不在record保存输入内容、密钥、真实用户资料、raw operation ID、PID、proc/dpkg全文或构建路径。没有新增签名权威、策略新鲜度服务、Keychain或外部存储；审阅提交不能当作任何系统mutation授权。
 
-资源按现有managed预算及最多一台运行VM串行安排。旧partial仍须先依原合同处理并取得后续disposable配额；seed guest的正常停止/证据冻结不自动允许退休，退休另批。保留seed证据与artifact后，未来验收可在另一fresh guest重新安装同一source包，不要求seed guest常驻注册；不得据此删除其原始材料。builder、seed、crash、连续L6、P05C角色逐项安排，不能默认多占guest或重用冻结/P04 guest。
+资源遵循[本机README](/Users/luobo/VirtualMachines/README.md)、现有managed预算及最多一台运行VM串行安排；干净基线只备份。目录整理后旧partial控制先审迁后路径/身份绑定，再逐步申请处理与后续disposable配额；seed guest的正常停止/证据冻结不自动允许退休，退休另批。保留seed证据与artifact后，未来验收可在另一fresh guest重新安装同一source包，不要求seed guest常驻注册；不得据此删除其原始材料。builder、seed、crash、连续L6、P05C角色逐项安排，不能默认多占guest或重用冻结/P04 guest。
 
 ## 验证计划与准入产物
 
@@ -125,13 +125,15 @@ V5的crash样本可各自使用获准的新snapshot/guest并保留各自失败�
 
 ## 首批实现范围与明确停止点
 
-建议实现范围只包括：新candidate/seed/baseline严格验证与有界合成用例；一个调用既有产品构建步骤的单artifact装配入口；source seed只读证据校验；新命名pair入口及target有界编排。可复用 [source copy原语](../../scripts/linux-product/l6_source_anchor.py)，但其现有完整实现必须经过新风险用例核对，不能因摘要相同而跳过读取窗口身份检查。
+已批准的仓库实现范围只包括：新candidate/seed/baseline严格验证与有界合成用例；一个调用既有产品构建步骤的单artifact装配入口；source seed只读证据校验；新命名pair入口及target有界编排。可复用 [source copy原语](../../scripts/linux-product/l6_source_anchor.py)，但其现有完整实现必须经过新风险用例核对，不能因摘要相同而跳过读取窗口身份检查。
 
 具体文件分工由实施批固定在`scripts/linux-product/`浅层和少量`scripts/`入口；保留旧接口与常量，不预建通用profile registry或空转wrapper。新命名的candidate配置可随实现提交；包含真实source摘要的baseline配置必须等V3完成，不能先提交测试值。原receipt/事务/data contract/FFI、默认数据保留、锁和production/acceptance隔离均不更改，无新依赖或SDK下载。
 
 原设计批仅交付合同和状态同步。2026-11-01 已批准恢复 V1/V2 仓库实现；这不等于批准V3–V5实机动作。第一实施批只允许仓库实现与有界定向检查，完整验收另行申请。候选编号、环境、目标或协议范围实质变化时重新审阅；失败先诊断、不自动重跑、不推送。当前仍无source锚点、pair或M5退出证据。
 
-## V1/V2 仓库实施切片（2026-11-01）
+## V1/V2 首批实施记录（2026-11-01，fde0ecb）
+
+本节保留首批范围与当时结果；后续装配/采集/target仓库实现已在`8800142`提交，详见下节及[装配runbook](../runbooks/linux-source-first-assembly.md)。两次提交均不自动分配S/R/T身份。
 
 本批交付独立的 [candidate](../../packaging/linux/source-first-candidate.json)、[严格格式](../../scripts/linux-product/source_first_contract.py)、[只读准入](../../scripts/linux-product/source_first.py)、[读取与发布](../../scripts/linux-product/source_first_io.py)和[source精确拷贝](../../scripts/linux-product/source_first_stage.py)。不更改旧38入口/常量、refresh、matrix、receipt或production行为，也不创建生产baseline或新case。
 
