@@ -1,6 +1,6 @@
 # macOS 无 snapshot 源 schema 观察合同
 
-本文供 userdb、升级核心与 macOS 产品协调层维护者审阅，限定准备取消时缺少 snapshot schema 的观察来源、请求绑定、失效与验收条件。状态：**2026-10-27 按批准范围实现生产观察库入口、私有副本生命周期及 reader 绑定，定向验证及四包全目标 Clippy 通过；11-01 完整常规在备份属性负向用例失败，可靠性未启动，未重跑，详见[当周记录](../devlogs/2026-W44.md)。生产 catalog 为空、issuer 未接入，不提供生产资格。** 10-18 合成实现的历史通过不覆盖本批；未操作冻结资产、真实库、账户或会话。
+本文供 userdb、升级核心与 macOS 产品协调层维护者审阅，限定准备取消时缺少 snapshot schema 的观察来源、请求绑定、失效与验收条件。状态：**2026-10-27 实现生产观察库；11-01 完整常规在备份属性负向用例失败，可靠性未启动。随后按授权补强句柄标记及路径绑定核验，8+1项定向测试、单包check/Clippy通过；修复后的完整验收待另行批准，详见[当周记录](../devlogs/2026-W44.md)。生产 catalog 为空、issuer 未接入，不提供生产资格。** 历史通过不覆盖本批；未操作冻结资产、真实库、账户或会话。
 
 上游为[资格证据 reader 合同](macos-cancellation-qualification-reader-contract.md)及[准备取消兼容合同](macos-preparation-cancellation-compatibility.md)。本设计不改变 v1/v2 回执、action `10–13`、双 guard/gate 或最终 marker；生产目录为空，issuer 未接入。设计源码定位基线为 `ad15bf7`，仅合成实施参数提交为 `ee6a11b`。
 
@@ -263,11 +263,17 @@ SQLite 缓存是建议值，`temp_store` 还受编译配置影响，progress 回
 
 - 位置固定为 Foundation 当前用户 Caches 域的 `RadishLex/SchemaObservation-v1/active`；以系统账户 home 交叉检查普通当前用户 `Library/Caches`，拒绝容器或环境重定向，不提供任意路径参数及 fallback。测试专用入口只注入新建合成 Caches 根；没有实际创建用户 Caches 下的产品目录。
 - 实际祖先逐级以描述符验证，不跟随链接，允许可信祖先的 deny-only ACL；产品私有目录及文件不允许 ACL，分别为 `0700` / `0600`。source/data/history 与 evidence 根按实物祖先身份排除重叠。root/real-effective UID 不同、非私有 owner/mode、成员 link/身份/hash 漂移均拒绝。
-- 独占创建空 `active` 同时作为跨进程 lease；专用根已有任何条目即拒绝。取得 lease 后，敏感字节写入前设置专用根及 active 的备份排除属性，并用新 CFURL 回读，捕获/查询/处置前后复验。没有修权限、认领旧目录、换根重试或 TTL 清扫。
+- 独占创建空 `active` 同时作为跨进程 lease；专用根已有任何条目即拒绝。取得 lease 后，敏感字节写入前设置专用根及 active 的备份排除属性，按下述句柄/路径/有效属性交叉核验，捕获/查询/处置前后复验。没有修权限、认领旧目录、换根重试或 TTL 清扫。
 - 源只按描述符读取；完整 proof 的 `source_ready` 决定 DB/WAL/SHM 缺失状态。只复制 DB/WAL；原 SHM 参与原件摘要，副本 SHM 只能在 SQLite 开始后登记。当前验证器 `compiled-fresh-schema9-exact-v1` 与本构建新建内存 userdb 的精确 manifest 比较；未知历史 layout、其他版本及非法 WAL 均拒绝，不推断 source 39 的 schema。
 - `SourceSchemaAuthority` 的 native Installer 桥接复用同一个任务 grant 的撤销状态和 deadline；没有续期或自发授权。`GuardedCancellationSource` 持有外层/内层 guard 引用，结果绑定完整 canonical proof、typed source/target、完整 family 和进程内 call ID。无 snapshot、维护未开始、handoff 未开始才准入。
 
 Apple 的[备份排除属性](https://developer.apple.com/documentation/foundation/urlresourcevalues/isexcludedfrombackup)不是所有备份工具、系统快照或 swap 的隔离保证；属性还可能继承自父目录。合成故障测试同时清除专用根及 leaf 来证明失败关闭，不能把叶目录 setter 成功等同于有效属性已清除。磁盘副本和 unlink 不提供安全擦除保证。
+
+11-01 修复不再仅以新 CFURL 的肯定回读作为资格。设置仍只使用 Foundation；生产核验新增只读 Darwin `fgetxattr`，从已验证目录句柄读取当前 profile 的 `com.apple.metadata:com_apple_backup_excludeItem`，每次最多256字节，要求是精确字符串 `com.apple.backupd` 的有效 plist。CoreFoundation仅在内存解析这份小材料，所有权与错误均显式释放/检查；生产不直接写扩展属性。缺失、空、超限、错误类型/值、无法解析或读取失败均拒绝，不跳过到继承属性或其他目录。该存储形状是本profile的保守准入条件，不承诺所有macOS/文件系统都提供相同标记；实际Caches资格尚未执行。
+
+每次核验前后要求pathname与持有句柄的device/inode/owner/mode一致，拒绝缺失、符号链接和错绑；在Foundation有效属性读取两侧分别核验标记，读取前显式清除URL资源缓存。scratch目录身份沿用`Chain`的same-node合同，不把ctime/size当作目录身份；namespace仍由原guard及条目清单复验，源DB/WAL的完整时间戳、hash与身份检查不变。新增标记读取属于有固定上限的native元数据观察，原3 GiB文件内容计费范围不变，不能据此声称统计了全部OS IO。
+
+本批修复授权仅覆盖这项核验及新建合成fixture：新增原生调用为生产只读`fgetxattr`、CFData/plist解析与cache-clear；`fsetxattr`仅用于测试亲自创建目录的预定异常标记注入。没有新增依赖、公开ABI、资格提供者、系统安装或原始用户库访问。历史间歇失败的完整机制仍未知，确定性的标记/绑定回归不冒充其根因证据。
 
 ### 核心复验、预算与处置
 

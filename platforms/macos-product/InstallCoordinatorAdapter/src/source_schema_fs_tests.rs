@@ -326,7 +326,10 @@ fn backup_property_failure_stops_before_capture_and_keeps_owned_leaf() {
     let fixture = Fixture::new(FixtureKind::MainOnly);
     let mut budget = budget();
     assert_eq!(
-        native::exclude_from_backup(&fixture.root.join("missing")),
+        native::exclude_from_backup(
+            &fixture.root.join("missing"),
+            &File::open(&fixture.root).unwrap()
+        ),
         Err(FsError::BackupExclusion)
     );
     let mut scratch = fixture.scratch(&mut budget);

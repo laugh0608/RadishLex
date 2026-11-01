@@ -371,8 +371,8 @@ impl Scratch {
             value.check(budget)?;
             // The exclusive empty leaf also serializes resource-property
             // changes on the shared dedicated root. No sensitive bytes exist.
-            native::exclude_from_backup(&value.base()?.path)?;
-            native::exclude_from_backup(&value.path)?;
+            native::exclude_from_backup(&value.base()?.path, value.base()?.file()?)?;
+            native::exclude_from_backup(&value.path, value.active()?)?;
             value.check_backup(budget)
         })();
         if let Err(error) = ready {
@@ -407,8 +407,8 @@ impl Scratch {
     }
     fn check_backup(&self, budget: &ObserverBudget) -> Result<(), FsError> {
         self.check(budget)?;
-        native::verify_backup_exclusion(&self.base()?.path)?;
-        native::verify_backup_exclusion(&self.path)?;
+        native::verify_backup_exclusion(&self.base()?.path, self.base()?.file()?)?;
+        native::verify_backup_exclusion(&self.path, self.active()?)?;
         self.check(budget)
     }
     pub(super) fn database_path(&self) -> PathBuf {
