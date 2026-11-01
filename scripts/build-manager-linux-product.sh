@@ -7,6 +7,7 @@ script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 manager_dir="${repo_root}/apps/radishlex-manager"
 cargo_home="${CARGO_HOME:-${HOME:-}/.cargo}"
+flutter_offline_arguments=()
 
 case "${1:-}" in
   --development-staged)
@@ -17,13 +18,23 @@ case "${1:-}" in
     native_profile="system-product"
     startup_identity_marker="debian-system-product"
     ;;
+  --system-product-offline)
+    native_profile="system-product"
+    startup_identity_marker="debian-system-product"
+    flutter_offline_arguments=(--no-pub)
+    export CARGO_NET_OFFLINE=true
+    if [[ ! -f "${manager_dir}/.dart_tool/package_config.json" ]]; then
+      echo "Offline Manager build requires pre-provisioned pub package configuration." >&2
+      exit 1
+    fi
+    ;;
   *)
-    echo "usage: $0 --development-staged|--system-product" >&2
+    echo "usage: $0 --development-staged|--system-product|--system-product-offline" >&2
     exit 2
     ;;
 esac
 if [[ "$#" -ne 1 ]]; then
-  echo "usage: $0 --development-staged|--system-product" >&2
+  echo "usage: $0 --development-staged|--system-product|--system-product-offline" >&2
   exit 2
 fi
 
@@ -73,6 +84,7 @@ fi
   RADISHLEX_MANAGER_FFI_LIBRARY="${ffi_library}" \
   RADISHLEX_MANAGER_NATIVE_PROFILE="${native_profile}" \
     flutter build linux \
+      "${flutter_offline_arguments[@]}" \
       --release \
       --dart-define=RADISHLEX_MANAGER_MODE=product
 )

@@ -60,6 +60,11 @@ product_version="$(
 )"
 temp_dir="$(mktemp -d "${canonical_output_parent}/.radishlex-addon.XXXXXX")"
 cleanup() {
+  local status=$?
+  if [[ ${status} -ne 0 && "${RADISHLEX_PRESERVE_BUILD_FAILURES:-0}" == 1 ]]; then
+    echo "Failed addon build retained: ${temp_dir}" >&2
+    return "${status}"
+  fi
   rm -rf "${temp_dir}"
 }
 trap cleanup EXIT

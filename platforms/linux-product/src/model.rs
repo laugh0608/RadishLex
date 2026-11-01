@@ -3,6 +3,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+mod source_seed;
+
 pub const LINUX_INSTALL_RECEIPT_FORMAT: &str = "radishlex-linux-install-receipt-v1";
 pub const LINUX_INSTALL_PRODUCT_ID: &str = "radishlex-linux";
 pub const LINUX_DISTRIBUTION_IDENTITY: &str = "debian-local-deb-v1";

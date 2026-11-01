@@ -18,4 +18,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_source_first.py" \
   --test-root "${evidence_root}/cases" >"${evidence_root}/tests.log" 2>&1
 cat "${evidence_root}/tests.log"
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/test_source_first_pipeline.py" \
+  --test-root "${evidence_root}/pipeline" >"${evidence_root}/pipeline.log" 2>&1
+cat "${evidence_root}/pipeline.log"
 echo "Source-first V1/V2 synthetic admission passed; no build, VM or installation."

@@ -58,6 +58,9 @@ def clean_head(root: Path) -> str:
         raise SourceFirstError("tracked/untracked/submodule changes block build admission")
     from l6_release_pair import CLEAN_OUTPUT_RELATIVES
     for relative in CLEAN_OUTPUT_RELATIVES:
+        if relative == Path("apps/radishlex-manager/.dart_tool"):
+            # Offline pub configuration is a pinned input, not a prior product build.
+            continue
         path = root / relative
         if path.exists() or path.is_symlink():
             raise SourceFirstError(f"prior build output blocks admission: {relative}")

@@ -29,6 +29,11 @@ RECIPE_PATHS = (
     "packaging/linux/debian/artifact.json",
     "scripts/linux-product/source_first.py", "scripts/linux-product/source_first_contract.py",
     "scripts/linux-product/source_first_io.py", "scripts/linux-product/source_first_stage.py",
+    "scripts/linux-product/source_first_build.py", "scripts/linux-product/source_first_capture.py",
+    "scripts/linux-product/source_first_process.py",
+    "platforms/linux-product/src/bin/radishlex-linux-artifact-verifier.rs",
+    "platforms/linux-product/src/model.rs", "scripts/check-linux-product-layout.sh",
+    "platforms/linux-product/src/model/source_seed.rs",
 )
 ROLES = {"preflight", "receipt", "postflight", "startup", "quiescence", "dependencies",
          "network", "xdg", "guest-result", "host-readback", "host-stop", "input-stability"}

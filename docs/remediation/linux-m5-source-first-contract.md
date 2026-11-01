@@ -1,6 +1,6 @@
 # Linux M5 source-first 交付基线合同
 
-本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。状态：**2026-11-01 合同已批准，V1/V2 首批仓库实现，40项及1项新增定向验证分别通过；没有新包、source 锚点或新 pair 资格。** 上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
+本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。状态：**2026-11-01 合同已批准，首批已提交；新编排27项定向通过；本批完整常规及22项可靠性通过，V3–V5未执行；没有新包、source 锚点或新 pair 资格。** 上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
 
 ## 目标与边界
 
@@ -198,3 +198,19 @@ test_valid_seed_and_baseline_summaries
 结果：2026-11-01 原40项串行一次全部通过，result计时3.913秒（unittest报告3.912秒），未重跑。计划、逐例合成根、日志和result保留在`/private/var/folders/dp/rzjx58m54kng6tn5k5gjw71h0000gn/T/radishlex-source-first-v12.U5uVyj/`。入口报告nice优先级调整被沙盒拒绝，不能声称调度降级已应用；测试正常完成。没有VM/系统动作、真实构建、生产baseline、pair或完整门禁结果。
 
 收尾发现静态candidate检查只接受40-2会阻塞未来合法40-3。已修正为严格接受既定source或target metadata，静态检查仍不授予target准入；合成S fixture也在真实T版本检出时固定回source配置。新增`test_static_candidate_gate_accepts_source_and_target_without_anchor`首次独立执行一次通过（result计时1.004秒，unittest报告1.003秒），覆盖T版本检出下的合成S/R/T全链，原40项未重跑；新结果位于`/private/var/folders/dp/rzjx58m54kng6tn5k5gjw71h0000gn/T/radishlex-source-first-target-gate-e6iryg63/`。执行方式为`./scripts/run-low-impact.sh env PYTHONDONTWRITEBYTECODE=1 python3 -`，只装载上述一个`SourceFirstTests`用例、预登记新根、300秒自身调用预算和结果回读。该次也报告nice受限。当前41项全集尚未在最终快照重跑；完整验收仍待单独批准。
+
+## 装配、采集与target编排实施批
+
+2026-11-01 项目所有者批准提交V1/V2首批并继续补齐三条入口；首批已提交为`fde0ecb`，不将其认领为S或R。[实施runbook](../runbooks/linux-source-first-assembly.md)固定单artifact与target入口、离线环境、私有capture/Rust receipt桥、失败保留和本轮新增用例计划。旧版本/pair/receipt持久格式和production mutation不变；真实执行、完整验收与VM动作未获本轮授权。
+
+本实施批结果：Rust5项和定向Clippy通过；Python首项因测试临时根断言位置错误失败，断言已修正但未重跑，原其余25项未执行，连同新增Git来源拒绝项现27项待另批复验。失败根/日志保留，具体命令、证据和未验证范围见实施runbook；本轮无VM、真实构建/seed安装、新锚点、完整验收或推送。
+
+2026-11-01另行批准的27项复验在第5项停止：4过、1失败、22未执行，1.082秒。失败来自夹具多层mkdir中间materials目录0755，collector在注入前正确拒绝；已改逐层私有创建并补回调计数/精确异常断言，未重跑，不放宽生产规则。新失败根为 /private/tmp/radishlex-source-first-pipeline-review-20261101-78nxopac/，两批现场保留，仍待27项另批复验。
+
+2026-11-01再次获批的27项复验在新根 /private/tmp/radishlex-source-first-pipeline-review2-20261101-a1uyuhkz/ 串行一次全部通过，7.847秒，无失败/遗漏、未超300秒；被测21文件与上轮摘要匹配。夹具权限、实际注入/拒绝原因、source/target装配、私有seed归集及发布失败保留取得本轮合成证据；不替代Linux实际构建或V3–V5。两批失败材料继续保留，未重放旧41项/Rust/Clippy，未操作VM、执行完整验收或推送。
+
+2026-11-01完整验收经另行批准执行一次：常规109.77秒失败，Linux product库122过/9 startup失败，exit101，可靠性未启动。监护启动为保护文件设置的umask077被门禁继承，0644创建请求变为0600，被原startup读取前门拒绝；独立新文件诊断确认此机制，恢复基线022后是否通过仍待定向验证。nice19/并发1正确落实，源码快照前后相同、无超时/残留进程，不自动重跑。证据根 /private/tmp/rlxgate-source-first-20261101-5k0b7p3u/ 保留日志/快照/采样；9项原startup夹具被既有Drop清理，未重建。下一步先修正监护子进程umask并补panic夹具保留，再单独申请9项有界验证，不盲目重放完整门禁。
+
+2026-11-01 所有者明确批准修正监护、补失败夹具保留及9条exact测试，总300秒。仅startup测试TestSite Drop增加panic时保留目录和路径输出，正常清理/生产权限不变；监护077与gate子进程022隔离并预检。9条串行各一次全部通过，总5.927秒，每条1 passed/123 filtered out，快照前后相同、无超时/遗留进程。证据根 /private/tmp/rlx-startup-targeted-20261101-115ixjwp/，失败原材料不重建；panic保留分支已编译，但本轮9项通过未触发panic注入。最终全仓/统一feature图及可靠性仍待新一轮授权，未运行完整门禁、VM或推送。
+
+2026-11-01 新一轮经明确批准，在修正umask监护前门下，两条完整命令串行各一次均通过：常规723.57秒、可靠性1044.31秒（2/16/4共22项），总1767.88秒；HEAD为fde0ecb加22文件，前后diff/status/untracked摘要一致，无超时/监护错误/遗留进程，无重跑。证据根 /private/tmp/rlxgate-source-first-corrected-20261101-58tjbih5/，常规包含41项基础和27项新pipeline。新Linux实际构建/SQLite/双FFI、真实seed/R锚点、pair及V3–V5未执行；自动验证不能替代它们。本批仅结果文档收尾或提交不重跑完整门禁，后续开发按风险定向，稳定阶段再集中验收。
