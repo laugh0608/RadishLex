@@ -164,6 +164,7 @@ REQUIRED_FILES = [
     "platforms/linux-product/src/tests/recovery.rs",
     "platforms/linux-product/src/tests/system_port.rs",
     "packaging/linux/l6-release-pair.json",
+    "packaging/linux/source-first-candidate.json",
     "packaging/linux/l6-maintenance-refresh.json",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.h",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.m",
@@ -225,6 +226,12 @@ REQUIRED_FILES = [
     "scripts/check-linux-l6-contract.sh",
     "scripts/check-linux-l6-controller.sh",
     "scripts/check-linux-l6-release-pair.sh",
+    "scripts/check-linux-source-first.sh",
+    "scripts/linux-product/source_first.py",
+    "scripts/linux-product/source_first_contract.py",
+    "scripts/linux-product/source_first_io.py",
+    "scripts/linux-product/source_first_stage.py",
+    "scripts/linux-product/test_source_first.py",
     "scripts/check-linux-l6-maintenance-refresh.sh",
     "scripts/build-linux-product-addon-stage.sh",
     "scripts/build-linux-deb-artifact.sh",
@@ -627,6 +634,10 @@ def check_linux_l6_maintenance_refresh() -> None:
     run_command([str(REPO_ROOT / "scripts/check-linux-l6-maintenance-refresh.sh")])
 
 
+def check_linux_source_first() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-source-first.sh")])
+
+
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
     for rule in ruleset.get("rules", []):
         if rule.get("type") != "required_status_checks":
@@ -804,6 +815,7 @@ def check_contracts() -> None:
     check_linux_l6_contract()
     check_linux_l6_release_pair()
     check_linux_l6_maintenance_refresh()
+    check_linux_source_first()
     run_script("linux-product/test_startup_gate_order.py")
     check_deployment_evidence()
     check_sync_deployment_hardening()

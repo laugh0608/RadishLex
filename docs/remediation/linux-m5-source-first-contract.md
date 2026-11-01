@@ -1,6 +1,6 @@
 # Linux M5 source-first 交付基线合同
 
-本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。状态：**2026-11-01 设计完成、待实施批准；没有新包、source 锚点或新 pair 资格。** 上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
+本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。状态：**2026-11-01 合同已批准，V1/V2 首批仓库实现，40项及1项新增定向验证分别通过；没有新包、source 锚点或新 pair 资格。** 上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
 
 ## 目标与边界
 
@@ -91,7 +91,7 @@ raw receipt（现有限额64KiB）和必要系统原文仅在获准的私有现�
 
 - 拟议candidate声明只定义本合同的版本/平台/seed要求，允许源包构建与准入材料采集；它没有source锚点，不能进入pair target构建。
 - 拟议baseline声明只在R阶段、真实材料审阅后产生，含上述source锚点及目标相邻revision约束；这是首版唯一可供新pair入口采用的来源。两类声明分别严格解析，不能将缺anchor当作首次路径。
-- 新profile及portable格式拟命名为 `debian13-arm64-source-first-v1` / `radishlex-linux-source-seed-evidence-v1` / `radishlex-linux-source-first-pair-evidence-v1`；均为待实施设计，不是已存在入口或生产许可。
+- 新profile及portable格式拟命名为 `debian13-arm64-source-first-v1` / `radishlex-linux-source-seed-evidence-v1` / `radishlex-linux-source-first-pair-evidence-v1`；本轮开始实现严格格式；格式存在不代表生产许可。
 
 上述baseline profile与既有matrix profile分开：复用`debian13-arm64-ephemeral-v1`的六operation、八自动crash、路径/字体/startup合同及acceptance evidence编码，不改其格式。新case另绑定baseline、真实pair摘要和精确执行器；digest未产生前不填占位case，旧case不能因共享matrix profile而认领新pair。
 
@@ -115,7 +115,7 @@ source seed和新pair的portable JSON沿用canonical UTF-8 pretty JSON加末尾�
 
 | 批次 | 覆盖与通过证据 | 预算/授权边界 |
 | --- | --- | --- |
-| V1：仓库定向合同 | candidate无anchor不能构建target；合法合成seed/锚点/pair链；S/R/T错序、同commit、dirty/untracked、metadata/锁/依赖变化、错版本/非相邻revision、缺终态或只CLI成功、错误执行器/guest/receipt绑定全部拒绝 | 实施后先列精确测试名与命令，首批纯解析/编排建议最多5分钟、串行一次。合成成功不生成R生产声明；本轮未实施或执行 |
+| V1：仓库定向合同 | candidate无anchor不能构建target；合法合成seed/锚点/pair链；S/R/T错序、同commit、dirty/untracked、metadata/锁/依赖变化、错版本/非相邻revision、缺终态或只CLI成功、错误执行器/guest/receipt绑定全部拒绝 | 实施后先列精确测试名与命令，首批纯解析/编排建议最多5分钟、串行一次。合成成功不生成R生产声明；本批精确入口和测试名见下文 |
 | V2：文件与失败保留 | 非canonical/重复键/超限、symlink/hardlink/inode替换、相同版本不同字节、混包、未知文件、已有输出、fsync/rename/发布后父目录同步失败、panic/部分初始化均保留可诊断现场；非执行入口mutation计数为0 | 只用预先登记的新合成根，精确触发一次，不改系统权限/服务或旧现场；不为本批测试扫描清理历史残留 |
 | V3：source真实准入 | 获准builder的L1–L5适用检查、实际SQLite/Rime/双FFI身份；source seed首次安装六项条件及host回读/停止；实际材料独立审阅后才提交R | 构建工具/路径/缓存与耗时未知，不能借用历史20/45分钟授权；在环境落实后另给精确命令、预算、资源/收尾范围，未定不执行 |
 | V4：target与pair | T干净后继、source输入前后不变、target L1–L5、双侧actual verifier、production/acceptance区分、证据完整与安全发布 | 先定向合同，再单独批准必要完整常规/适用可靠性及ARM64真实构建；缺依赖不自动下载。只读字节核验与真正构建分别报告 |
@@ -129,4 +129,72 @@ V5的crash样本可各自使用获准的新snapshot/guest并保留各自失败�
 
 具体文件分工由实施批固定在`scripts/linux-product/`浅层和少量`scripts/`入口；保留旧接口与常量，不预建通用profile registry或空转wrapper。新命名的candidate配置可随实现提交；包含真实source摘要的baseline配置必须等V3完成，不能先提交测试值。原receipt/事务/data contract/FFI、默认数据保留、锁和production/acceptance隔离均不更改，无新依赖或SDK下载。
 
-本轮只交付合同文档及状态同步。批准本设计不等于批准V3–V5实机动作；第一实施批只允许仓库实现与有界定向检查，完整验收另行申请。候选编号、环境、目标或协议范围实质变化时重新审阅；失败先诊断、不自动重跑、不推送。当前仍无source锚点、pair或M5退出证据。
+原设计批仅交付合同和状态同步。2026-11-01 已批准恢复 V1/V2 仓库实现；这不等于批准V3–V5实机动作。第一实施批只允许仓库实现与有界定向检查，完整验收另行申请。候选编号、环境、目标或协议范围实质变化时重新审阅；失败先诊断、不自动重跑、不推送。当前仍无source锚点、pair或M5退出证据。
+
+## V1/V2 仓库实施切片（2026-11-01）
+
+本批交付独立的 [candidate](../../packaging/linux/source-first-candidate.json)、[严格格式](../../scripts/linux-product/source_first_contract.py)、[只读准入](../../scripts/linux-product/source_first.py)、[读取与发布](../../scripts/linux-product/source_first_io.py)和[source精确拷贝](../../scripts/linux-product/source_first_stage.py)。不更改旧38入口/常量、refresh、matrix、receipt或production行为，也不创建生产baseline或新case。
+
+- CLI只有`validate-candidate`、`verify-seed`、`preflight-pair`，没有构建、采集、安装或生成审阅锚点的命令。pair准入只读取明确R提交的`packaging/linux/source-first-baseline.json`，拒绝外部baseline和candidate冒充。复验S/R/T严格祖先、R字节在T保留、完整metadata/三份锁、S配方、artifact文件名联动、私有材料及source包/evidence读取前后身份；tracked/untracked/submodule及既有忽略构建输出均拒绝。
+- portable seed首版严格闭合12个角色附件，每个含相同attempt、guest/boot/operation摘要、source和S production执行器绑定。receipt摘要保留完整target artifact/proof及fresh/chain1/completed条件；dpkg/inventory/startup/guard/dependency/font/offline/XDG/readback/正常停止分别检查，guest/host结果与清单摘要须一致。baseline另绑定seed、inventory、receipt、guest结果与独立review；review不包含自己的摘要或未来R。
+- `verify-seed`只核对脱敏结构化摘要的格式、绑定和文件字节，不读取私有raw receipt/proc/dpkg、调用Rust actual verifier或证明历史安装确曾发生。摘要中的通过值和digest必须在V3独立核对raw材料，提交R才形成受审信任起点；合成fixture仅在新临时根内，不进入生产声明。
+- 新读取路径使用有界descriptor、no-follow、single-link/owner/mode、路径与descriptor前后identity/hash检查；相同字节inode替换也拒绝。source只exclusive copy，失败保留部分文件及`failure.json`。发布闭合文件/目录inventory、逐文件/目录fsync、重读、no-replace rename和父目录fsync；同步或发布失败保留staging或已发布目录，不报告完成、不清理/重试。尚未调用于真实handoff。
+- 本切片只完成V1/V2的解析、准入和文件主路径。单artifact装配入口、真实环境/离线依赖前门、seed采集与raw receipt核验、actual双侧verifier以及target构建编排仍是进入V3/V4前的后续仓库工作；不存在可执行的真实构建承诺。完整验收与VM/系统动作各自另批。
+
+本轮精确命令（串行一次，5分钟测试预算）：
+
+```bash
+./scripts/run-low-impact.sh ./scripts/check-linux-source-first.sh
+```
+
+该入口先检查candidate，再执行`test_source_first.py`中的`SourceFirstTests`。预登记新临时根和精确用例（现共41项），保存plan、每例目录、tests.log/result；超时只中止当前测试调用自身，无会话进程扫描或外部kill。所有合成材料保留，不扫描或清理历史根。后续完整仓库门禁已接入该入口，本轮不执行完整门禁。
+
+精确测试名如下：
+
+```text
+test_baseline_absent_candidate_cannot_admit_target
+test_bool_cannot_replace_count_or_size
+test_candidate_cannot_be_baseline
+test_copy_input_replaced_after_first_read_preserves_output
+test_copy_panic_preserves_first_file_and_diagnostic
+test_copy_partial_initialization_preserved
+test_dirty_tracked_rejected_without_mutation
+test_exact_source_copy_and_publication
+test_existing_output_is_preserved
+test_fsync_failure_preserves_partial_file
+test_git_roles_equal_reversed_or_unrelated
+test_hardlink_and_mode_owner_drift_rejected
+test_host_guest_readback_mismatch
+test_ignored_build_output_rejected
+test_initial_directory_sync_failure_preserves_directory
+test_metadata_locks_dependency_and_revision_drift
+test_missing_terminal_cli_only_and_incomplete_postflight
+test_mixed_evidence_rejected_before_output
+test_noncanonical_duplicate_bom_and_oversized_json
+test_observation_guest_boot_operation_and_executor_binding
+test_pair_evidence_roles_dependencies_and_distinct_target
+test_publish_conflict_never_overwrites_destination
+test_publish_file_sync_failure_preserves_staging
+test_publish_parent_fsync_failure_preserves_published
+test_publish_rename_failure_preserves_staging
+test_publish_same_byte_inode_replacement_rejected
+test_r_baseline_cannot_be_changed_in_t
+test_receipt_artifact_and_source_proof_binding
+test_replacement_during_read_rejected
+test_review_and_receipt_digest_cannot_be_substituted
+test_same_byte_inode_replacement_rejected
+test_same_version_different_bytes_rejected
+test_seed_unknown_file_and_empty_directory
+test_static_candidate_gate_accepts_source_and_target_without_anchor
+test_symlink_file_and_parent_rejected
+test_target_artifact_filename_drift_rejected
+test_unknown_fields_profiles_and_zero_digests
+test_unsafe_attachment_paths_counts_and_sizes
+test_untracked_rejected_without_cleanup
+test_valid_git_lineage_readonly_and_no_build
+test_valid_seed_and_baseline_summaries
+```
+
+结果：2026-11-01 原40项串行一次全部通过，result计时3.913秒（unittest报告3.912秒），未重跑。计划、逐例合成根、日志和result保留在`/private/var/folders/dp/rzjx58m54kng6tn5k5gjw71h0000gn/T/radishlex-source-first-v12.U5uVyj/`。入口报告nice优先级调整被沙盒拒绝，不能声称调度降级已应用；测试正常完成。没有VM/系统动作、真实构建、生产baseline、pair或完整门禁结果。
+
+收尾发现静态candidate检查只接受40-2会阻塞未来合法40-3。已修正为严格接受既定source或target metadata，静态检查仍不授予target准入；合成S fixture也在真实T版本检出时固定回source配置。新增`test_static_candidate_gate_accepts_source_and_target_without_anchor`首次独立执行一次通过（result计时1.004秒，unittest报告1.003秒），覆盖T版本检出下的合成S/R/T全链，原40项未重跑；新结果位于`/private/var/folders/dp/rzjx58m54kng6tn5k5gjw71h0000gn/T/radishlex-source-first-target-gate-e6iryg63/`。执行方式为`./scripts/run-low-impact.sh env PYTHONDONTWRITEBYTECODE=1 python3 -`，只装载上述一个`SourceFirstTests`用例、预登记新根、300秒自身调用预算和结果回读。该次也报告nice受限。当前41项全集尚未在最终快照重跑；完整验收仍待单独批准。
