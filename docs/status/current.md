@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-11-01（`90e7717`完整自动验收通过，Q2/策略新鲜度路线复审完成、待边界决策）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
+- 复核：2026-11-01（`90e7717`完整自动验收通过；保持当前账户/会话，Q2暂停、F0未闭合）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -72,7 +72,7 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一阶段重点：生产资格方案审查
+## 下一阶段：仓库可靠性
 
 按已批准的[准备中止兼容设计](../remediation/macos-preparation-cancellation-compatibility.md)，完整取消证明、唯一 v2 索引及严格 lifecycle 保留旧 v1 和历史原件，缺失索引不能回退首次路径。取消最后 marker 仍要求当次授权及独立 `QualifiedSource`，结构化对象不能代替证据，最终取消按钮继续关闭。
 
@@ -81,9 +81,9 @@
 `11–13` 已接新准备、续跑和取消保存，最后 marker 保留。[reader](../remediation/macos-cancellation-qualification-reader-contract.md) 与 [schema observer](../remediation/macos-source-schema-observation-contract.md) 的生产库、备份标记/ACL窗口及panic保留修复在`90e7717`常规及22项可靠性通过；catalog为空、issuer未接。[A1](../remediation/macos-source39-qualification-plan.md)材料冻结，Q2/真实运行及观察、策略新鲜度、WAL/pager断电与B段退出仍开放。
 
 1. **自动验收已收口**：本机常规5分钟未达、CI10分钟未测；性能诊断由新热点触发，不无限延期产品方案。
-2. **Q2先决策环境**：同账户/会话内仍无已证明路径。先选实际独立图形登录环境，再分隔离验证、副本核验、完整矩阵授权；不默认建账户/guest。
-3. **随后决策新鲜来源**：reader合同已补验证计划。离线目录、签名票据、防降级状态不能证明当前未撤销。逐检查点认证仅为建议，先批信任/撤销/隐私合同再做定向与八点组合验证，不默认新增服务/密钥设施。
-4. 运行证据、源schema/profile与新鲜度分别成立后才审issuer；最终取消关闭、不直接重试40。材料保留见[周志](../devlogs/2026-W44.md)。系统/实机/容量另行授权；边界不变则资格阻塞，M5顺位不变。
+2. **Q2暂停实验**：已明确保持当前账户/会话，E1/E2/Q3暂停；F0尚无可信资格策略来源，设备签名/同步撤销不能替代。
+3. **下一仓库项**：[维护fixture失败保留](../remediation/macos-wal-source-preparation-design.md#保持当前会话边界后的仓库工作顺位)，先补创建登记、失败保留与成功清理；本轮仅审计。内部I/O宿主另审。
+4. Q2、源schema/profile与新鲜度分别闭合后才审issuer；最终取消关闭、不重试40。保留规则见[周志](../devlogs/2026-W44.md)。系统/实机/容量另行授权，M5顺位不变。
 
 ## Linux M5 系统操作下一步（顺位不变，2026-09-05 复核）
 
