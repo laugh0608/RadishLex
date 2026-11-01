@@ -4,8 +4,8 @@
 
 ## 当前判断
 
-- 复核：2026-11-01，已明确回归Linux M5并完成[交付基线审计](../remediation/linux-m5-delivery-baseline-audit.md)；本轮未操作系统或构建候选。最新macOS实机仍为09-09 source39恢复，外层`rolled_back`/数据`aborted_preserved`，材料保留、双组件停止，未复验。常态分支`dev`，主线`master`。
-- 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，source-first合同待审，后续为仓库实现与定向验证。
+- 复核：2026-11-01，source-first设计已提交、实现暂停，VM已归类。macOS现场为09-09 source39恢复，外层`rolled_back`/数据`aborted_preserved`，材料保留、双组件停止，未复验。常态分支`dev`，主线`master`。
+- 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，source-first合同待实施批准，本轮未推进。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
 
@@ -45,7 +45,7 @@
 
 - Linux 输入与 Manager 已有 P04 实机记录；P05 的六类 operation 为分散证据，尚不能证明连续 L6。
 - `install_prepared` 与 `install_artifacts_staged` 已取得代表 crash 恢复终态；第二场景 transaction 权威为 `7fcef38e…0e3d/completed`，停止权威为 `096fe01f…e133/stopped-verified`。
-- `upgrade_quiesced` 当前为 partial `move-ready`：`7765f1c` 的唯一 prepare 观察 8 台全停，manifest `fa6e7335…33ea5` 冻结；未执行 UI Move 或物化。
+- `upgrade_quiesced`旧`move-ready`及`fa6e7335…33ea5`冻结。本轮维护仅迁partial至`utms/`，不是旧case的Move/adopt验收，未物化S2或启动；旧路径绑定不可直接沿用。
 - 五批 VM 退休共 17 个 raw bundle 已 absent，旧 snapshot/handoff 与失败证据保留。
 - 原入口中的精确证据流水已原样移入[本周周志的入口归档](../devlogs/2026-W36.md#2026-09-05入口历史证据归档)。这是文档迁移，不是现场复验；操作前仍需按 runbook 重新满足资格与授权。
 
@@ -83,11 +83,11 @@
 
 ## Linux M5 系统操作停止线
 
-本轮未查询或操作UTM/guest。历史managed账本5+1已到6台预算、partial仍仅为壳体；不能默认新建source/builder guest或提高预算。
+目录整理见[本机README](/Users/luobo/VirtualMachines/README.md)：日常复用Debian13-ARM64/Windows11-ARM64，基线只备份。`utms/`集中10份载体，`datas/`收纳106个结果根，`images/`保留；UTM9台原UUID/新路径核对且全停，另1份同UUID备份不注册。未启动guest。
 
-1. 现有冻结资产范围下，下一系统动作仍只能另批旧partial的一次UTM原生UI Move；adopt、物化、start、input-preflight、crash、resume、terminal-stop继续分段授权。旧授权已消费，当前活状态未知。
-2. 该旧case终态及授权退休后才可取得下一disposable配额；旧两个crash仅证明原适用域。新基线设计可先在仓库推进，系统链受阻不自动追加替代clone/清理/通用框架。
-3. 连续L6使用一台新guest，P05C另用独立guest；完整验证、构建环境变更和系统动作仍须逐轮明确范围及授权。冻结、输入热路径、同步和后续平台停止线保持。
+1. 旧证据内容不改写；迁移映射与核对见`datas/_organization/2026-11-01/`。partial仍为壳，不能直接运行旧Move/adopt/物化控制；恢复工作前先审迁后路径/身份绑定，系统动作另批。
+2. 普通任务复用两台日常机；确有fresh/隔离验收需求才申请专属VM，不启动或复用冻结机。旧项目预算不因整理扩大，保留材料不自动授权删除/退休。
+3. 连续L6/P05C的必要独立guest及完整门禁仍单独授权；source-first实现按本次要求暂停，不借整理推进。冻结、输入热路径、同步和后续平台边界保持。
 
 ## 验证入口
 

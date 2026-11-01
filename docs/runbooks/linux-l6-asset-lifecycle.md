@@ -4,6 +4,8 @@
 
 2026-11-01：[交付基线审计](../remediation/linux-m5-delivery-baseline-audit.md)确认当前build40/Rime合同不属于旧38 pair，maintenance refresh也不能替代新包。本文原Move/物化与配额顺序继续约束旧partial，历史账本不代表本轮live观察；新source/pair与当前候选验收另行建立，不能套用旧记录。当前仓库任务先设计新基线，系统动作仍逐步授权，不默认增加guest或清理partial。
 
+同日后续项目所有者另行授权本机目录整理：全部10份`.utm`统一到`/Users/luobo/VirtualMachines/utms/`，106个结果根整体迁入`datas/`，`images/`保留，9台UTM原UUID/新路径均核对且全停。精确映射/摘要存于`datas/_organization/2026-11-01/`，本机README规定两台日常机及仅作备份的基线。下文旧绝对路径、预期目标、manifest与冻结账本保留历史事实；本次不是旧case既定目的地的Move/adopt验收，partial未物化S2、未启动。后续先审迁后真实路径/身份绑定，禁止直接复跑旧控制器或改写旧证据；新专机需求与系统动作仍另批，source-first后续实现已按要求暂停。
+
 ## 1. 收敛判断
 
 P05B 不再把八个 crash checkpoint 全部执行为真实系统阻塞项。八个场景仍由 committed matrix、compile-isolated acceptance controller、checkpoint/resume 合同、fake runner 和 canonical evidence schema 完整覆盖；真实系统只保留三个具有不同恢复边界的代表场景：
