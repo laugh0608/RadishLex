@@ -6,13 +6,14 @@ use radishlex_ime_userdb::schema_observer::{
 };
 use std::cell::RefCell;
 use std::fs::{self, DirBuilder};
-use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 static NEXT: AtomicU64 = AtomicU64::new(1);
 struct Fixture {
+    kind: FixtureKind,
     root: PathBuf,
     source: PathBuf,
     caches: PathBuf,
@@ -68,6 +69,7 @@ impl Fixture {
             journal: member(FAMILY[3]),
         };
         Self {
+            kind,
             root,
             source,
             caches,
@@ -88,6 +90,36 @@ impl Fixture {
     }
     fn active(&self) -> PathBuf {
         self.caches.join("RadishLex/SchemaObservation-v1/active")
+    }
+    fn capture_failed(&self, scratch: &Scratch, error: FsError) -> ! {
+        // Only this host's synthetic paths are diagnosed. These are observations
+        // after rejection, not evidence of metadata at the failing syscall.
+        // Do not open SQLite, retry capture or dispose an unexplained failure.
+        let mut paths = vec![self.source.clone(), self.active()];
+        paths.extend(self.caches.ancestors().map(Path::to_path_buf));
+        for directory in [&self.source, &self.active()] {
+            paths.extend(FAMILY.map(|name| directory.join(name)));
+        }
+        let observed: Vec<_> = paths
+            .iter()
+            .map(|path| (path, fs::symlink_metadata(path)))
+            .collect();
+        let held: Vec<_> = scratch
+            .held
+            .iter()
+            .map(|held| (held.name, &held.id, held.file.as_ref().map(posix::identity)))
+            .collect();
+        let copied: Vec<_> = scratch
+            .copied
+            .iter()
+            .map(|(name, copy)| (name, &copy.id, &copy.digest))
+            .collect();
+        panic!(
+            "synthetic capture rejected: {error:?}; kind={:?}; expected_root={:?}; \
+             expected_family={:?}; held={held:?}; copied={copied:?}; \
+             post_failure_metadata={observed:?}; retained_root={:?}",
+            self.kind, self.identity, self.family, self.root
+        );
     }
     fn finish(self) {
         assert!(
@@ -169,7 +201,9 @@ fn production_copy_uses_compiled_layout_and_disposes_main_and_wal() {
         let fixture = Fixture::new(kind);
         let mut budget = budget();
         let mut scratch = fixture.scratch(&mut budget);
-        scratch.capture(&mut budget).unwrap();
+        scratch
+            .capture(&mut budget)
+            .unwrap_or_else(|error| fixture.capture_failed(&scratch, error));
         scratch.mark_sqlite_started(&budget).unwrap();
         let path = scratch.database_path();
         let control = budget.control();
@@ -365,6 +399,43 @@ fn sqlite_close_uncertainty_retains_the_actual_owned_copy() {
 }
 
 #[test]
+fn capture_permission_rejection_keeps_evidence_and_reports_synthetic_context() {
+    let fixture = Fixture::new(FixtureKind::MainOnly);
+    let mut budget = budget();
+    let mut scratch = fixture.scratch(&mut budget);
+    let database = fixture.source.join(FAMILY[0]);
+    fs::set_permissions(&database, fs::Permissions::from_mode(0o400)).unwrap();
+    let error = scratch.capture(&mut budget).unwrap_err();
+    assert_eq!(error, FsError::Identity);
+    assert!(scratch.held.is_empty());
+    assert!(scratch.copied.is_empty());
+    assert!(names(scratch.active().unwrap()).unwrap().is_empty());
+    let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        fixture.capture_failed(&scratch, error);
+    }))
+    .unwrap_err();
+    let message = failure.downcast_ref::<String>().unwrap();
+    for expected in [
+        "synthetic capture rejected: Identity",
+        "kind=MainOnly",
+        "expected_family=",
+        "post_failure_metadata=",
+        fixture.root.to_str().unwrap(),
+    ] {
+        assert!(message.contains(expected), "missing diagnostic {expected}");
+    }
+    assert!(fixture.active().is_dir());
+    let meta = fs::symlink_metadata(&database).unwrap();
+    assert_eq!((meta.dev(), meta.ino()), fixture.source_files[FAMILY[0]]);
+    assert_eq!(meta.mode() & 0o7777, 0o400);
+    // Restore only this fixture's planned permission fault, after verifying its
+    // original inode. Neither capture nor diagnostics performs this repair.
+    fs::set_permissions(&database, fs::Permissions::from_mode(0o600)).unwrap();
+    scratch.dispose(&mut budget).unwrap();
+    fixture.finish();
+}
+
+#[test]
 fn compiled_layout_rejects_same_version_unknown_schema_and_unsupported_version() {
     for (kind, expected) in [
         (FixtureKind::InvalidLayout, ObserverError::Layout),
@@ -376,7 +447,9 @@ fn compiled_layout_rejects_same_version_unknown_schema_and_unsupported_version()
         let fixture = Fixture::new(kind);
         let mut budget = budget();
         let mut scratch = fixture.scratch(&mut budget);
-        scratch.capture(&mut budget).unwrap();
+        scratch
+            .capture(&mut budget)
+            .unwrap_or_else(|error| fixture.capture_failed(&scratch, error));
         scratch.mark_sqlite_started(&budget).unwrap();
         let path = scratch.database_path();
         let control = budget.control();
