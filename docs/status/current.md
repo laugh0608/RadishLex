@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-11-01（ACL窗口与panic保留修复定向通过，新完整验收待批准）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
+- 复核：2026-11-01（`90e7717`常规及22项可靠性完整通过，真实资格仍未闭合）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -72,16 +72,16 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一阶段重点：验收优化与门禁收口
+## 下一阶段重点：生产资格方案审查
 
 按已批准的[准备中止兼容设计](../remediation/macos-preparation-cancellation-compatibility.md)，完整取消证明、唯一 v2 索引及严格 lifecycle 保留旧 v1 和历史原件，缺失索引不能回退首次路径。取消最后 marker 仍要求当次授权及独立 `QualifiedSource`，结构化对象不能代替证据，最终取消按钮继续关闭。
 
 同锁程序/data/终态执行、进展态恢复和接续 action `10` 已接线。初始准入仅接 `prepared/preflighted`；推进态和终态封存重新绑定精确 outer/preparation/data 或 release，并取得四项确认、最多 5 分钟且可撤销的任务授权。`10` 只处理完整交接/封存，普通 bootstrap 空前驱限制保持，不能用它开始源库准备或取消。
 
-`11–13` 已接新准备、续跑和取消保存，最后 marker 保留。[reader](../remediation/macos-cancellation-qualification-reader-contract.md) 与 [schema observer](../remediation/macos-source-schema-observation-contract.md) 的生产库接线已提交，定向测试及四包 Clippy 通过，11-01 常规失败、可靠性未启动；catalog 为空、issuer 未接。[A1](../remediation/macos-source39-qualification-plan.md) 材料冻结，Q2/真实运行及观察、策略新鲜度、WAL/pager 断电与 B 段退出仍开放。
+`11–13` 已接新准备、续跑和取消保存，最后 marker 保留。[reader](../remediation/macos-cancellation-qualification-reader-contract.md) 与 [schema observer](../remediation/macos-source-schema-observation-contract.md) 的生产库、备份标记/ACL窗口及panic保留修复在`90e7717`常规及22项可靠性通过；catalog为空、issuer未接。[A1](../remediation/macos-source39-qualification-plan.md)材料冻结，Q2/真实运行及观察、策略新鲜度、WAL/pager断电与B段退出仍开放。
 
-1. **优先收口观察器验收失败**：基于有界复现和稳定修复申请新完整验收，不以频繁全量试跑代替诊断；耗时优化保留安全与恢复覆盖。
-2. 11-01 已复现目录ACL时间戳误判的`Io`/`Identity`并修复，补齐panic保留及检查点；两组定向覆盖16个父用例，原两失败用例通过。现存材料不动，旧reader已删材料不补建；本批完整门禁待新授权，历史具体syscall仍未知，见[周志](../devlogs/2026-W44.md)，5/10分钟目标未达。
+1. **本批自动验收已收口**：`90e7717`常规及适用可靠性通过；后续性能诊断仅由新明确热点触发。本机常规5分钟目标未达、常规CI10分钟未实测，不以此无限延期产品方案。
+2. **优先审阅Q2与策略新鲜度**：独立source39正常双程序运行、真实源观察及新鲜批准仍是分别成立的门槛，库实现与自动通过不生成资格。失败材料保留、旧reader已删材料不补建，历史具体syscall仍未知；结果见[周志](../devlogs/2026-W44.md)。
 3. 门禁收口后继续审阅 Q2 与策略新鲜度；不直接重试 40，新升级完成后才继续客户端身份与 composition 隐私实测。真实 39/40、用户数据、Linux/UTM、容量实验及系统动作均需另行明确范围与授权。
 
 ## Linux M5 系统操作下一步（顺位不变，2026-09-05 复核）
@@ -92,7 +92,7 @@
 
 ## 验证入口
 
-2026-11-01：干净`0b8ea7b`常规368.98秒后失败（exit101、两项），可靠性未启动、未重跑。此前成功仅覆盖10-27的`2c08320`及文档快照（常规/22项可靠性合计32分6.34秒）。结果见[周志](../devlogs/2026-W44.md)，规则见[门禁手册](../runbooks/repository-validation.md)与[协作细则](../agent-collaboration.md)。本批完整验收未通过；未推送、未做真实资格或容量实验。
+2026-11-01：干净`90e7717`常规773.82秒、22项可靠性1088.23秒均通过，合计31分2.05秒，未超20/45分钟预算；Go race命中缓存。单层nice19、并发1，前后快照一致，无重跑。结果见[周志](../devlogs/2026-W44.md)，规则见[门禁手册](../runbooks/repository-validation.md)与[协作细则](../agent-collaboration.md)。通过不替代容量、真实资格或实机；未推送。
 
 ```bash
 ./scripts/check-linux-product-metadata.sh
