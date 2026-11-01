@@ -5,7 +5,7 @@
 ## 当前判断
 
 - 复核：2026-11-01，已明确回归Linux M5并完成[交付基线审计](../remediation/linux-m5-delivery-baseline-audit.md)；本轮未操作系统或构建候选。最新macOS实机仍为09-09 source39恢复，外层`rolled_back`/数据`aborted_preserved`，材料保留、双组件停止，未复验。常态分支`dev`，主线`master`。
-- 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，最近任务为新source-first交付基线合同设计。
+- 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，source-first合同待审，后续为仓库实现与定向验证。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
 
@@ -76,7 +76,7 @@
 
 项目所有者已批准回归M5主线。详细候选、源码定位、5项只读核验及B1–B6门槛见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)；不把macOS Q2/F0/W0或最终取消设为Linux退出前置。
 
-1. **先设计新source-first合同**：当前源码候选`26.7.1+40-2`尚无本轮Linux载体资格；拟先形成真实source安装终态锚点，再由clean descendant形成`40-3`相邻revision target。编号/提交/摘要未冻结，不改旧pair，不虚构anchor，不扩展`38→40`跨Rime合同升级。
+1. **source-first合同已成稿**：[合同](../remediation/linux-m5-source-first-contract.md)固定S的`40-2`真实构建/seed安装、R的审阅锚点、T的`40-3`后继pair；V1/V2先做仓库定向，V3–V5另批真实构建/验收。当前无实际锚点或载体资格；不改旧pair、编造摘要或扩展`38→40`跨合同升级。
 2. **固定构建与资源方案**：Debian13 ARM64 builder、离线依赖/工具链、L1–L5、实际双FFI/SQLite/Rime配置均待核验。旧pair声明通过，但当前target因build/Rime锁漂移不合格；package-preserving refresh同样拒绝当前metadata。
 3. **依次闭合产品证据**：在获准资源中建立新source/pair，完成第三代表crash及其对新pair的适用域审阅、同一新guest连续L6和当前候选隐私/学习/删除/重启，随后独立guest P05C及M5退出；旧分散结果不拼作新候选通过。
 4. **支线后置**：macOS action`10–13`、reader/observer及`90e7717`自动通过保留；Q2保持当前账户/会话、F0来源未定，catalog为空、issuer/最终取消关闭，W0与内部I/O宿主延期，不重试真实40。性能优化由新热点触发，常规5分钟未达/CI10分钟未测不无限阻塞M5。

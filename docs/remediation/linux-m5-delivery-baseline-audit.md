@@ -1,6 +1,6 @@
 # Linux M5 交付基线与剩余门槛审计
 
-本文面向 Linux 产品、构建与验收维护者，记录回归 M5 主线后的候选、源码约束、证据缺口和串行顺序。状态：**2026-11-01 仓库审计完成；新交付基线尚未建立，未构建或实机核验候选。** 本文不授权修改冻结 pair、扩大 VM 预算、启动/移动 guest、安装、发布或下载依赖。执行优先级见 [current](../status/current.md)，长期退出标准见[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)。
+本文面向 Linux 产品、构建与验收维护者，记录回归 M5 主线后的候选、源码约束、证据缺口和串行顺序。状态：**2026-11-01 仓库审计完成，[source-first合同](linux-m5-source-first-contract.md)已成稿待实施批准；新交付基线尚未建立，未构建或实机核验候选。** 本文不授权修改冻结 pair、扩大 VM 预算、启动/移动 guest、安装、发布或下载依赖。执行优先级见 [current](../status/current.md)，长期退出标准见[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)。
 
 ## 审计结论
 
@@ -60,7 +60,7 @@ REV-06 的根 Rust 1.80 声明与近期依赖 MSRV 不一致仍开放。新 buil
 
 ## 执行顺序
 
-**最近的仓库任务是新 source-first 基线合同设计，不是直接运行旧 pair builder。** 设计只覆盖 build40 同合同主路径、真实 source 锚定及显式新 case 的有界复用，不扩展跨 Rime/schema 迁移，不新建通用验收框架。
+审计后已完成[source-first合同](linux-m5-source-first-contract.md)，固定S构建/R审阅/T后继、source seed、锚点字段、新pair及V1–V5验证范围，待实施批准。下列顺序仍约束真实交付链；当前不能直接运行旧 pair builder，不扩展跨 Rime/schema 迁移，不新建通用验收框架。
 
 1. **固定新基线方案**：明确 source候选/冻结时点、首次 source 包生成及终态取证方式、新 pair/case 与旧合同的隔离、target相邻revision和谱系、证据引用、失败保留及每步预算。真实 source 证据未产生前不编造 anchor，不写占位哈希给 builder；实施前审阅具体代码/文件范围。
 2. **落实环境资格与资源路径**：仓库可先审设计；真正查询或改动 builder/VM须独立授权。现有资产边界下，下一允许申请的系统动作仍只有旧 partial 的原生 UI Move；后续 adopt/物化/启动/旧第三crash/stop/退休分段授权。若该环境链受阻，记录具体 blocker，不自动扩建框架、创建替代clone、删除未终结partial或提高预算。
