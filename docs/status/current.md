@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-11-01（备份属性核验修复定向通过，完整验收待批准；前轮常规失败）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
+- 复核：2026-11-01（修复后常规两项失败，可靠性未启动）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -80,8 +80,8 @@
 
 `11–13` 已接新准备、续跑和取消保存，最后 marker 保留。[reader](../remediation/macos-cancellation-qualification-reader-contract.md) 与 [schema observer](../remediation/macos-source-schema-observation-contract.md) 的生产库接线已提交，定向测试及四包 Clippy 通过，11-01 常规失败、可靠性未启动；catalog 为空、issuer 未接。[A1](../remediation/macos-source39-qualification-plan.md) 材料冻结，Q2/真实运行及观察、策略新鲜度、WAL/pager 断电与 B 段退出仍开放。
 
-1. **优先优化验收耗时与门禁编排**：基于现有日志定位常规/可靠性热点及跨层重复，保留安全与恢复覆盖；先做有界定向测量，不以频繁全量试跑代替诊断。
-2. 11-01 备份属性核验已补强句柄标记、pathname绑定及有效属性交叉检查，8+1项定向测试与单包check/Clippy通过；完整验收待新授权。前轮失败及新增合成失败现场保留，历史间歇失败/原`Identity`机制仍未知，结果见[周志](../devlogs/2026-W44.md)；5/10分钟目标未达。
+1. **优先收口观察器验收失败**：先补齐失败材料并有界定位，不以频繁全量试跑代替诊断；耗时与编排优化仍须基于有效日志，保留安全与恢复覆盖。
+2. 11-01 修复后完整常规在reader的`Filesystem(Io)`及layout捕获的`Identity`失败，备份属性回归通过。保留现存合成材料，先定位ACL/路径核验并补齐panic时保留proof的测试生命周期，不能重跑或用旧通过覆盖；根因未定，结果见[周志](../devlogs/2026-W44.md)，5/10分钟目标未达。
 3. 门禁收口后继续审阅 Q2 与策略新鲜度；不直接重试 40，新升级完成后才继续客户端身份与 composition 隐私实测。真实 39/40、用户数据、Linux/UTM、容量实验及系统动作均需另行明确范围与授权。
 
 ## Linux M5 系统操作下一步（顺位不变，2026-09-05 复核）
@@ -92,7 +92,7 @@
 
 ## 验证入口
 
-2026-11-01：`8ed8e06`加当批三文件快照，常规501.15秒后失败（exit 101），可靠性未启动，未重跑。此前成功仅覆盖10-27的`2c08320`及文档快照（常规/22项可靠性合计32分6.34秒）。结果见[周志](../devlogs/2026-W44.md)，规则见[门禁手册](../runbooks/repository-validation.md)与[协作细则](../agent-collaboration.md)。本批完整验收未通过；未推送、未做真实资格或容量实验。
+2026-11-01：干净`0b8ea7b`常规368.98秒后失败（exit101、两项），可靠性未启动、未重跑。此前成功仅覆盖10-27的`2c08320`及文档快照（常规/22项可靠性合计32分6.34秒）。结果见[周志](../devlogs/2026-W44.md)，规则见[门禁手册](../runbooks/repository-validation.md)与[协作细则](../agent-collaboration.md)。本批完整验收未通过；未推送、未做真实资格或容量实验。
 
 ```bash
 ./scripts/check-linux-product-metadata.sh

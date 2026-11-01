@@ -1,6 +1,6 @@
 # macOS 无 snapshot 源 schema 观察合同
 
-本文供 userdb、升级核心与 macOS 产品协调层维护者审阅，限定准备取消时缺少 snapshot schema 的观察来源、请求绑定、失效与验收条件。状态：**2026-10-27 实现生产观察库；11-01 完整常规在备份属性负向用例失败，可靠性未启动。随后按授权补强句柄标记及路径绑定核验，8+1项定向测试、单包check/Clippy通过；修复后的完整验收待另行批准，详见[当周记录](../devlogs/2026-W44.md)。生产 catalog 为空、issuer 未接入，不提供生产资格。** 历史通过不覆盖本批；未操作冻结资产、真实库、账户或会话。
+本文供 userdb、升级核心与 macOS 产品协调层维护者审阅，限定准备取消时缺少 snapshot schema 的观察来源、请求绑定、失效与验收条件。状态：**2026-10-27 实现生产观察库；11-01 按授权补强备份标记及路径绑定，8+1项定向测试、单包check/Clippy通过。修复后完整常规的备份回归通过，但reader观察`Filesystem(Io)`与layout捕获`Identity`两项失败，可靠性未启动，未重跑；完整验收未通过，详见[当周记录](../devlogs/2026-W44.md)。生产 catalog 为空、issuer 未接入，不提供生产资格。** 历史通过不覆盖本批；未操作冻结资产、真实库、账户或会话。
 
 上游为[资格证据 reader 合同](macos-cancellation-qualification-reader-contract.md)及[准备取消兼容合同](macos-preparation-cancellation-compatibility.md)。本设计不改变 v1/v2 回执、action `10–13`、双 guard/gate 或最终 marker；生产目录为空，issuer 未接入。设计源码定位基线为 `ad15bf7`，仅合成实施参数提交为 `ee6a11b`。
 
