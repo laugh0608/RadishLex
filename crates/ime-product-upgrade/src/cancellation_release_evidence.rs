@@ -6,21 +6,18 @@ impl ReleaseHistory<'_> {
         &self,
         path: &Path,
         hasher: &impl PreparationHasher,
-    ) -> Result<CancellationReleaseReceipt> {
-        let identity = self.journal.evidence(path, hasher)?;
-        let proof = CancellationReleaseReceipt::decode(&self.journal.read_history_bytes(path)?)?;
-        if self.journal.evidence(path, hasher)? != identity {
-            return Err(Error::EvidenceChanged);
-        }
-        Ok(proof)
+    ) -> Result<EncodedCancellationProof<'static>> {
+        let (_, bytes) = self.journal.read_verified_history(path, hasher)?;
+        EncodedCancellationProof::decode(bytes)
     }
     pub(in super::super) fn cancellation_index(
         &self,
-        proof: &CancellationReleaseReceipt,
+        encoded: &EncodedCancellationProof<'_>,
         hasher: &impl PreparationHasher,
     ) -> Result<ReleaseIndex> {
-        let bytes = proof.encode()?;
-        let digest = hash_bytes(&bytes, hasher)?;
+        let proof = encoded.receipt();
+        let bytes = encoded.bytes();
+        let digest = hash_bytes(bytes, hasher)?;
         let path = self
             .journal
             .store
@@ -33,16 +30,19 @@ impl ReleaseHistory<'_> {
         if identity.sha256 != digest || identity.byte_len != bytes.len() as u64 {
             return Err(Error::EvidenceChanged);
         }
-        ReleaseIndex::for_cancellation(proof, identity)
+        ReleaseIndex::for_cancellation(encoded, identity)
     }
     pub(in super::super) fn verify_cancellation_materials(
         &self,
-        proof: &CancellationReleaseReceipt,
+        encoded: &EncodedCancellationProof<'_>,
         historical: bool,
         temporary: Option<(&Path, &PreparationFileIdentity)>,
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
-        proof.validate()?;
+        let proof = encoded.receipt();
+        // encoded() has validated the complete immutable model and each size
+        // bound. Serialize nested values canonically without validating that
+        // same subtree again; disk evidence is still read independently below.
         let archive = &proof.archive;
         let prep = proof.preparation();
         let binding = prep.binding();
@@ -59,6 +59,7 @@ impl ReleaseHistory<'_> {
             }
         }
         for entry in fs::read_dir(&root).map_err(|_| Error::Io)? {
+            hasher.before_read(0).map_err(|_| Error::Io)?;
             let entry = entry.map_err(|_| Error::Io)?;
             let name = entry.file_name();
             if name == INDEX || name == INDEX_TEMP {
@@ -79,6 +80,7 @@ impl ReleaseHistory<'_> {
             "cancelled-outer.json",
         ];
         for entry in fs::read_dir(&directory).map_err(|_| Error::Io)? {
+            hasher.before_read(0).map_err(|_| Error::Io)?;
             let entry = entry.map_err(|_| Error::Io)?;
             if !allowed.iter().any(|v| entry.file_name() == *v)
                 && temporary.map(|v| v.0) != Some(entry.path().as_path())
@@ -91,9 +93,9 @@ impl ReleaseHistory<'_> {
             (
                 REQUEST,
                 archive.source.request_identity(),
-                archive.request.encode()?,
+                encode(&archive.request)?,
             ),
-            (ARCHIVE, &proof.archive_identity, archive.encode()?),
+            (ARCHIVE, &proof.archive_identity, encode(archive)?),
         ] {
             let target = directory.join(name);
             let active = self.journal.store.state_directory.join(name);
@@ -112,12 +114,12 @@ impl ReleaseHistory<'_> {
             (
                 "preparation.json",
                 archive.request.preparation_identity(),
-                prep.encode().map_err(|_| Error::EvidenceChanged)?,
+                encode(prep)?,
             ),
             (
                 "cancellation-source.json",
                 &archive.source_identity,
-                archive.source.encode()?,
+                encode(&archive.source)?,
             ),
         ] {
             self.verify_bytes(&directory.join(name), identity, &bytes, hasher)?;
@@ -178,6 +180,7 @@ impl ReleaseHistory<'_> {
                 }
             }
             for entry in fs::read_dir(&paths[2]).map_err(|_| Error::Io)? {
+                hasher.before_read(0).map_err(|_| Error::Io)?;
                 let entry = entry.map_err(|_| Error::Io)?;
                 if !SLOTS
                     .iter()
@@ -188,9 +191,6 @@ impl ReleaseHistory<'_> {
             }
             for (slot, identity) in SLOTS.iter().zip(&archive.previous_files) {
                 let path = paths[2].join(slot_name(*slot));
-                if self.optional_file(&path, hasher)? != *identity {
-                    return Err(Error::EvidenceChanged);
-                }
                 if *slot == Slot::Receipt {
                     self.verify_bytes(
                         &path,
@@ -198,6 +198,8 @@ impl ReleaseHistory<'_> {
                         &receipt.encode().map_err(|_| Error::EvidenceChanged)?,
                         hasher,
                     )?;
+                } else if self.optional_file(&path, hasher)? != *identity {
+                    return Err(Error::EvidenceChanged);
                 }
             }
             if proof.previous_index.is_none() {
@@ -212,7 +214,8 @@ impl ReleaseHistory<'_> {
                 inventory.files = archive.previous_files.clone();
                 inventory.directories = archive.previous_directories.clone();
                 inventory.verify_context(self.journal, prep)?;
-                self.journal.verify_history_directories(&inventory, true)?;
+                self.journal
+                    .verify_history_directories(&inventory, true, hasher)?;
                 self.verify_bytes(
                     &paths[1].join(INVENTORY),
                     prep.previous_inventory_identity()
@@ -241,10 +244,8 @@ impl ReleaseHistory<'_> {
         bytes: &[u8],
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
-        if self.journal.evidence(path, hasher)? != *identity
-            || self.journal.read_history_bytes(path)? != bytes
-            || self.journal.evidence(path, hasher)? != *identity
-        {
+        let (actual, observed) = self.journal.read_verified_history(path, hasher)?;
+        if actual != *identity || observed != bytes {
             return Err(Error::EvidenceChanged);
         }
         Ok(())
@@ -307,14 +308,17 @@ impl CancellationReleaseStore {
     ) -> Result<()> {
         self.journal.store.revalidate()?;
         self.validate_active()?;
+        // The value cannot change during this call. Share only its pure
+        // canonical computation; every physical read and before/after stamp
+        // remains fresh, including at the next authorization checkpoint.
+        let encoded = proof.encoded()?;
         let directory = self.directory(proof.operation_id());
         let path = directory.join(CANCELLATION_RELEASE);
-        if self.history().optional_file(&path, hasher)?.as_ref() != identity {
-            return Err(Error::EvidenceChanged);
-        }
         if let Some(identity) = identity {
             self.history()
-                .verify_bytes(&path, identity, &proof.encode()?, hasher)?;
+                .verify_bytes(&path, identity, encoded.bytes(), hasher)?;
+        } else if path_exists(&path)? {
+            return Err(Error::EvidenceChanged);
         }
         for path in [
             directory.join(PROOF_TEMP),
@@ -326,7 +330,7 @@ impl CancellationReleaseStore {
             }
         }
         self.history()
-            .verify_cancellation_materials(proof, false, temporary, hasher)?;
+            .verify_cancellation_materials(&encoded, false, temporary, hasher)?;
         self.history().verify_lifecycle_ancestors(
             &LifecycleReleaseReceipt::Cancellation(Box::new(proof.clone())),
             hasher,
@@ -375,7 +379,7 @@ impl CancellationReleaseStore {
         let actual = self.history().load_index_with_temp(hasher, index_temp)?;
         let published = identity.is_some()
             && actual.as_ref().map(|v| &v.index)
-                == Some(&self.history().cancellation_index(proof, hasher)?);
+                == Some(&self.history().cancellation_index(&encoded, hasher)?);
         if actual != proof.previous_index && !(identity.is_some() && published) {
             return Err(Error::EvidenceChanged);
         }
@@ -383,6 +387,7 @@ impl CancellationReleaseStore {
             for entry in
                 fs::read_dir(self.journal.store.root.path.join(HISTORY)).map_err(|_| Error::Io)?
             {
+                hasher.before_read(0).map_err(|_| Error::Io)?;
                 let name = entry.map_err(|_| Error::Io)?.file_name();
                 if name != INDEX
                     && name != INDEX_TEMP

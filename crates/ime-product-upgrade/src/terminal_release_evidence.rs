@@ -46,7 +46,7 @@ impl TerminalReleaseStore {
     ) -> Result<()> {
         self.validate_active_entries()?;
         record.validate()?;
-        self.history().verify_directories(record, false)?;
+        self.history().verify_directories(record, false, hasher)?;
         let paths = self.paths(record);
         let marker = self.unique_location(&self.active(RELEASE), &paths[1].join(RELEASE))?;
         if self.history().read_release(&marker, hasher)? != *record

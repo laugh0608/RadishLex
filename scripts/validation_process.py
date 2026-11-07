@@ -9,6 +9,7 @@ import os
 import shlex
 import signal
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -55,17 +56,18 @@ def _cleanup(process: subprocess.Popen) -> None:
     process.wait()
 
 
-def run_command(command: list[str], cwd: Path) -> None:
+def run_command(command: list[str], cwd: Path, *, capture: bool = False) -> str | None:
     label = shlex.join(command)
     started = time.monotonic()
     print(f"[START] {label}", flush=True)
     handlers = {s: signal.getsignal(s) for s in (signal.SIGINT, signal.SIGTERM)}
     process = None
+    output = tempfile.TemporaryFile(mode="w+t", encoding="utf-8") if capture else None
     outcome = "incomplete"
     try:
         for signum in handlers:
             signal.signal(signum, _interrupt)
-        process = subprocess.Popen(command, cwd=cwd, start_new_session=os.name == "posix")
+        process = subprocess.Popen(command, cwd=cwd, stdout=output, start_new_session=os.name == "posix")
         while True:
             try:
                 code = process.wait(timeout=30)
@@ -76,6 +78,9 @@ def run_command(command: list[str], cwd: Path) -> None:
             outcome = f"failed ({code})"
             raise SystemExit(code if code > 0 else 128 - code)
         outcome = "passed"
+        if output is not None:
+            output.seek(0)
+            return output.read()
     except FileNotFoundError as exc:
         raise SystemExit(f"{command[0]} is required for validation") from exc
     except ValidationInterrupted as exc:
@@ -89,6 +94,8 @@ def run_command(command: list[str], cwd: Path) -> None:
             if process is not None:
                 _cleanup(process)
         finally:
+            if output is not None:
+                output.close()
             for signum, handler in handlers.items():
                 signal.signal(signum, handler)
         print(f"[END {time.monotonic() - started:.2f}s; {outcome}] {label}", flush=True)

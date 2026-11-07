@@ -19,17 +19,14 @@ impl ReleaseHistory<'_> {
         path: &Path,
         hasher: &impl PreparationHasher,
     ) -> Result<TerminalReleaseReceipt> {
-        let identity = self.journal.evidence(path, hasher)?;
-        let result = TerminalReleaseReceipt::decode(&self.journal.read_history_bytes(path)?)?;
-        if self.journal.evidence(path, hasher)? != identity {
-            return Err(Error::EvidenceChanged);
-        }
-        Ok(result)
+        let (_, bytes) = self.journal.read_verified_history(path, hasher)?;
+        TerminalReleaseReceipt::decode(&bytes)
     }
     pub(super) fn verify_directories(
         &self,
         record: &TerminalReleaseReceipt,
         initializing: bool,
+        hasher: &impl PreparationHasher,
     ) -> Result<()> {
         if record.data_root != self.journal.data_root_identity()
             || record.state_directory != self.journal.state_directory_identity()
@@ -40,6 +37,7 @@ impl ReleaseHistory<'_> {
         if path_exists(&paths[0])? {
             self.journal.history_directory(&paths[0])?;
             for entry in fs::read_dir(&paths[0]).map_err(|_| Error::Io)? {
+                hasher.before_read(0).map_err(|_| Error::Io)?;
                 let entry = entry.map_err(|_| Error::Io)?;
                 let name = entry.file_name();
                 if name == INDEX || name == INDEX_TEMP {
@@ -60,6 +58,7 @@ impl ReleaseHistory<'_> {
             return Ok(());
         }
         for entry in fs::read_dir(&paths[1]).map_err(|_| Error::Io)? {
+            hasher.before_read(0).map_err(|_| Error::Io)?;
             let entry = entry.map_err(|_| Error::Io)?;
             let name = entry.file_name();
             if name == "data" {
@@ -74,6 +73,7 @@ impl ReleaseHistory<'_> {
         }
         if !initializing || record.directories.len() == 3 {
             for entry in fs::read_dir(&paths[2]).map_err(|_| Error::Io)? {
+                hasher.before_read(0).map_err(|_| Error::Io)?;
                 let entry = entry.map_err(|_| Error::Io)?;
                 if !SLOTS
                     .iter()
@@ -128,7 +128,7 @@ impl ReleaseHistory<'_> {
                         return Err(Error::EvidenceChanged);
                     }
                     if slot == Slot::Receipt
-                        && (self.journal.read_history_bytes(&location)?
+                        && (self.journal.read_verified_history(&location, hasher)?.1
                             != record
                                 .receipt
                                 .encode()
@@ -190,7 +190,8 @@ impl ReleaseHistory<'_> {
             let proof = PreparationReceipt::decode(
                 &self
                     .journal
-                    .read_history_bytes(&operation.join(PREPARATION[0]))?,
+                    .read_verified_history(&operation.join(PREPARATION[0]), hasher)?
+                    .1,
             )
             .map_err(|_| Error::EvidenceChanged)?;
             let intent = proof.handoff_intent().ok_or(Error::EvidenceChanged)?;
@@ -329,14 +330,12 @@ impl ReleaseHistory<'_> {
             return Err(Error::EvidenceChanged);
         }
         let path = root.join(INDEX);
-        let Some(identity) = self.optional_file(&path, hasher)? else {
+        if !path_exists(&path)? {
             return Ok(None);
-        };
-        let index: ReleaseIndex = decode(&self.journal.read_history_bytes(&path)?)?;
-        index.validate()?;
-        if self.journal.evidence(&path, hasher)? != identity {
-            return Err(Error::EvidenceChanged);
         }
+        let (identity, bytes) = self.journal.read_verified_history(&path, hasher)?;
+        let index: ReleaseIndex = decode(&bytes)?;
+        index.validate()?;
         Ok(Some(PreviousIndex { identity, index }))
     }
     pub(super) fn index_for(
@@ -399,6 +398,7 @@ impl ReleaseHistory<'_> {
         let mut seen = std::collections::BTreeSet::from([record.operation_id().to_owned()]);
         let mut current = record.clone();
         while let Some(previous) = current.previous_index() {
+            hasher.before_read(0).map_err(|_| Error::Io)?;
             if !seen.insert(previous.index.operation_id().to_owned())
                 || current.previous_data_id() != previous.index.data_operation_id()
                 || current.source_release() != previous.index.installed_release()
@@ -437,12 +437,12 @@ impl ReleaseHistory<'_> {
             let path = root
                 .join(index.operation_id())
                 .join(index.proof_file_name());
-            let identity = self.journal.evidence(&path, hasher)?;
-            let record = self.read_cancellation(&path, hasher)?;
-            if self.cancellation_index(&record, hasher)? != *index {
+            let (identity, bytes) = self.journal.read_verified_history(&path, hasher)?;
+            let encoded = cancellation_release::EncodedCancellationProof::decode(bytes)?;
+            if ReleaseIndex::for_cancellation(&encoded, identity.clone())? != *index {
                 return Err(Error::EvidenceChanged);
             }
-            self.verify_cancellation_materials(&record, true, None, hasher)?;
+            self.verify_cancellation_materials(&encoded, true, None, hasher)?;
             // A current matching active request is never historical completion.
             let active = self
                 .journal
@@ -451,7 +451,7 @@ impl ReleaseHistory<'_> {
                 .join("preparation-cancellation.json");
             if path_exists(&active)? {
                 let request = PreparationCancellationRequest::decode(
-                    &self.journal.read_history_bytes(&active)?,
+                    &self.journal.read_verified_history(&active, hasher)?.1,
                 )?;
                 if request.preparation().binding().operation_id == index.operation_id() {
                     return Err(Error::EvidenceChanged);
@@ -460,7 +460,9 @@ impl ReleaseHistory<'_> {
             if self.journal.evidence(&path, hasher)? != identity {
                 return Err(Error::EvidenceChanged);
             }
-            return Ok(LifecycleReleaseReceipt::Cancellation(Box::new(record)));
+            return Ok(LifecycleReleaseReceipt::Cancellation(Box::new(
+                encoded.into_receipt(),
+            )));
         }
         if path_exists(&self.active(RELEASE))?
             && self
@@ -476,13 +478,14 @@ impl ReleaseHistory<'_> {
         let operation = root.join(index.operation_id());
         self.journal.history_directory(&operation)?;
         let path = operation.join(RELEASE);
-        let identity = self.journal.evidence(&path, hasher)?;
-        let record = self.read_release(&path, hasher)?;
-        if self.index_for(&record, hasher)? != *index {
+        let (identity, bytes) = self.journal.read_verified_history(&path, hasher)?;
+        let record = TerminalReleaseReceipt::decode(&bytes)?;
+        if record.phase != TerminalReleasePhase::ReleaseReady
+            || ReleaseIndex::for_terminal(&record, identity.sha256.clone())? != *index
+        {
             return Err(Error::EvidenceChanged);
         }
-        record.validate()?;
-        self.verify_directories(&record, false)?;
+        self.verify_directories(&record, false, hasher)?;
         self.verify_files(&record, hasher, true)?;
         self.verify_preparation(&record, hasher)?;
         if self.journal.evidence(&path, hasher)? != identity {

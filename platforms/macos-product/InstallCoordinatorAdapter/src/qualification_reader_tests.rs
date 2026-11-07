@@ -10,6 +10,7 @@ static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 struct Fixture {
     path: PathBuf,
+    root_identity: (u64, u64, u32, u32),
     manifest: model::Manifest,
     catalog: Catalog,
 }
@@ -25,6 +26,12 @@ impl Fixture {
         #[cfg(target_os = "linux")]
         let path = PathBuf::from("/tmp").join(path.file_name().unwrap());
         DirBuilder::new().mode(0o700).create(&path).unwrap();
+        let meta = fs::symlink_metadata(&path).unwrap();
+        let root_identity = (meta.dev(), meta.ino(), meta.uid(), meta.mode());
+        eprintln!(
+            "synthetic evidence pack created: {} {root_identity:?}",
+            path.display()
+        );
         for (relative, bytes) in files {
             let file = path.join(relative);
             let mut directories = Vec::new();
@@ -55,6 +62,7 @@ impl Fixture {
         };
         let mut fixture = Self {
             path,
+            root_identity,
             manifest,
             catalog: Catalog {
                 revision: "test-only-1".into(),
@@ -92,6 +100,18 @@ impl Fixture {
 }
 impl Drop for Fixture {
     fn drop(&mut self) {
+        if std::thread::panicking() {
+            eprintln!(
+                "synthetic evidence pack retained after panic: {}",
+                self.path.display()
+            );
+            return;
+        }
+        let meta = fs::symlink_metadata(&self.path).unwrap();
+        assert_eq!(
+            (meta.dev(), meta.ino(), meta.uid(), meta.mode()),
+            self.root_identity
+        );
         fs::remove_dir_all(&self.path).unwrap();
     }
 }

@@ -61,6 +61,11 @@ done
 
 temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/radishlex-deb-artifact.XXXXXX")"
 cleanup() {
+  local status=$?
+  if [[ ${status} -ne 0 && "${RADISHLEX_PRESERVE_BUILD_FAILURES:-0}" == 1 ]]; then
+    echo "Failed Debian artifact build retained: ${temp_dir}" >&2
+    return "${status}"
+  fi
   rm -rf "${temp_dir}"
 }
 trap cleanup EXIT

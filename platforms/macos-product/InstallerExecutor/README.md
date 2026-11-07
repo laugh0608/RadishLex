@@ -41,7 +41,7 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 数据成功先到外层 `data_settled`，数据失败先恢复源程序至 `programs_restored`；两者均先封存实际数据终态、生成 `release_ready` 和索引，再在完整证明及程序实物校验下持久化 outer `completed` / `rolled_back`。marker 最后原 inode 移入历史并同步/回读后，才返回 `PreparedUpgradeSummary`。历史数据回执、保护快照与旧 outer 原件保留，后续正常 WAL 学习不再被历史 v1 长度阻断。未知临时材料、无记录的 staging 或 release 初始化材料保留并拒绝自动接纳。
 
-`inspect_prepared_upgrade_continuation` 只读投影完整活动交接或终态封存关系，不创建目录、取得 guard、打开 SQLite 或确认持久化。Driver/Bridge/AppKit 已接 `ContinuePreparedUpgrade` / `10`；Bridge 从 fresh 系统根与 sealed payload 重建适配器，再重新读取完整关系并授权同一任务。新准备和主动取消的 Bridge dispatch 仍未开放；独立旧程序资格及实机停止线见 [Installer 合同](../../../docs/macos-installer-app-boundary.md#专用接续准入与待开放动作合同)。
+`inspect_prepared_upgrade_continuation` 只读投影完整活动交接或终态封存关系，不创建目录、取得 guard、打开 SQLite 或确认持久化。Driver/Bridge/AppKit 已接 `ContinuePreparedUpgrade` / `10`；Bridge 从 fresh 系统根与 sealed payload 重建适配器，再重新读取完整关系并授权同一任务。新准备、续跑和取消保存已接 Bridge action `11–13`；独立旧程序资格及实机停止线见 [Installer 合同](../../../docs/macos-installer-app-boundary.md#专用接续准入与待开放动作合同)。
 
 ## 交接后查询与重绑
 
@@ -49,7 +49,7 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 `rebind_prepared_upgrade` 要求调用者持有匹配 outer guard，取得 inner guard 后核验封存旧 outer、当前完整产品关系、外层/内层合法状态组合和准备证明，再返回现存 store、inner guard 与数据回执；不创建或重写回执。查询和重绑均不打开 SQLite、不补同步，不宣称持久化边界已确认，也不授予执行权限。后续 mutation 仍须当次任务授权、实际程序/静止观察，并在首个 v1 mutation 前通过准备任务接续确认 handoff 持久化。
 
-完整交接或终态封存关系可投影 `preparing_source + continue_prepared_upgrade`，展示实际 outer 进度及手动静止提示；部分交接或取消状态继续只刷新。普通 intent 保持阻断，ABI v1 POD/symbol/version 不变，专用 action `10` 不能用于普通 bootstrap、新准备或主动取消。
+完整交接或终态封存关系可投影 `preparing_source + continue_prepared_upgrade`，展示实际 outer 进度及手动静止提示；部分交接或取消状态不使用 action `10`，只可按 `11–13` 专用准入投影，缺少准入时仅刷新。普通 intent 保持阻断，ABI v1 POD/symbol/version 不变，专用 action `10` 不能用于普通 bootstrap、新准备或主动取消。
 
 ## 准备取消任务
 
@@ -57,7 +57,7 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 `finish_preparation_cancellation` 要求针对该完整 proof 另取 `authorize_cancellation_release` 授权，并显式传入可信独立资格提供者；没有默认实现。核心要求资格时才允许最后释放，提供者返回后重新核验 outer、程序、静止和任务有效性。生产入口固定使用真实安装适配器与专用 native 预检，不暴露可替换的合成观察器；预检现保留经验证的实际可用容量供源库预算使用。
 
-重开任务重新授权，执行器不从持久请求续权。各阶段中断按核心证明继续同一 operation，active outer 暂缺也只能沿已有封存证明恢复；未绑定临时文件、handoff 或材料漂移保持拒绝。新准备任务已接入 Executor，Bridge/UI action 尚未接入，真实资格未完成时最终 marker 与按钮继续阻断。细节见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#取消-executor-任务入口)。
+重开任务重新授权，执行器不从持久请求续权。各阶段中断按核心证明继续同一 operation，active outer 暂缺也只能沿已有封存证明恢复；未绑定临时文件、handoff 或材料漂移保持拒绝。新准备、续跑和取消保存已接 Bridge/UI action `11–13`；真实资格未完成时最终 marker 与最终取消按钮继续阻断。细节见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#取消-executor-任务入口)。
 
 ## 失败关闭
 
@@ -67,7 +67,9 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 `MacOsCancellationQuiescenceAuthority` 在每次调用中运行专用 native cancellation preflight，核对实际 root 与绑定 target manifest，并在 helper 返回后复查授权未撤销/到期。程序实物观察仍由上层在其前后执行。普通 v1 preflight 响应不被专用路径接受；没有默认放行或环境开关。
 
-准备/取消的只读维护查询已接入 driver/bridge/UI；六个维护阶段均只提供刷新，普通 v1 执行器在 outer guard 内复核维护记录以拒绝旧 intent。查询不创建目录、取得 guard 或打开 SQLite，损坏/缺失证据继续阻断；完整规则见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#准备与取消的只读维护投影)。取消任务执行入口已接入本 crate，Bridge/action 与独立旧程序资格提供者仍缺失。现有 source validation host 不能证明无新 data receipt 的正常打开/再学习/重启资格；必须通过专用副本验证取得对应证据，缺少时仍阻断最后 marker。产品入口完整接线按[取消设计](../../../docs/remediation/macos-preparation-cancellation-compatibility.md)推进。
+macOS 的 `SourceSchemaAuthority` 桥接复用 `MacOsCancellationQuiescenceAuthority` 当前 grant 的截止时间和共享撤销状态，完整 proof/source 不匹配、control 被撤销或释放即失效，不生成新授权或续期。该桥只支撑协调层观察库，未接生产 issuer；副本生命周期与 reader 绑定见[协调层说明](../InstallCoordinatorAdapter/README.md#源-schema-观察与证据-reader)。
+
+准备/取消的只读维护查询已接入 driver/bridge/UI；基础维护投影只提供刷新，经专用准入后可提供 action `10–13`；等待资格与已完成取消仍只刷新，普通 v1 执行器在 outer guard 内复核维护记录以拒绝旧 intent。查询不创建目录、取得 guard 或打开 SQLite，损坏/缺失证据继续阻断；完整规则见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#准备与取消的只读维护投影)。取消任务执行入口已接入本 crate，保存 action `13` 已接，独立旧程序资格提供者仍缺失。现有 source validation host 不能证明无新 data receipt 的正常打开/再学习/重启资格；必须通过专用副本验证取得对应证据，缺少时仍阻断最后 marker。产品入口完整接线按[取消设计](../../../docs/remediation/macos-preparation-cancellation-compatibility.md)推进。
 
 - active guard、中断/损坏 receipt、未知对象、root/程序身份漂移由核心或平台 port 保留稳定错误并拒绝执行；
 - stale begin/confirm/resume intent、operation/source/target 不匹配和缺失 upgrade context 均拒绝；

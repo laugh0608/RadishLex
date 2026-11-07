@@ -13,7 +13,8 @@ path = "src/lib.rs"
 
 [features]
 default = []
-synthetic-schema-observer = ["rusqlite/hooks"]
+schema-observer = ["rusqlite/hooks"]
+synthetic-schema-observer = ["schema-observer"]
 
 [dependencies]
 radishlex-ime-crypto = { path = "../ime-crypto" }

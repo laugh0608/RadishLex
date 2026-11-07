@@ -68,10 +68,10 @@ test(ffi): cover invalid UTF-8 ownership path
 git diff --check
 ```
 
-阶段性、高风险或跨模块交付还应执行：
+常规质量门禁入口（完整执行须按协作规则取得本轮授权）：
 
 ```bash
 ./scripts/check-repo.sh
 ```
 
-实现改动继续按范围执行相应门禁，例如 Rust 的 `cargo fmt --check`、`cargo check`、相关 `cargo test` 和 `clippy`，Go 的 `gofmt` 与 `go test ./...`，Flutter 的 `dart format`、`flutter analyze` 和相关测试，以及平台壳的 build/smoke。PR 只记录真实执行过的命令，并明确列出未执行项和残余风险。
+正式验收还须包含[门禁手册](docs/runbooks/repository-validation.md)规定的所有适用可靠性专项；`--component` 是明确覆盖范围，不能单独冒充完整验收。PR 的常规质量与适用专项在同一 revision 上聚合，不强制本地全量后远端重复全量。实现改动继续按范围执行相应门禁，例如 Rust 的 `cargo fmt --check`、`cargo check`、相关 `cargo test` 和 `clippy`，Go 的 `gofmt` 与 `go test ./...`，Flutter 的 `dart format`、`flutter analyze` 和相关测试，以及平台壳的 build/smoke。PR 只记录真实执行过的命令，并明确列出未执行项和残余风险。

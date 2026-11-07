@@ -113,6 +113,13 @@ impl TestSite {
 
 impl Drop for TestSite {
     fn drop(&mut self) {
+        if std::thread::panicking() {
+            eprintln!(
+                "startup fixture retained after failure: {}",
+                self.root.display()
+            );
+            return;
+        }
         let _ = fs::remove_dir_all(&self.root);
     }
 }

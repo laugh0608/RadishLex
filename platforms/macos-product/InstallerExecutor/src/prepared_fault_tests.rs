@@ -51,7 +51,18 @@ fn failed_data_restarts_before_each_program_restore_and_terminal_release() {
 }
 
 #[test]
-fn every_observed_mutation_boundary_checks_revocation_and_retains_the_original_proof() {
+fn representative_mutation_boundaries_revoke_and_preserve_original_proof() {
+    check_mutation_boundaries(false);
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_every_observed_mutation_boundary_checks_revocation_and_retains_the_original_proof(
+) {
+    check_mutation_boundaries(true);
+}
+
+fn check_mutation_boundaries(exhaustive: bool) {
     for outcome in [Outcome::Completed, Outcome::RolledBack] {
         let (f, mut p, prep) = seed();
         let install = f.install();
@@ -62,6 +73,9 @@ fn every_observed_mutation_boundary_checks_revocation_and_retains_the_original_p
             if !points.contains(&point) {
                 points.push(point);
             }
+        }
+        if !exhaustive {
+            points = vec![*points.first().unwrap(), *points.last().unwrap()];
         }
         for stop in points {
             let (f, mut p, prep) = seed();

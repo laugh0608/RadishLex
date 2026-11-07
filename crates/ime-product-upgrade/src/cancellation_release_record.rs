@@ -22,6 +22,41 @@ pub struct CancellationReleaseReceipt {
     pub(in super::super) previous_index: Option<PreviousIndex>,
 }
 
+/// Validated immutable value and canonical bytes for one verification call.
+/// This contains no filesystem observations and must never waive fresh reads.
+/// Private fields prevent pairing an unchecked value with unrelated bytes.
+pub(in super::super) struct EncodedCancellationProof<'a> {
+    receipt: std::borrow::Cow<'a, CancellationReleaseReceipt>,
+    bytes: Vec<u8>,
+}
+
+impl EncodedCancellationProof<'_> {
+    pub(in super::super) fn receipt(&self) -> &CancellationReleaseReceipt {
+        &self.receipt
+    }
+
+    pub(in super::super) fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub(in super::super) fn into_receipt(self) -> CancellationReleaseReceipt {
+        self.receipt.into_owned()
+    }
+}
+
+impl EncodedCancellationProof<'static> {
+    pub(in super::super) fn decode(bytes: Vec<u8>) -> Result<Self> {
+        // The public strict decoder checks canonical bytes and the full model.
+        // Keep both results together instead of revalidating immediately after
+        // this read. Subsequent reads still use the strict decoder again.
+        let receipt = CancellationReleaseReceipt::decode(&bytes)?;
+        Ok(Self {
+            receipt: std::borrow::Cow::Owned(receipt),
+            bytes,
+        })
+    }
+}
+
 impl CancellationReleaseReceipt {
     pub fn operation_id(&self) -> &str {
         &self.preparation().binding().operation_id
@@ -61,6 +96,12 @@ impl CancellationReleaseReceipt {
         self.validate()?;
         encode(self)
     }
+    pub(in super::super) fn encoded(&self) -> Result<EncodedCancellationProof<'_>> {
+        Ok(EncodedCancellationProof {
+            receipt: std::borrow::Cow::Borrowed(self),
+            bytes: self.encode()?,
+        })
+    }
     pub fn decode(bytes: &[u8]) -> Result<Self> {
         let value: Self = decode(bytes)?;
         value.validate()?;
@@ -83,7 +124,9 @@ impl CancellationReleaseReceipt {
         Ok(value)
     }
     pub(in super::super) fn validate(&self) -> Result<()> {
-        self.archive.validate()?;
+        // encode() already validates the complete archive. Do not repeat its
+        // nested request/source/preparation validation solely to get a length.
+        let archive_bytes = self.archive.encode()?;
         let prep = self.preparation();
         let binding = prep.binding();
         self.archive_identity
@@ -95,7 +138,7 @@ impl CancellationReleaseReceipt {
             || self.legacy_outer_operation_id() == self.operation_id()
             || self.archive_identity.device_id != binding.data_root.device_id
             || self.archive_identity.owner_id != binding.data_root.owner_id
-            || self.archive_identity.byte_len != self.archive.encode()?.len() as u64
+            || self.archive_identity.byte_len != archive_bytes.len() as u64
             || self.data_receipt.as_ref().map(UpgradeReceipt::operation_id)
                 != binding.previous_data_operation_id.as_deref()
             || self.previous_index.as_ref().map(|v| &v.identity)
@@ -104,7 +147,7 @@ impl CancellationReleaseReceipt {
             return Err(Error::EvidenceChanged);
         }
         if let Some(receipt) = &self.data_receipt {
-            receipt.encode().map_err(|_| Error::EvidenceChanged)?;
+            let receipt_bytes = receipt.encode().map_err(|_| Error::EvidenceChanged)?;
             let installed = if receipt.state() == UpgradeState::Completed {
                 receipt.target_release()
             } else {
@@ -115,7 +158,7 @@ impl CancellationReleaseReceipt {
                 || receipt.operation_id() == self.operation_id()
                 || installed != &binding.source_release
                 || self.archive.previous_files[0].as_ref().map(|v| v.byte_len)
-                    != Some(receipt.encode().map_err(|_| Error::EvidenceChanged)?.len() as u64)
+                    != Some(receipt_bytes.len() as u64)
                 || self.archive.previous_files[0].as_ref().map(|v| &v.sha256)
                     != binding.previous_data_receipt_sha256.as_ref()
             {

@@ -5,11 +5,63 @@ use crate::{PreparationFamily, PreparationFileIdentity};
 use super::*;
 
 impl PreparationJournalStore {
+    /// One bounded observation: the returned digest describes exactly the
+    /// returned bytes. Nothing survives a callback, write or later invocation.
+    /// Check both the open descriptor and the private pathname before/after;
+    /// hashing an independently reopened stream would not bind the decoded bytes.
+    pub(super) fn read_verified_history(
+        &self,
+        path: &Path,
+        hasher: &impl PreparationHasher,
+    ) -> Result<(PreparationFileIdentity, Vec<u8>)> {
+        hasher.before_read(0).map_err(|_| Error::Io)?;
+        let before = self.private_metadata(path)?;
+        if before.len() > MAX_PREPARATION_RECEIPT_BYTES as u64 {
+            return Err(Error::EvidenceChanged);
+        }
+        hasher
+            .before_read(MAX_PREPARATION_RECEIPT_BYTES as u64 + 1)
+            .map_err(|_| Error::Io)?;
+        let mut file = File::open(path).map_err(|_| Error::Io)?;
+        if stamp(&file.metadata().map_err(|_| Error::Io)?) != stamp(&before) {
+            return Err(Error::EvidenceChanged);
+        }
+        let mut bytes = Vec::new();
+        (&mut file)
+            .take(MAX_PREPARATION_RECEIPT_BYTES as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| Error::Io)?;
+        if bytes.len() as u64 != before.len() {
+            return Err(Error::EvidenceChanged);
+        }
+        let mut source = bytes.as_slice();
+        let digest = hasher.sha256(&mut source).map_err(|_| Error::Io)?;
+        if !source.is_empty()
+            || stamp(&file.metadata().map_err(|_| Error::Io)?) != stamp(&before)
+            || stamp(&self.private_metadata(path)?) != stamp(&before)
+        {
+            return Err(Error::EvidenceChanged);
+        }
+        Ok((
+            PreparationFileIdentity {
+                device_id: before.dev(),
+                inode: before.ino(),
+                owner_id: before.uid(),
+                mode: before.mode() & 0o7777,
+                link_count: before.nlink(),
+                byte_len: before.len(),
+                sha256: digest.iter().map(|byte| format!("{byte:02x}")).collect(),
+            },
+            bytes,
+        ))
+    }
+
     pub(super) fn evidence(
         &self,
         path: &Path,
         hasher: &impl PreparationHasher,
     ) -> Result<PreparationFileIdentity> {
+        hasher.before_read(0).map_err(|_| Error::Io)?;
         let before = self.private_metadata(path)?;
         let mut file = File::open(path).map_err(|_| Error::Io)?;
         if stamp(&file.metadata().map_err(|_| Error::Io)?) != stamp(&before) {

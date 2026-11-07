@@ -138,7 +138,7 @@ impl CancellationArchiveStore {
                 return Err(Error::EvidenceChanged);
             }
             let prep = record.request.preparation();
-            record.source.validate_request(&record.request)?;
+            record.source.encode_for_request(&record.request)?;
             for (name, bytes, identity) in [
                 (
                     REQUEST,

@@ -49,6 +49,7 @@ fn points() -> Vec<RP> {
     ]);
     points
 }
+#[cfg(feature = "reliability-matrix")]
 fn blocked(point: RP) -> bool {
     matches!(
         point,
@@ -112,8 +113,10 @@ pub(super) fn tree(root: &Path) -> Vec<(PathBuf, u64, u32, Vec<u8>)> {
     out
 }
 
+#[cfg(feature = "reliability-matrix")]
 #[test]
-fn authorization_loss_at_each_release_boundary_preserves_or_resumes_exact_objects() {
+fn reliability_matrix_authorization_loss_at_each_release_boundary_preserves_or_resumes_exact_objects(
+) {
     for point in points() {
         let fixture = Fixture::new();
         let (store, guard, binding, mut port) = terminal(&fixture, false, State::AbortedPreserved);
@@ -140,8 +143,9 @@ fn authorization_loss_at_each_release_boundary_preserves_or_resumes_exact_object
     }
 }
 
+#[cfg(feature = "reliability-matrix")]
 #[test]
-fn process_exit_at_each_release_boundary_reloads_from_disk() {
+fn reliability_matrix_process_exit_at_each_release_boundary_reloads_from_disk() {
     for (index, point) in points().into_iter().enumerate() {
         let fixture = Fixture::new();
         let (_, guard, binding, _) = terminal(&fixture, false, State::AbortedPreserved);

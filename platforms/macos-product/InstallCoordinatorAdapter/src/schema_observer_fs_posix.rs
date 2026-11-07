@@ -1,4 +1,4 @@
-//! Minimal, descriptor-relative POSIX boundary for the synthetic observer.
+//! Minimal, descriptor-relative POSIX boundary shared by observer and test host.
 //! No existing object is repaired and no cleanup traverses an unowned tree.
 
 use super::FsError;
@@ -8,6 +8,10 @@ use std::fs::File;
 use std::mem::MaybeUninit;
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
 
+#[cfg(test)]
+#[path = "schema_observer_fs_diagnostics.rs"]
+pub(crate) mod diagnostics;
+
 /// Single-threaded, deterministic synthetic failure injection. It cannot change
 /// an input path, install a process hook, or affect another test thread.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,13 +20,17 @@ pub(crate) enum FsOperation {
     Unlink,
     Rmdir,
 }
+#[cfg(test)]
 thread_local! { static FAULT: std::cell::Cell<Option<(FsOperation, usize)>> = const { std::cell::Cell::new(None) }; }
+#[cfg(test)]
 pub(crate) fn inject_fault(operation: FsOperation, successful_calls: usize) {
     FAULT.with(|fault| fault.set(Some((operation, successful_calls))));
 }
+#[cfg(test)]
 pub(crate) fn clear_fault() {
     FAULT.with(|fault| fault.set(None));
 }
+#[cfg(test)]
 fn fail(operation: FsOperation) -> bool {
     FAULT.with(|fault| match fault.get() {
         Some((wanted, remaining)) if wanted == operation => {
@@ -38,8 +46,13 @@ fn fail(operation: FsOperation) -> bool {
     })
 }
 
+#[cfg(not(test))]
+fn fail(_operation: FsOperation) -> bool {
+    false
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct Identity {
+pub(crate) struct Identity {
     pub device: u64,
     pub inode: u64,
     pub owner: u32,
@@ -62,7 +75,7 @@ impl Identity {
     }
 }
 
-pub(super) fn name(value: &str) -> Result<CString, FsError> {
+pub(crate) fn name(value: &str) -> Result<CString, FsError> {
     if value.is_empty()
         || value == "."
         || value == ".."
@@ -75,6 +88,7 @@ pub(super) fn name(value: &str) -> Result<CString, FsError> {
     }
     CString::new(value).map_err(|_| FsError::Identity)
 }
+#[cfg_attr(test, track_caller)]
 fn owned(fd: i32) -> Result<File, FsError> {
     if fd < 0 {
         return Err(last_error());
@@ -82,14 +96,21 @@ fn owned(fd: i32) -> Result<File, FsError> {
     // SAFETY: successful open/openat returns a fresh owned descriptor.
     Ok(unsafe { File::from_raw_fd(fd) })
 }
-pub(super) fn last_error() -> FsError {
-    match std::io::Error::last_os_error().raw_os_error() {
+#[cfg_attr(test, track_caller)]
+pub(crate) fn last_error() -> FsError {
+    let errno = std::io::Error::last_os_error().raw_os_error();
+    let error = match errno {
         Some(libc::ENOENT) => FsError::Missing,
         Some(libc::EEXIST) => FsError::ScratchOccupied,
         _ => FsError::Io,
+    };
+    #[cfg(test)]
+    if !matches!(&error, FsError::Missing | FsError::ScratchOccupied) {
+        diagnostics::failure("posix syscall", &error, errno, None, None);
     }
+    error
 }
-pub(super) fn close(file: File) -> Result<(), FsError> {
+pub(crate) fn close(file: File) -> Result<(), FsError> {
     let injected = fail(FsOperation::Close);
     let fd = file.into_raw_fd();
     // SAFETY: ownership was removed from File and close is called exactly once.
@@ -109,19 +130,60 @@ pub(super) fn close(file: File) -> Result<(), FsError> {
     }
     Ok(())
 }
-pub(super) fn open_slash() -> Result<File, FsError> {
+pub(crate) fn open_slash() -> Result<File, FsError> {
     // SAFETY: literal is terminated, flags use no variadic mode argument.
     owned(unsafe { libc::open(c"/".as_ptr(), directory_flags()) })
 }
 fn directory_flags() -> i32 {
     libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC
 }
-pub(super) fn open_dir(parent: &File, component: &str) -> Result<File, FsError> {
+pub(crate) fn open_dir(parent: &File, component: &str) -> Result<File, FsError> {
     let component = name(component)?;
     // SAFETY: borrowed parent and terminated single component remain live.
     owned(unsafe { libc::openat(parent.as_raw_fd(), component.as_ptr(), directory_flags()) })
 }
-pub(super) fn open_read(parent: &File, component: &str) -> Result<File, FsError> {
+/// Absolute-path ancestors may contain non-ASCII names. These helpers still
+/// accept exactly one normal component and never follow symlinks.
+pub(crate) fn open_ancestor(parent: &File, component: &std::ffi::OsStr) -> Result<File, FsError> {
+    let component = ancestor_name(component)?;
+    // SAFETY: live parent, checked single component and non-creating flags.
+    owned(unsafe { libc::openat(parent.as_raw_fd(), component.as_ptr(), directory_flags()) })
+}
+fn ancestor_name(component: &std::ffi::OsStr) -> Result<CString, FsError> {
+    use std::os::unix::ffi::OsStrExt;
+    let bytes = component.as_bytes();
+    if bytes.is_empty()
+        || bytes.len() > 255
+        || bytes == b"."
+        || bytes == b".."
+        || bytes.contains(&b'/')
+    {
+        return Err(FsError::Identity);
+    }
+    CString::new(bytes).map_err(|_| FsError::Identity)
+}
+pub(crate) fn ancestor_identity_at(
+    parent: &File,
+    component: &std::ffi::OsStr,
+) -> Result<Identity, FsError> {
+    let component = ancestor_name(component)?;
+    let mut value = MaybeUninit::<libc::stat>::uninit();
+    // SAFETY: live parent and name, valid output storage, symlinks not followed.
+    if unsafe {
+        libc::fstatat(
+            parent.as_raw_fd(),
+            component.as_ptr(),
+            value.as_mut_ptr(),
+            libc::AT_SYMLINK_NOFOLLOW,
+        )
+    } != 0
+    {
+        return Err(last_error());
+    }
+    // SAFETY: fstatat succeeded and initialized the output.
+    stat_value(unsafe { value.assume_init() })
+}
+pub(crate) fn open_read(parent: &File, component: &str) -> Result<File, FsError> {
     let component = name(component)?;
     // O_NONBLOCK prevents a replaced FIFO/device from blocking before fstat.
     // SAFETY: parent and terminated single component are valid; no creation.
@@ -133,7 +195,8 @@ pub(super) fn open_read(parent: &File, component: &str) -> Result<File, FsError>
         )
     })
 }
-pub(super) fn open_write_for_planned_fault(
+#[cfg(test)]
+pub(crate) fn open_write_for_planned_fault(
     parent: &File,
     component: &str,
 ) -> Result<File, FsError> {
@@ -147,7 +210,7 @@ pub(super) fn open_write_for_planned_fault(
         )
     })
 }
-pub(super) fn create_file(parent: &File, component: &str) -> Result<File, FsError> {
+pub(crate) fn create_file(parent: &File, component: &str) -> Result<File, FsError> {
     let component = name(component)?;
     // SAFETY: mode is provided for O_CREAT; O_EXCL refuses all existing entries.
     owned(unsafe {
@@ -159,7 +222,7 @@ pub(super) fn create_file(parent: &File, component: &str) -> Result<File, FsErro
         )
     })
 }
-pub(super) fn create_dir(parent: &File, component: &str) -> Result<File, FsError> {
+pub(crate) fn create_dir(parent: &File, component: &str) -> Result<File, FsError> {
     let component_c = name(component)?;
     // SAFETY: live parent, checked component, fixed private mode. No umask change.
     if unsafe { libc::mkdirat(parent.as_raw_fd(), component_c.as_ptr(), 0o700) } != 0 {
@@ -182,7 +245,7 @@ fn stat_value(value: libc::stat) -> Result<Identity, FsError> {
         changed: (value.st_ctime, value.st_ctime_nsec),
     })
 }
-pub(super) fn identity(file: &File) -> Result<Identity, FsError> {
+pub(crate) fn identity(file: &File) -> Result<Identity, FsError> {
     let mut value = MaybeUninit::<libc::stat>::uninit();
     // SAFETY: fstat initializes valid output on success, descriptor is borrowed.
     if unsafe { libc::fstat(file.as_raw_fd(), value.as_mut_ptr()) } != 0 {
@@ -191,7 +254,7 @@ pub(super) fn identity(file: &File) -> Result<Identity, FsError> {
     // SAFETY: successful fstat initialized the complete value.
     stat_value(unsafe { value.assume_init() })
 }
-pub(super) fn identity_at(parent: &File, component: &str) -> Result<Option<Identity>, FsError> {
+pub(crate) fn identity_at(parent: &File, component: &str) -> Result<Option<Identity>, FsError> {
     let component = name(component)?;
     let mut value = MaybeUninit::<libc::stat>::uninit();
     // SAFETY: live descriptor, checked name and initialized storage; no symlink follow.
@@ -212,7 +275,7 @@ pub(super) fn identity_at(parent: &File, component: &str) -> Result<Option<Ident
     // SAFETY: successful fstatat initialized the complete value.
     stat_value(unsafe { value.assume_init() }).map(Some)
 }
-pub(super) fn validate(
+pub(crate) fn validate(
     file: &File,
     user: u32,
     device: u64,
@@ -235,7 +298,39 @@ pub(super) fn validate(
     reject_acl(file)?;
     Ok(id)
 }
-pub(super) fn reject_acl(file: &File) -> Result<(), FsError> {
+pub(crate) fn reject_acl(file: &File) -> Result<(), FsError> {
+    let before = identity(file)?;
+    private_acl_sample(file)?;
+    if before.directory() {
+        // Two fixed policy observations, not retry-until-success. A new grant
+        // between them must reject even though directory timestamps may move.
+        private_acl_sample(file)?;
+    }
+    let after = identity(file)?;
+    if !acl_identity_matches(&before, &after) {
+        #[cfg(test)]
+        diagnostics::failure(
+            "private ACL window",
+            &FsError::Changed,
+            None,
+            Some(&before),
+            Some(&after),
+        );
+        return Err(FsError::Changed);
+    }
+    Ok(())
+}
+
+fn acl_identity_matches(before: &Identity, after: &Identity) -> bool {
+    if before.directory() {
+        before.same_node(after)
+    } else {
+        // Source files retain size, link and exact timestamp protection.
+        before == after
+    }
+}
+
+fn private_acl_sample(file: &File) -> Result<(), FsError> {
     use std::ffi::c_void;
     extern "C" {
         fn acl_get_fd(fd: libc::c_int) -> *mut c_void;
@@ -250,12 +345,22 @@ pub(super) fn reject_acl(file: &File) -> Result<(), FsError> {
     let before = identity(file)?;
     // SAFETY: acl_get_fd borrows a valid descriptor and returns an owned ACL.
     let acl = unsafe { acl_get_fd(file.as_raw_fd()) };
+    let query_errno = std::io::Error::last_os_error().raw_os_error();
+    #[cfg(test)]
+    diagnostics::reached(diagnostics::Checkpoint::PrivateAclRead, file);
     if acl.is_null() {
-        if std::io::Error::last_os_error().raw_os_error() == Some(libc::ENOENT)
-            && identity(file)? == before
-        {
+        let after = identity(file)?;
+        if query_errno == Some(libc::ENOENT) && acl_identity_matches(&before, &after) {
             return Ok(());
         }
+        #[cfg(test)]
+        diagnostics::failure(
+            "private ACL query/identity",
+            &FsError::Io,
+            query_errno,
+            Some(&before),
+            Some(&after),
+        );
         return Err(FsError::Io);
     }
     // SAFETY: ACL is live; validation and lookup borrow it before freeing once.
@@ -273,12 +378,136 @@ pub(super) fn reject_acl(file: &File) -> Result<(), FsError> {
     if freed != 0 {
         return Err(FsError::Close);
     }
-    if valid && result == -1 && error == Some(libc::EINVAL) && identity(file)? == before {
+    let after = identity(file)?;
+    if valid && result == -1 && error == Some(libc::EINVAL) && acl_identity_matches(&before, &after)
+    {
         return Ok(());
     }
+    #[cfg(test)]
+    diagnostics::failure(
+        "private ACL policy/identity",
+        &FsError::Identity,
+        error,
+        Some(&before),
+        Some(&after),
+    );
     Err(FsError::Identity)
 }
-pub(super) fn names(file: &File) -> Result<BTreeSet<String>, FsError> {
+/// Ancestors may carry macOS' usual deny-delete ACL. Grant entries are rejected
+/// conservatively; dedicated private directories/files still require no ACL.
+pub(crate) fn reject_grant_acl(file: &File) -> Result<(), FsError> {
+    let before = identity(file)?;
+    ancestor_acl_sample(file)?;
+    if before.directory() {
+        ancestor_acl_sample(file)?;
+    }
+    let after = identity(file)?;
+    if !acl_identity_matches(&before, &after) {
+        #[cfg(test)]
+        diagnostics::failure(
+            "ancestor ACL window",
+            &FsError::Changed,
+            None,
+            Some(&before),
+            Some(&after),
+        );
+        return Err(FsError::Changed);
+    }
+    Ok(())
+}
+
+fn ancestor_acl_sample(file: &File) -> Result<(), FsError> {
+    use std::ffi::c_void;
+    extern "C" {
+        fn acl_get_fd(fd: libc::c_int) -> *mut c_void;
+        fn acl_valid(acl: *mut c_void) -> libc::c_int;
+        fn acl_get_entry(
+            acl: *mut c_void,
+            entry_id: libc::c_int,
+            entry: *mut *mut c_void,
+        ) -> libc::c_int;
+        fn acl_get_tag_type(entry: *mut c_void, tag: *mut libc::c_int) -> libc::c_int;
+        fn acl_free(object: *mut c_void) -> libc::c_int;
+    }
+    let before = identity(file)?;
+    // SAFETY: live descriptor; returned ACL is owned by this scope.
+    let acl = unsafe { acl_get_fd(file.as_raw_fd()) };
+    let query_errno = std::io::Error::last_os_error().raw_os_error();
+    #[cfg(test)]
+    diagnostics::reached(diagnostics::Checkpoint::AncestorAclRead, file);
+    if acl.is_null() {
+        let after = identity(file)?;
+        return if query_errno == Some(libc::ENOENT) && acl_identity_matches(&before, &after) {
+            Ok(())
+        } else {
+            #[cfg(test)]
+            diagnostics::failure(
+                "ancestor ACL query/identity",
+                &FsError::Identity,
+                query_errno,
+                Some(&before),
+                Some(&after),
+            );
+            Err(FsError::Identity)
+        };
+    }
+    let result = (|| {
+        // SAFETY: the ACL remains live through this loop.
+        if unsafe { acl_valid(acl) } != 0 {
+            return Err(FsError::Identity);
+        }
+        for index in 0..=169 {
+            let mut entry = std::ptr::null_mut();
+            // SAFETY: thread-local errno and valid ACL/output pointers.
+            unsafe {
+                *libc::__error() = 0;
+            }
+            let next = unsafe { acl_get_entry(acl, if index == 0 { 0 } else { -1 }, &mut entry) };
+            if next == -1 && std::io::Error::last_os_error().raw_os_error() == Some(libc::EINVAL) {
+                return Ok(());
+            }
+            let mut tag = 0;
+            // SAFETY: only a successful non-null ACL entry is dereferenced.
+            if next != 0
+                || entry.is_null()
+                || index == 169
+                || unsafe { acl_get_tag_type(entry, &mut tag) } != 0
+                || tag != 2
+            {
+                return Err(FsError::Identity);
+            }
+        }
+        Err(FsError::Identity)
+    })();
+    // SAFETY: the owned ACL is freed exactly once after the last access.
+    if unsafe { acl_free(acl) } != 0 {
+        return Err(FsError::Close);
+    }
+    let after = identity(file)?;
+    if !acl_identity_matches(&before, &after) {
+        #[cfg(test)]
+        diagnostics::failure(
+            "ancestor ACL identity",
+            &FsError::Changed,
+            None,
+            Some(&before),
+            Some(&after),
+        );
+        return Err(FsError::Changed);
+    }
+    #[cfg(test)]
+    if let Err(error) = &result {
+        diagnostics::failure(
+            "ancestor ACL policy",
+            error,
+            None,
+            Some(&before),
+            Some(&after),
+        );
+    }
+    result
+}
+pub(crate) fn names(file: &File) -> Result<BTreeSet<String>, FsError> {
     let descriptor = {
         // The public component validator deliberately rejects dot; this fixed
         // internal open obtains an independent directory cursor, unlike dup.
@@ -332,7 +561,7 @@ pub(super) fn names(file: &File) -> Result<BTreeSet<String>, FsError> {
     }
     result
 }
-pub(super) fn unlink(parent: &File, component: &str, directory: bool) -> Result<(), FsError> {
+pub(crate) fn unlink(parent: &File, component: &str, directory: bool) -> Result<(), FsError> {
     let component_c = name(component)?;
     if fail(if directory {
         FsOperation::Rmdir
@@ -357,7 +586,7 @@ pub(super) fn unlink(parent: &File, component: &str, directory: bool) -> Result<
     }
     Ok(())
 }
-pub(super) fn free_space(file: &File) -> Result<(), FsError> {
+pub(crate) fn free_space(file: &File) -> Result<(), FsError> {
     let mut value = MaybeUninit::<libc::statvfs>::uninit();
     // SAFETY: fstatvfs only reads filesystem capacity for this live directory.
     if unsafe { libc::fstatvfs(file.as_raw_fd(), value.as_mut_ptr()) } != 0 {

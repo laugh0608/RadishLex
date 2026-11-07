@@ -63,8 +63,11 @@ impl CancellationSourceReceipt {
         next.source_ready = Some(family);
         Ok(next)
     }
-    pub(crate) fn validate_request(&self, request: &PreparationCancellationRequest) -> Result<()> {
-        self.encode()?;
+    pub(crate) fn encode_for_request(
+        &self,
+        request: &PreparationCancellationRequest,
+    ) -> Result<Vec<u8>> {
+        let bytes = self.encode()?;
         let original = request.preparation();
         let mut expected = original.clone();
         if expected.phase() == PreparationPhase::MaintenanceIntent {
@@ -94,7 +97,7 @@ impl CancellationSourceReceipt {
             }
             record::validate_source(&self.preparation, family)?;
         }
-        Ok(())
+        Ok(bytes)
     }
     pub fn encode(&self) -> Result<Vec<u8>> {
         self.preparation

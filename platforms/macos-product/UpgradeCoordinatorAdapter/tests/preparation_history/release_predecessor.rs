@@ -420,12 +420,14 @@ fn retry_points() -> Vec<Point> {
         Point::HandoffMarkerRenamed,
     ]
 }
+#[cfg(feature = "reliability-matrix")]
 fn retry_blocked(point: Point) -> bool {
     matches!(point, Point::SnapshotCreated | Point::HandoffHistoryCreated)
 }
 
+#[cfg(feature = "reliability-matrix")]
 #[test]
-fn released_predecessor_authority_loss_reloads_the_same_index_and_proof() {
+fn reliability_matrix_released_predecessor_authority_loss_reloads_the_same_index_and_proof() {
     for point in retry_points() {
         let fixture = Fixture::new();
         let prior = released(&fixture, State::RolledBack);
@@ -450,8 +452,9 @@ fn released_predecessor_authority_loss_reloads_the_same_index_and_proof() {
     }
 }
 
+#[cfg(feature = "reliability-matrix")]
 #[test]
-fn released_predecessor_process_exit_recovers_from_disk_without_rearchiving() {
+fn reliability_matrix_released_predecessor_process_exit_recovers_from_disk_without_rearchiving() {
     for (index, point) in retry_points().into_iter().enumerate() {
         let fixture = Fixture::new();
         let prior = released(&fixture, State::Completed);

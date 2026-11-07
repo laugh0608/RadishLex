@@ -196,17 +196,31 @@ fn assert_preserved(fixture: &Fixture, record: &CancellationArchiveReceipt) {
 
 #[test]
 fn preserves_cancellation_materials_and_outer_without_releasing_gate() {
-    for state in [
-        None,
-        Some(State::Completed),
-        Some(State::AbortedPreserved),
-        Some(State::RolledBack),
-    ] {
-        for stage in 0..=5 {
+    check_preservation_cases(&[None, Some(State::RolledBack)], &[0, 5], &[true]);
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_preserves_cancellation_materials_and_outer_without_releasing_gate() {
+    check_preservation_cases(
+        &[
+            None,
+            Some(State::Completed),
+            Some(State::AbortedPreserved),
+            Some(State::RolledBack),
+        ],
+        &[0, 1, 2, 3, 4, 5],
+        &[false, true],
+    );
+}
+
+fn check_preservation_cases(states: &[Option<State>], stages: &[u8], outers: &[bool]) {
+    for &state in states {
+        for &stage in stages {
             if stage == 4 && state.is_none() {
                 continue;
             }
-            for new_outer in [false, true] {
+            for &new_outer in outers {
                 let fixture = Fixture::new();
                 let (store, guard, outer) = prepare(&fixture, state, stage, new_outer);
                 let db = fs::read(fixture.source()).unwrap();
@@ -273,7 +287,17 @@ fn archive_crash_child() {
 }
 
 #[test]
-fn every_archive_boundary_revokes_authority_and_survives_process_exit() {
+fn representative_archive_boundaries_revoke_and_survive_process_exit() {
+    check_archive_boundaries(false);
+}
+
+#[cfg(feature = "reliability-matrix")]
+#[test]
+fn reliability_matrix_every_archive_boundary_revokes_authority_and_survives_process_exit() {
+    check_archive_boundaries(true);
+}
+
+fn check_archive_boundaries(exhaustive: bool) {
     let fixture = Fixture::new();
     let (store, guard, outer) = prepare(&fixture, Some(State::RolledBack), 3, true);
     let mut trace = Authority::new();
@@ -301,6 +325,9 @@ fn every_archive_boundary_revokes_authority_and_survives_process_exit() {
         if !selected.contains(&(index, point)) {
             selected.push((index, point));
         }
+    }
+    if !exhaustive {
+        selected = vec![*selected.first().unwrap(), *selected.last().unwrap()];
     }
     // Keep the full failure matrix inside one libtest worker.
     for (index, point) in selected {

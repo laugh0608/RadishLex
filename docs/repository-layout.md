@@ -363,6 +363,8 @@ apps/radishlex-manager/
 
 `packaging/linux/` 保存 format v1 Linux product mirror、`debian-system-v1` component layout、Debian control/artifact contract、desktop/icon source 和 `debian-local-deb-v1` identity；不保存生成的 `.deb`、rootfs 构建物、apt repository metadata、签名凭据或用户数据。`scripts/linux-product/product_metadata.py` 负责格式与派生值，`source_contract.py` 交叉验证 version/build、ABI/schema、RimeData lock、dependency/font profile 与源码身份，`rootfs.py` 从显式 Manager/addon 输入离线装配临时 `DESTDIR` 并生成 canonical product manifest；`deb_artifact.py` 生成和重验 canonical ar/USTAR、control、md5sums 与 SHA-256 evidence，`shlibdeps_diagnostics.py` 精确核验私有未版本库和 Debian 13 ARM64 libc6 usrmerge 诊断。Rust/Cargo 与 C++ 产品构建路径映射为稳定 identity，强门禁扫描全部 ELF 的 repo/home/staging 泄漏；真实 Debian 13.6 ARM64 载荷与重复 `.deb` 构建已通过。以上入口不写真实 `/usr`、`/var`、dpkg database 或 XDG，也不把载体生成称为安装完成。完整边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
 
+Linux source-first入口独立于旧pair/refresh：`source_first_contract.py`定义candidate/seed/baseline/pair严格格式，`source_first.py`只做准入；`source_first_build.py`组合既有离线source/target构建，`source_first_capture.py`归集已授权的私有seed材料，`source_first_process.py`管理有界构建子进程，I/O与stage模块负责身份核验、精确拷贝和持久发布。candidate保存在`packaging/linux/source-first-candidate.json`；真实材料审阅后才提交baseline，不将raw receipt、私有现场或生成artifact入库。Rust seed投影归属`platforms/linux-product/src/model/source_seed.rs`并由只读artifact verifier调用，不属于系统observer。入口及失败保留见[装配runbook](runbooks/linux-source-first-assembly.md)。
+
 ## 平台目录
 
 M5-P02 已以真实实现和 contract 建立 `platforms/linux-fcitx5/`：

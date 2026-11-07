@@ -265,6 +265,29 @@ Executor 已接 `authorize_source_preparation` / `authorize_preparation_resume` 
 
 Driver/Bridge/AppKit 已接 `ContinuePreparedUpgrade` / `10`，仅完整交接/封存可提供动作。生产 Bridge 在 authoritative root 与 sealed payload 下重读关系并核验实际程序槽位，再执行同一双锁任务；普通 UI action 不替代任务授权。新准备/取消 dispatch、独立 source 39 正常双程序资格及 WAL/pager 内部断电仍开放，不构成 B 段退出或真实升级完成。实现与验证记录见 [W42](../devlogs/2026-W42.md)。
 
+## 保持当前会话边界后的仓库工作顺位
+
+2026-11-01：完整自动验收已在 `90e7717` 收口，随后完成 Q2 与策略路线复审。项目所有者明确保持当前账户/会话边界，[Q2-E0](macos-source39-qualification-plan.md#q2-e0-决策保持当前账户与会话边界)不进入实验；[F0 来源核查](macos-cancellation-qualification-reader-contract.md#f0-信任来源核查与准入清单)也未找到已选定的可信当前策略来源。生产资格暂不推进，M5 系统操作顺位不变；可继续准备本方案已列出的 WAL/pager 内部故障验证，但不据此关闭 B 段。
+
+本轮只读审计得到三个具体事实：
+
+- [维护实现](../../crates/ime-userdb/src/store/maintenance.rs)的 `MaintenancePoint` 位于 `wal_checkpoint(TRUNCATE)`、`journal_mode=DELETE` 调用前后及 close 周围；这些回调不在 SQLite 内部 I/O 发生时触发。[现有子进程测试](../../crates/ime-userdb/src/store/maintenance_tests.rs)在这些边界 `exit`，不能当作 pager 写入中断或硬件断电证据。
+- 维护与 [journal recovery 测试](../../crates/ime-userdb/src/store/maintenance_recovery_tests.rs)的 fixture `Drop` 仍无条件删除根；恢复 fixture 在完成数据库初始化前也没有持有可保留根的完整对象。下一批故障注入前应先修正创建登记、部分构造失败、panic/子进程失败和成功 teardown 的生命周期，避免再次缺失失败现场。
+- `ime-userdb` 根为 `forbid(unsafe_code)`，维护连接未指定自定义 VFS；本次检查的维护模块没有现成内部 I/O 注入入口。不能把 observer 的测试钩子当作维护 VFS，也不能为测试移除该安全边界、改生产默认 VFS 或自动新增依赖。
+
+[SQLite 测试说明](https://sqlite.org/testing.html#crash_testing)区分注入 I/O 错误与模拟崩溃后的未同步写入；[VFS 说明](https://sqlite.org/vfs.html#vfs_shims)支持在既有实现上叠加 shim。由此提出以下候选顺序，尚未运行或实施：
+
+| 批次 | 具体交付与验证 | 边界及停止条件 |
+| --- | --- | --- |
+| W0：故障现场先保留 | 仅修改两组维护测试 fixture：创建即登记合成根，私有权限，部分初始化与失败保留；成功清理先核对本次根身份。新增确定性 panic/构造失败/子进程失败用例，核对 source/snapshot/journal 身份与字节；只拆除预先登记的本次回归对象 | 小型测试可靠性补漏，不改生产 API/SQLite 路径；旧失败根不扫描、清理或重建。精确用例清单及单批最多5分钟、串行一次的命令在实施时固定；失败先诊断，不自动重跑 |
+| W1：内部 I/O 测试宿主设计 | 明确怎样在独立测试子进程使用与产品相同锁定 SQLite，观察 `xWrite/xSync/xTruncate/xDelete` 和必要的 WAL shared-memory/锁调用；逐项证明原 VFS 委托、文件角色、数据根限制、事件顺序及触发位置 | 先审 unsafe/FFI、构建与依赖复用的具体边界，未批准不实现。不能让进程级注册影响其他测试/产品；不改变生产维护 API、默认 VFS 或 `forbid(unsafe_code)`，不下载 SQLite 测试工具 |
+| W2：先做有界定向故障 | 先以一个小型合成 WAL 源和单一已观察到的内部 I/O 点做无故障对照、一次 I/O 错误、内部进程中断；每个样本独立新根，恢复走真实维护/协调器合同，完整比较合成内容、tombstone、保护快照及身份，保留失败材料 | 触发计数必须非零且证明发生在目标调用内部；未知/未触发不得跳过记通过。I/O 错误不等于崩溃，进程退出不等于丢失系统缓存；该批不宣称断电资格闭合 |
+| W3：持久化模型与完整矩阵 | 另审同步边界、未同步写入丢弃/重排/部分写及目录操作的确定性故障模型，再覆盖 WAL→DELETE 与恢复路径，证明可精确继续或保持可诊断阻断；核对全部持久数据而非仅行数 | 完整专项、容量与整仓门禁须逐轮给命令、预算并单独授权。模型测试不等于真实介质断电，也不补 source39 正常运行、策略新鲜度或最终取消资格 |
+
+当前最近的可实施项为 W0。W1 的测试宿主边界未获批准，不预建空壳或默认成功注入器；W0 成功也不会自动授权 W1–W3。W0 具体实施只使用已有工具链、新合成根及定向检查，真实 39/40、用户 Caches/DB、输入源、Linux/UTM 和现存证据保持原状。
+
+同日后续项目所有者已明确回归Linux M5，完成[交付基线审计](linux-m5-delivery-baseline-audit.md)并调整current。上段“最近”仅保留本专题内的W0–W3依赖顺序，W0不再是项目默认下一任务；本专题故障宿主及生产资格延期，不作为Linux退出前置，也不将延期写为验收通过。
+
 ## 进入实机前必须另行确定
 
 仓库实现和独立产品资格通过后，再确定新候选版本/构建身份、唯一 source、当前数据库与旧事务归档清单、准备写入与停止条件，并请求一次新的实机授权。9 月 9 日恢复授权已消费，本方案不授权复跑恢复、直接重试 target 40、手工 checkpoint、删除 sidecar 或搬移冻结材料。

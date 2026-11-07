@@ -45,6 +45,11 @@ done
 temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/radishlex-linux-layout.XXXXXX")"
 temp_dir="$(CDPATH= cd -- "${temp_dir}" && pwd -P)"
 cleanup() {
+  local status=$?
+  if [[ ${status} -ne 0 && "${RADISHLEX_PRESERVE_BUILD_FAILURES:-0}" == 1 ]]; then
+    echo "Failed Linux layout inspection retained: ${temp_dir}" >&2
+    return "${status}"
+  fi
   rm -rf "${temp_dir}"
 }
 trap cleanup EXIT

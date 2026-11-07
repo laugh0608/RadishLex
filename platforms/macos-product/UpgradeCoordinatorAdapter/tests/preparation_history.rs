@@ -21,6 +21,7 @@ static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 const NEW: &str = "11111111111111111111111111111111";
 const OLD: &str = "22222222222222222222222222222222";
 const OUTER: &str = "33333333333333333333333333333333";
+#[cfg(feature = "reliability-matrix")]
 #[path = "preparation_history/cancellation.rs"]
 mod cancellation;
 #[path = "preparation_history/cancellation_archive.rs"]
@@ -90,7 +91,7 @@ impl Fixture {
         (store, guard)
     }
     fn legacy(&self, state: Option<State>) -> (PreparationJournalStore, UpgradeProcessGuard) {
-        self.legacy_with_learning(state, 80)
+        self.legacy_with_learning(state, 1)
     }
     fn legacy_with_learning(
         &self,
@@ -404,8 +405,9 @@ fn archive_points() -> Vec<Point> {
     points
 }
 
+#[cfg(feature = "reliability-matrix")]
 #[test]
-fn authority_loss_at_every_archive_boundary_preserves_and_reloads_exactly() {
+fn reliability_matrix_authority_loss_at_every_archive_boundary_preserves_and_reloads_exactly() {
     for point in archive_points() {
         let fixture = Fixture::new();
         let (store, guard, mut port) = fixture.reserve(Some(State::RolledBack));
@@ -430,8 +432,9 @@ fn authority_loss_at_every_archive_boundary_preserves_and_reloads_exactly() {
     }
 }
 
+#[cfg(feature = "reliability-matrix")]
 #[test]
-fn process_exit_at_every_archive_boundary_reopens_with_new_guard() {
+fn reliability_matrix_process_exit_at_every_archive_boundary_reopens_with_new_guard() {
     for (index, point) in archive_points().into_iter().enumerate() {
         let fixture = Fixture::new();
         let (_, guard, mut port) = fixture.reserve(Some(State::RolledBack));
@@ -732,4 +735,32 @@ fn captured_inventory_cannot_be_rebound_to_another_outer_or_source() {
             .is_err());
         assert!(fixture.state("receipt.json").exists());
     }
+}
+
+#[test]
+fn post_terminal_learning_grows_source_while_old_private_inventory_remains_valid() {
+    let fixture = Fixture::new();
+    let (store, guard) = fixture.legacy_with_learning(Some(State::RolledBack), 80);
+    let receipt =
+        UpgradeReceipt::decode(&fs::read(fixture.state("receipt.json")).unwrap()).unwrap();
+    let old_source = receipt
+        .artifacts()
+        .iter()
+        .find(|item| item.slot() == Artifact::SourceDatabase)
+        .unwrap();
+    assert_ne!(
+        fs::metadata(fixture.source()).unwrap().len(),
+        old_source.byte_len()
+    );
+    let inventory = store
+        .capture_previous_inventory(&guard, NEW, Some(OUTER), Some(OLD), &Hasher)
+        .unwrap();
+    assert!(store
+        .previous_inventory_identity(&guard, &inventory, &Hasher)
+        .unwrap()
+        .is_some());
+    drop(guard);
+    let db = UserDb::open(fixture.source()).unwrap();
+    assert_eq!(db.list_active_terms().unwrap().len(), 81);
+    assert_eq!(db.list_deleted_term_tombstones().unwrap().len(), 1);
 }

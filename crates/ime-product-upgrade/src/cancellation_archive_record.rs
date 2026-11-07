@@ -120,8 +120,9 @@ impl CancellationArchiveReceipt {
         result
     }
     pub(in super::super) fn validate(&self) -> Result<()> {
-        self.request.encode()?;
-        self.source.validate_request(&self.request)?;
+        // This validates both models and their relationship, including the
+        // canonical size limits. Reuse the source encoding for its length.
+        let source_bytes = self.source.encode_for_request(&self.request)?;
         let prep = self.request.preparation();
         let binding = prep.binding();
         if self.format != "radishlex-cancellation-archive-v1"
@@ -130,7 +131,7 @@ impl CancellationArchiveReceipt {
             || !self.expected_slots().starts_with(&self.moved)
             || self.previous_directories.is_some() != binding.previous_data_operation_id.is_some()
             || self.previous_files[0].is_some() != binding.previous_data_operation_id.is_some()
-            || self.source_identity.byte_len != self.source.encode()?.len() as u64
+            || self.source_identity.byte_len != source_bytes.len() as u64
             || Some(&self.outer.previous_identity.sha256)
                 != binding.previous_install_receipt_sha256.as_ref()
             || self.outer.previous_identity.byte_len != self.outer.previous_bytes.len() as u64

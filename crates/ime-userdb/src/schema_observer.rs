@@ -1,19 +1,24 @@
-//! Synthetic-only, default-off schema observation. No production input-path API.
+//! Default-off inspection of a host-verified private copy.
 //!
-//! A fixture capability can only be minted by the generator in this module.
+//! Synthetic fixture generation is separately gated and never required by the
+//! production inspector. Trusted layout comes from compiled schema code.
 //! The caller owns verified directory capture, immutable DB/WAL checks and scratch
 //! disposal. A successful SQLite read is not a cancellation qualification.
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(feature = "synthetic-schema-observer")]
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use rusqlite::{config::DbConfig, types::ValueRef, Connection, ErrorCode, OpenFlags};
 
+#[cfg(feature = "synthetic-schema-observer")]
 #[path = "schema_observer_fixture.rs"]
 mod fixture;
 #[path = "schema_observer_wal.rs"]
 mod wal;
 
+#[cfg(feature = "synthetic-schema-observer")]
 pub use fixture::{create_synthetic_fixture, FixtureKind};
 
 /// Fixed diagnostics deliberately exclude paths, SQL, SQLite messages and rows.
@@ -53,27 +58,29 @@ const MAX_OBJECTS: usize = 64;
 
 /// Created from compiled, trusted schema code before any fixture mutation.
 /// Fields cannot be manufactured from paths, JSON or schema integers.
+#[cfg(feature = "synthetic-schema-observer")]
 pub struct SyntheticFixture {
     source: PathBuf,
     trusted_manifest: Vec<SchemaObject>,
     reference_version: Option<i64>,
 }
 
-/// An intermediate synthetic result. The host must close its capture handles,
+/// An intermediate copy result. The host must close its capture handles,
 /// verify unchanged source/copy identities and hashes, dispose scratch, then
 /// bind the result to its own proof/control lifetime before exposing success.
 #[derive(Debug)]
-pub struct SyntheticObservation {
+pub struct CopyObservation {
+    profile: &'static str,
     schema_version: i64,
     sqlite_source_id: String,
     compile_options: Vec<String>,
 }
-impl SyntheticObservation {
+impl CopyObservation {
     pub const fn schema_version(&self) -> i64 {
         self.schema_version
     }
     pub const fn profile(&self) -> &'static str {
-        "synthetic-fresh-schema9-exact-v1"
+        self.profile
     }
     pub fn sqlite_source_id(&self) -> &str {
         &self.sqlite_source_id
@@ -83,6 +90,10 @@ impl SyntheticObservation {
     }
 }
 
+#[cfg(feature = "synthetic-schema-observer")]
+pub type SyntheticObservation = CopyObservation;
+
+#[cfg(feature = "synthetic-schema-observer")]
 impl SyntheticFixture {
     pub fn source_dir(&self) -> &Path {
         &self.source
@@ -108,143 +119,197 @@ impl SyntheticFixture {
             .ok_or(ObserverError::Fixture)?
             .join("scratch")
             .join("userdb.sqlite3");
-        let admission = wal::admit(&path, &control, charge)?;
-        control()?;
-        let connection = Connection::open_with_flags(
+        inspect_verified_copy(
             &path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX
-                | OpenFlags::SQLITE_OPEN_PRIVATE_CACHE
-                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+            &self.trusted_manifest,
+            "synthetic-fresh-schema9-exact-v1",
+            control,
+            charge,
+            after_transaction,
         )
-        .map_err(sql_error)?;
-        let interrupted = Arc::new(Mutex::new(None));
-        let result = (|| {
-            configure(&connection)?;
-            install_progress(&connection, control.clone(), interrupted.clone())?;
-            control()?;
-            connection
-                .execute_batch("BEGIN DEFERRED")
+    }
+}
+
+/// Inspect only a private DB/WAL copy whose filesystem ownership, family and
+/// lifetime the host has verified. This low-level result is not task authority;
+/// the host must confirm close, dispose the copy and revalidate the full proof.
+/// No migration or source opening belongs in this interface.
+pub fn inspect_private_copy(
+    path: &Path,
+    control: ObserverControl,
+    charge: &mut ReadCharge<'_>,
+    after_transaction: &mut dyn FnMut() -> Result<(), ObserverError>,
+) -> Result<CopyObservation, ObserverError> {
+    control()?;
+    if crate::UserDb::supported_schema_version() != 9 {
+        return Err(ObserverError::UnsupportedSchema);
+    }
+    // Build the exact trusted layout in memory, never from input SQL or a disk
+    // fixture. Different historical layouts fail closed even at user_version=9.
+    let connection = crate::UserDb::open_in_memory()
+        .map_err(|_| ObserverError::Configuration)?
+        .connection;
+    let manifest = read_manifest(&connection, &mut 0, &control);
+    if let Err((connection, _)) = connection.close() {
+        drop(connection);
+        return Err(ObserverError::CloseUnconfirmed);
+    }
+    control()?;
+    inspect_verified_copy(
+        path,
+        &manifest?,
+        "compiled-fresh-schema9-exact-v1",
+        control,
+        charge,
+        after_transaction,
+    )
+}
+
+fn inspect_verified_copy(
+    path: &Path,
+    trusted_manifest: &[SchemaObject],
+    profile: &'static str,
+    control: ObserverControl,
+    charge: &mut ReadCharge<'_>,
+    after_transaction: &mut dyn FnMut() -> Result<(), ObserverError>,
+) -> Result<CopyObservation, ObserverError> {
+    let admission = wal::admit(path, &control, charge)?;
+    control()?;
+    let connection = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_PRIVATE_CACHE
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(sql_error)?;
+    let interrupted = Arc::new(Mutex::new(None));
+    let result = (|| {
+        configure(&connection)?;
+        install_progress(&connection, control.clone(), interrupted.clone())?;
+        control()?;
+        connection
+            .execute_batch("BEGIN DEFERRED")
+            .map_err(sql_error)?;
+        control()?;
+        let version: i64 = connection
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .map_err(sql_error)?;
+        control()?;
+        if version != 9 {
+            return Err(ObserverError::UnsupportedSchema);
+        }
+        if let Some(pages) = admission.committed_pages {
+            let actual: u32 = connection
+                .query_row("PRAGMA page_count", [], |r| r.get(0))
                 .map_err(sql_error)?;
-            control()?;
-            let version: i64 = connection
-                .query_row("PRAGMA user_version", [], |r| r.get(0))
-                .map_err(sql_error)?;
-            control()?;
-            if version != 9 {
-                return Err(ObserverError::UnsupportedSchema);
-            }
-            if let Some(pages) = admission.committed_pages {
-                let actual: u32 = connection
-                    .query_row("PRAGMA page_count", [], |r| r.get(0))
-                    .map_err(sql_error)?;
-                if actual != pages {
-                    return Err(ObserverError::InputFormat);
-                }
-            }
-            let page_size: u32 = connection
-                .query_row("PRAGMA page_size", [], |r| r.get(0))
-                .map_err(sql_error)?;
-            if page_size != admission.page_size {
+            if actual != pages {
                 return Err(ObserverError::InputFormat);
             }
-            control()?;
-            let mut integrity = connection
-                .prepare("PRAGMA integrity_check")
-                .map_err(sql_error)?;
-            let mut rows = integrity.query([]).map_err(sql_error)?;
-            let row = rows
-                .next()
-                .map_err(sql_error)?
-                .ok_or(ObserverError::Integrity)?;
-            if row.get_ref(0).map_err(sql_error)? != ValueRef::Text(b"ok")
-                || rows.next().map_err(sql_error)?.is_some()
-            {
-                return Err(ObserverError::Integrity);
-            }
-            drop(rows);
-            drop(integrity);
-            control()?;
-            let mut material = 0;
-            let manifest = read_manifest(&connection, &mut material, &control)?;
-            if manifest != self.trusted_manifest {
-                return Err(ObserverError::Layout);
-            }
-            control()?;
-            let mut source_query = connection
-                .prepare("SELECT sqlite_source_id()")
-                .map_err(sql_error)?;
-            let mut rows = source_query.query([]).map_err(sql_error)?;
-            let row = rows
-                .next()
-                .map_err(sql_error)?
-                .ok_or(ObserverError::Configuration)?;
-            let source_id = text(row.get_ref(0).map_err(sql_error)?, &mut material)?;
-            if rows.next().map_err(sql_error)?.is_some() {
-                return Err(ObserverError::Configuration);
-            }
-            drop(rows);
-            drop(source_query);
-            let mut compile_options = Vec::new();
-            let mut options = connection
-                .prepare("PRAGMA compile_options")
-                .map_err(sql_error)?;
-            let mut rows = options.query([]).map_err(sql_error)?;
-            while let Some(row) = rows.next().map_err(sql_error)? {
-                control()?;
-                compile_options.push(text(row.get_ref(0).map_err(sql_error)?, &mut material)?);
-            }
-            drop(rows);
-            drop(options);
-            if !compile_options
-                .iter()
-                .any(|v| matches!(v.as_str(), "TEMP_STORE=1" | "TEMP_STORE=2" | "TEMP_STORE=3"))
-                || compile_options
-                    .iter()
-                    .any(|v| matches!(v.as_str(), "OMIT_WAL" | "OMIT_PROGRESS_CALLBACK"))
-            {
-                return Err(ObserverError::Configuration);
-            }
-            control()?;
-            connection.execute_batch("COMMIT").map_err(sql_error)?;
-            control()?;
-            after_transaction()?;
-            control()?;
-            Ok(SyntheticObservation {
-                schema_version: version,
-                sqlite_source_id: source_id,
-                compile_options,
-            })
-        })();
-        // On revoke/error only resource disposal remains; no further observation.
-        let reason = match interrupted.lock() {
-            Ok(mut value) => value.take(),
-            Err(_) => Some(ObserverError::Configuration),
-        };
-        let disable = connection
-            .progress_handler(0, None::<fn() -> bool>)
-            .map_err(sql_error);
-        let rollback = if !connection.is_autocommit() {
-            connection.execute_batch("ROLLBACK").map_err(sql_error)
-        } else {
-            Ok(())
-        };
-        match connection.close() {
-            Ok(()) => {}
-            Err((connection, _)) => {
-                drop(connection);
-                return Err(ObserverError::CloseUnconfirmed);
-            }
         }
-        disable?;
-        rollback?;
-        if let Some(reason) = reason {
-            return Err(reason);
+        let page_size: u32 = connection
+            .query_row("PRAGMA page_size", [], |r| r.get(0))
+            .map_err(sql_error)?;
+        if page_size != admission.page_size {
+            return Err(ObserverError::InputFormat);
         }
-        let observation = result?;
         control()?;
-        Ok(observation)
+        let mut integrity = connection
+            .prepare("PRAGMA integrity_check")
+            .map_err(sql_error)?;
+        let mut rows = integrity.query([]).map_err(sql_error)?;
+        let row = rows
+            .next()
+            .map_err(sql_error)?
+            .ok_or(ObserverError::Integrity)?;
+        if row.get_ref(0).map_err(sql_error)? != ValueRef::Text(b"ok")
+            || rows.next().map_err(sql_error)?.is_some()
+        {
+            return Err(ObserverError::Integrity);
+        }
+        drop(rows);
+        drop(integrity);
+        control()?;
+        let mut material = 0;
+        let manifest = read_manifest(&connection, &mut material, &control)?;
+        if manifest != trusted_manifest {
+            return Err(ObserverError::Layout);
+        }
+        control()?;
+        let mut source_query = connection
+            .prepare("SELECT sqlite_source_id()")
+            .map_err(sql_error)?;
+        let mut rows = source_query.query([]).map_err(sql_error)?;
+        let row = rows
+            .next()
+            .map_err(sql_error)?
+            .ok_or(ObserverError::Configuration)?;
+        let source_id = text(row.get_ref(0).map_err(sql_error)?, &mut material)?;
+        if rows.next().map_err(sql_error)?.is_some() {
+            return Err(ObserverError::Configuration);
+        }
+        drop(rows);
+        drop(source_query);
+        let mut compile_options = Vec::new();
+        let mut options = connection
+            .prepare("PRAGMA compile_options")
+            .map_err(sql_error)?;
+        let mut rows = options.query([]).map_err(sql_error)?;
+        while let Some(row) = rows.next().map_err(sql_error)? {
+            control()?;
+            compile_options.push(text(row.get_ref(0).map_err(sql_error)?, &mut material)?);
+        }
+        drop(rows);
+        drop(options);
+        if !compile_options
+            .iter()
+            .any(|v| matches!(v.as_str(), "TEMP_STORE=1" | "TEMP_STORE=2" | "TEMP_STORE=3"))
+            || compile_options
+                .iter()
+                .any(|v| matches!(v.as_str(), "OMIT_WAL" | "OMIT_PROGRESS_CALLBACK"))
+        {
+            return Err(ObserverError::Configuration);
+        }
+        control()?;
+        connection.execute_batch("COMMIT").map_err(sql_error)?;
+        control()?;
+        after_transaction()?;
+        control()?;
+        Ok(CopyObservation {
+            profile,
+            schema_version: version,
+            sqlite_source_id: source_id,
+            compile_options,
+        })
+    })();
+    // On revoke/error only resource disposal remains; no further observation.
+    let reason = match interrupted.lock() {
+        Ok(mut value) => value.take(),
+        Err(_) => Some(ObserverError::Configuration),
+    };
+    let disable = connection
+        .progress_handler(0, None::<fn() -> bool>)
+        .map_err(sql_error);
+    let rollback = if !connection.is_autocommit() {
+        connection.execute_batch("ROLLBACK").map_err(sql_error)
+    } else {
+        Ok(())
+    };
+    match connection.close() {
+        Ok(()) => {}
+        Err((connection, _)) => {
+            drop(connection);
+            return Err(ObserverError::CloseUnconfirmed);
+        }
     }
+    disable?;
+    rollback?;
+    if let Some(reason) = reason {
+        return Err(reason);
+    }
+    let observation = result?;
+    control()?;
+    Ok(observation)
 }
 
 fn install_progress(

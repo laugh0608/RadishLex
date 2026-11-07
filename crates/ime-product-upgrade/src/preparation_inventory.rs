@@ -305,7 +305,7 @@ impl PreparationJournalStore {
             operation_identity,
             self.history_directory(&paths[2])?,
         ]);
-        self.verify_history_directories(&inventory, false)?;
+        self.verify_history_directories(&inventory, false, hasher)?;
         let bytes = inventory.encode()?;
         let staged = paths[1].join(STAGED_INVENTORY);
         let final_path = paths[1].join(INVENTORY);
@@ -329,7 +329,7 @@ impl PreparationJournalStore {
         }
         faults.hit(HistoryFault::BeforeInventoryRename)?;
         self.verify_guard(guard)?;
-        self.verify_history_directories(&inventory, false)?;
+        self.verify_history_directories(&inventory, false, hasher)?;
         self.verify_inventory_files(&inventory, hasher, None)?;
         if self.evidence(&staged, hasher)? != staged_identity || path_exists(&final_path)? {
             return Err(Error::EvidenceChanged);
@@ -339,7 +339,7 @@ impl PreparationJournalStore {
         sync_directory(&paths[1])?;
         faults.hit(HistoryFault::InventoryDirectorySynced)?;
         self.verify_guard(guard)?;
-        self.verify_history_directories(&inventory, true)?;
+        self.verify_history_directories(&inventory, true, hasher)?;
         self.verify_inventory_files(&inventory, hasher, None)?;
         if self.evidence(&final_path, hasher)? != staged_identity
             || self.read_history_bytes(&final_path)? != bytes
@@ -378,7 +378,7 @@ impl PreparationJournalStore {
             }
             return Ok(None);
         }
-        self.verify_history_directories(inventory, true)?;
+        self.verify_history_directories(inventory, true, hasher)?;
         let path = inventory.paths(self)?[1].join(INVENTORY);
         let identity = self.evidence(&path, hasher)?;
         if self.read_history_bytes(&path)? != inventory.encode()?

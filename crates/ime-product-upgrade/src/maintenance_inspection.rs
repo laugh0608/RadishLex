@@ -220,8 +220,7 @@ fn inspect_existing(
                 cancellation_outer: None,
             }));
         }
-        let inventory = journal.load_previous_inventory(&record, hasher)?;
-        journal.verify_inventory_objects(&inventory, hasher, Some(&record))?;
+        journal.load_verified_previous_inventory(&record, hasher)?;
         if record.snapshot_identity().is_some() {
             journal.verify_snapshot(&record, hasher)?;
         } else if path_exists(&journal.path(PREPARATION_SNAPSHOT))? {

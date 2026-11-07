@@ -1,11 +1,11 @@
 # RadishLex 当前状态
 
-本文是维护者判断当前里程碑、证据、停止线和下一步的短入口；设计细节进入专题文档，历史流水进入周志。
+规划见[专题地图](../topics.md)；当前状态见下文。
 
 ## 当前判断
 
-- 复核：2026-10-18（合成 observer 与门禁优化已提交，完整仓库门禁通过）；最新实机仍为 09-09 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，双组件未启动，未复验现场。常态分支 `dev`，主线 `master`。
-- 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
+- 复核：2026-11-01，source-first本批完整自动通过，VM不操作。macOS现场为09-09 source39恢复，外层`rolled_back`/数据`aborted_preserved`，材料保留、双组件停止，未复验。常态分支`dev`，主线`master`。
+- 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，本批完整自动通过，V3–V5另批。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
 
@@ -45,7 +45,7 @@
 
 - Linux 输入与 Manager 已有 P04 实机记录；P05 的六类 operation 为分散证据，尚不能证明连续 L6。
 - `install_prepared` 与 `install_artifacts_staged` 已取得代表 crash 恢复终态；第二场景 transaction 权威为 `7fcef38e…0e3d/completed`，停止权威为 `096fe01f…e133/stopped-verified`。
-- `upgrade_quiesced` 当前为 partial `move-ready`：`7765f1c` 的唯一 prepare 观察 8 台全停，manifest `fa6e7335…33ea5` 冻结；未执行 UI Move 或物化。
+- `upgrade_quiesced`旧`move-ready`及`fa6e7335…33ea5`冻结。本轮维护仅迁partial至`utms/`，不是旧case的Move/adopt验收，未物化S2或启动；旧路径绑定不可直接沿用。
 - 五批 VM 退休共 17 个 raw bundle 已 absent，旧 snapshot/handoff 与失败证据保留。
 - 原入口中的精确证据流水已原样移入[本周周志的入口归档](../devlogs/2026-W36.md#2026-09-05入口历史证据归档)。这是文档迁移，不是现场复验；操作前仍需按 runbook 重新满足资格与授权。
 
@@ -72,25 +72,26 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步：独立程序资格与最终取消门禁
+## 下一阶段：Linux M5 交付收口
 
-按已批准的[准备中止兼容设计](../remediation/macos-preparation-cancellation-compatibility.md)，完整取消证明、唯一 v2 索引及严格 lifecycle 保留旧 v1 和历史原件，缺失索引不能回退首次路径。取消最后 marker 仍要求当次授权及独立 `QualifiedSource`，结构化对象不能代替证据，最终取消按钮继续关闭。
+M5候选与B1–B6门槛见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)；macOS支线不作为Linux退出前置。
 
-同锁程序/data/终态执行、进展态恢复和接续 action `10` 已接线。初始准入仅接 `prepared/preflighted`；推进态和终态封存重新绑定精确 outer/preparation/data 或 release，并取得四项确认、最多 5 分钟且可撤销的任务授权。`10` 只处理完整交接/封存，普通 bootstrap 空前驱限制保持，不能用它开始源库准备或取消。
+1. **source-first V1/V2已获批**：[合同](../remediation/linux-m5-source-first-contract.md)固定S的`40-2`真实构建/seed安装、R的审阅锚点、T的`40-3`后继pair；仓库实现已提交`fde0ecb`/`8800142`并完整自动通过，V3–V5另批。当前无实际锚点或载体资格；不改旧pair、编造摘要或扩展`38→40`跨合同升级。
+2. **接续先审V3计划**：按[装配入口](../runbooks/linux-source-first-assembly.md)只读审阅S候选、Debian13 ARM64 builder、离线工具/缓存清单及L1–L5/双FFI/SQLite/Rime取证；固定命令、预算、资源和失败保留，再申请实际环境核验。`8800142`不自动成为S/R；今晚收尾，不操作VM或下载依赖。
+3. **依次闭合产品证据**：在获准资源中建立新source/pair，完成第三代表crash及其对新pair的适用域审阅、同一新guest连续L6和当前候选隐私/学习/删除/重启，随后独立guest P05C及M5退出；旧分散结果不拼作新候选通过。
+4. **支线后置**：macOS action`10–13`、reader/observer及`90e7717`自动通过保留；Q2保持当前账户/会话、F0来源未定，catalog为空、issuer/最终取消关闭，W0与内部I/O宿主延期，不重试真实40。性能优化由新热点触发，常规5分钟未达/CI10分钟未测不无限阻塞M5。
 
-2026-10-17 已接通 `11–13`；准备完成另行确认 `10`，取消保存保留最后 marker。[A1 路径隔离被拒绝](../remediation/macos-source39-qualification-plan.md)，材料冻结、不复跑；Q2 阻塞，不复制/启动旧程序。[资格证据 reader](../remediation/macos-cancellation-qualification-reader-contract.md)已提交；生产目录为空，未接 issuer。[schema observer](../remediation/macos-source-schema-observation-contract.md)仅合成实现已提交，末次 Clippy 与完整门禁已通过，未接 reader。门禁已去除 macOS 默认长矩阵重复，结果见[本周接续记录](../devlogs/2026-W42.md#2026-10-18门禁优化与合成-observer-接续)。**下一步先讨论 Q2 隔离、独立程序资格与生产观察生命周期方案**；真实运行证据、生产 schema 与策略新鲜度仍缺，最终取消关闭，WAL/pager 内部断电与 B 段退出仍开放。
+## Linux M5 系统操作停止线
 
-新升级真正完成后才继续客户端身份与 composition 隐私实测，不直接重试 40。冻结 macOS 39/40、用户数据、Linux/UTM 与系统动作均不在本批范围；实机动作仍须另行明确目标与授权。10-09 的待办由本批承接，历史交接保留在[2026-W41](../devlogs/2026-W41.md#2026-10-09明日事项)。
+目录整理见[本机README](/Users/luobo/VirtualMachines/README.md)：日常复用Debian13-ARM64/Windows11-ARM64，基线只备份。`utms/`集中10份载体，`datas/`收纳106个结果根，`images/`保留；UTM9台原UUID/新路径核对且全停，另1份同UUID备份不注册。未启动guest。
 
-## Linux M5 系统操作下一步（顺位不变，2026-09-05 复核）
-
-1. 只可先另行授权一次UTM原生UI Move；`move-adopt`与物化继续分段授权。
-2. start、input-preflight、crash、resume与terminal-stop仍分段授权；第五批与clone不得复跑。
-3. 第三场景闭合后，以一台新guest完成连续L6；P05C使用独立guest。
+1. 旧证据内容不改写；迁移映射与核对见`datas/_organization/2026-11-01/`。partial仍为壳，不能直接运行旧Move/adopt/物化控制；恢复工作前先审迁后路径/身份绑定，系统动作另批。
+2. 普通任务复用两台日常机；确有fresh/隔离验收需求才申请专属VM，不启动或复用冻结机。旧项目预算不因整理扩大，保留材料不自动授权删除/退休。
+3. 连续L6/P05C的必要独立guest及完整门禁仍单独授权；V1/V2仓库实现已提交，VM暂不操作。冻结、输入热路径、同步和后续平台边界保持。
 
 ## 验证入口
 
-默认 Cargo jobs/test threads 为 1，重型验证串行；`check-repo.sh` 自动降载，但不构成 CPU/RSS 硬配额。静态检查前置，workspace 目标/doc-test 各一次，feature/native 保留。覆盖与进程收尾见[门禁手册](../runbooks/repository-validation.md)，资源约束见[协作细则](../agent-collaboration.md)。
+2026-11-01：fde0ecb加22文件快照，常规723.57秒、22项可靠性1044.31秒通过，合计29分27.88秒，未超20/45分钟。monitor077/gate022、单层nice19、并发1；前后快照一致，无重跑/遗留。结果见[周志](../devlogs/2026-W44.md)，口径见[门禁手册](../runbooks/repository-validation.md)。仅自动验证，不替代V3–V5；未推送。本批未改代码时，结果文档/提交仅静态检查，不重跑全套。
 
 ```bash
 ./scripts/check-linux-product-metadata.sh
@@ -114,10 +115,11 @@ git diff --check
 
 ## 阅读索引
 
+- [Linux M5 交付基线审计](../remediation/linux-m5-delivery-baseline-audit.md)
 - [路线图](../roadmap.md)
 - [Linux 安装维护边界](../linux-installation-maintenance-boundary.md)
 - [Linux Fcitx5 平台边界](../linux-fcitx5-boundary.md)
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
 - [Linux L6 Debian package matrix runbook](../runbooks/linux-l6-package-matrix.md)
 - [Linux L6 收敛与本地资产生命周期](../runbooks/linux-l6-asset-lifecycle.md)
-- [本周周志](../devlogs/2026-W43.md)
+- [本周周志](../devlogs/2026-W44.md)

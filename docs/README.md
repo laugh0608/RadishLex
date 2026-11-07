@@ -6,6 +6,8 @@
 
 RadishLex（萝卜词核）是由 Rust 输入核心、Go 自部署同步后端、Flutter Manager 与平台原生薄壳组成的源代码可见中文输入系统。输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发；平台壳不承载 userdb、排序、同步或隐私真相源。许可条款以仓库根 `LICENSE` 为准。
 
+整体规划 → 跨阶段能力 → 子专题 → 任务与验收的阅读关系见[能力专题地图](topics.md)；阶段顺位仍以 current 为准。
+
 ## 先读什么
 
 - [当前状态](status/current.md)：当前里程碑、批次、冻结基线、停止线、下一步和本周周志入口；这是唯一阶段快照。
@@ -30,7 +32,7 @@ RadishLex（萝卜词核）是由 Rust 输入核心、Go 自部署同步后端�
 - `docs/*.md`：稳定的架构、协议、平台、隐私、Guide、Boundary 或 Reference。
 - 各组件 `README.md`：组件职责、就地开发入口和局部验证方式。
 
-Linux 当前安装工作从 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)、[L6 package matrix](runbooks/linux-l6-package-matrix.md) 与 [L6 资产生命周期](runbooks/linux-l6-asset-lifecycle.md) 进入；输入平台与 Manager 分别见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md) 和 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)。其他专题从当前状态、技术方案或仓库结构继续下钻。
+Linux 当前安装工作从 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)、[L6 package matrix](runbooks/linux-l6-package-matrix.md)、[L6 资产生命周期](runbooks/linux-l6-asset-lifecycle.md) 与 [source-first 装配及收证](runbooks/linux-source-first-assembly.md) 进入；输入平台与 Manager 分别见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md) 和 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)。其他专题从当前状态、技术方案或仓库结构继续下钻。
 
 ## 维护规则
 

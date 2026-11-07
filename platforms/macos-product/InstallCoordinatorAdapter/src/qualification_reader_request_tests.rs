@@ -19,6 +19,10 @@ use radishlex_ime_product_upgrade::{
 use radishlex_ime_userdb::UserDb;
 use std::io::{Read, Write};
 
+#[cfg(target_os = "macos")]
+#[path = "source_schema_request_tests.rs"]
+mod source_schema_tests;
+
 const OLD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const OPERATION: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
@@ -123,11 +127,19 @@ enum PreparationPoint {
 }
 struct CoreProof {
     path: PathBuf,
+    root_identity: (u64, u64, u32, u32),
     proof: CancellationReleaseReceipt,
     target: ProductArtifactIdentity,
 }
 impl CoreProof {
     fn new(source: &ProductArtifactIdentity, point: PreparationPoint) -> Self {
+        Self::with_observer_fixture(source, point, false)
+    }
+    fn with_observer_fixture(
+        source: &ProductArtifactIdentity,
+        point: PreparationPoint,
+        observer_fixture: bool,
+    ) -> Self {
         let path = fs::canonicalize(std::env::temp_dir())
             .unwrap()
             .join(format!(
@@ -136,7 +148,18 @@ impl CoreProof {
                 SEQUENCE.fetch_add(1, Ordering::Relaxed)
             ));
         DirBuilder::new().mode(0o700).create(&path).unwrap();
-        drop(UserDb::open(path.join("userdb.sqlite3")).unwrap());
+        let meta = fs::symlink_metadata(&path).unwrap();
+        let root_identity = (meta.dev(), meta.ino(), meta.uid(), meta.mode());
+        eprintln!(
+            "synthetic core proof created: {} {root_identity:?}",
+            path.display()
+        );
+        if observer_fixture {
+            use radishlex_ime_userdb::schema_observer::{create_synthetic_fixture, FixtureKind};
+            create_synthetic_fixture(&path, FixtureKind::MainOnly).unwrap();
+        } else {
+            drop(UserDb::open(path.join("userdb.sqlite3")).unwrap());
+        }
         assert_eq!(UserDb::supported_schema_version(), 9);
         let target = ProductArtifactIdentity::new(
             source.product_id(),
@@ -278,6 +301,7 @@ impl CoreProof {
         drop(outer_guard);
         let result = Self {
             path,
+            root_identity,
             proof,
             target,
         };
@@ -291,7 +315,55 @@ impl CoreProof {
 }
 impl Drop for CoreProof {
     fn drop(&mut self) {
+        if std::thread::panicking() {
+            eprintln!(
+                "synthetic core proof retained after panic: {}",
+                self.path.display()
+            );
+            return;
+        }
+        let meta = fs::symlink_metadata(&self.path).unwrap();
+        assert_eq!(
+            (meta.dev(), meta.ino(), meta.uid(), meta.mode()),
+            self.root_identity
+        );
         fs::remove_dir_all(&self.path).unwrap();
+    }
+}
+
+#[test]
+fn planned_panic_preserves_complete_core_proof_and_evidence_pack() {
+    let mut saved = None;
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let fixture = Fixture::new();
+        let core = CoreProof::with_observer_fixture(
+            &fixture.manifest.source.product,
+            PreparationPoint::Reserved,
+            true,
+        );
+        saved = Some((
+            fixture.path.clone(),
+            fixture.root_identity,
+            snapshot(&fixture.path),
+            core.path.clone(),
+            core.root_identity,
+            snapshot(&core.path),
+        ));
+        panic!("planned synthetic fixture-retention test");
+    }));
+    assert!(result.is_err());
+    let (pack, pack_id, pack_snapshot, core, core_id, core_snapshot) = saved.unwrap();
+    assert_eq!(snapshot(&pack), pack_snapshot);
+    assert_eq!(snapshot(&core), core_snapshot);
+    assert!(core
+        .join(".radishlex-upgrade-v1/preparation-cancellation.json")
+        .is_file());
+    // Only this predeclared fault's own exact, unchanged creations may be
+    // dismantled. Unknown failures remain retained by the Drop implementations.
+    for (path, expected) in [(pack, pack_id), (core, core_id)] {
+        let meta = fs::symlink_metadata(&path).unwrap();
+        assert_eq!((meta.dev(), meta.ino(), meta.uid(), meta.mode()), expected);
+        fs::remove_dir_all(path).unwrap();
     }
 }
 

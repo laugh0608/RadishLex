@@ -168,6 +168,7 @@ fn points() -> Vec<Point> {
     ]
 }
 
+#[cfg(feature = "reliability-matrix")]
 fn unbound_creation(point: Point) -> bool {
     matches!(
         point,
@@ -184,6 +185,7 @@ fn unbound_creation(point: Point) -> bool {
     )
 }
 
+#[cfg(feature = "reliability-matrix")]
 fn root_checkpoint(point: Point) -> bool {
     matches!(
         point,
@@ -193,8 +195,10 @@ fn root_checkpoint(point: Point) -> bool {
     )
 }
 
+#[cfg(feature = "reliability-matrix")]
 #[test]
-fn authority_loss_at_every_boundary_preserves_evidence_and_only_resumes_bound_objects() {
+fn reliability_matrix_authority_loss_at_every_boundary_preserves_evidence_and_only_resumes_bound_objects(
+) {
     for previous in [None, Some(State::AbortedPreserved)] {
         for point in points() {
             let fixture = Fixture::new();
@@ -232,8 +236,9 @@ fn authority_loss_at_every_boundary_preserves_evidence_and_only_resumes_bound_ob
     }
 }
 
+#[cfg(feature = "reliability-matrix")]
 #[test]
-fn subprocess_exit_at_each_boundary_reloads_under_a_fresh_guard() {
+fn reliability_matrix_subprocess_exit_at_each_boundary_reloads_under_a_fresh_guard() {
     for (index, point) in points().into_iter().enumerate() {
         let fixture = Fixture::new();
         let (store, guard, port) = fixture.reserve(Some(State::RolledBack));
