@@ -63,7 +63,11 @@ class SyntheticCommands:
             names = (["radishlex-linux-l6-acceptance"] if label == "acceptance" else
                      ["radishlex-linux-maintenance", "radishlex-linux-artifact-verifier"])
             for name in names:
-                binary(cwd / "target/release" / name, acceptance=label == "acceptance")
+                executable = cwd / "target/release" / name
+                binary(executable, acceptance=label == "acceptance")
+                deps = executable.parent / "deps"
+                deps.mkdir(exist_ok=True, mode=0o700)
+                os.link(executable, deps / (name.replace("-", "_") + "-0123456789abcdef"))
         if label == "artifact":
             output = Path(arguments[arguments.index("--output-dir") + 1])
             metadata = json.loads((cwd / admission.METADATA_PATH).read_bytes())
@@ -206,6 +210,24 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(self.commands.calls.count("manager"), 1)
         self.assertTrue((self.output / "inventory.json").is_file())
         self.assertFalse((self.fixture.repo / admission.BASELINE_PATH).exists())
+        for executable in source["executables"].values():
+            name = executable["file"]["filename"]
+            original = self.fixture.repo / "target/release" / name
+            published = self.output / name
+            self.assertEqual(original.stat().st_nlink, 2)
+            self.assertEqual(published.stat().st_nlink, 1)
+            self.assertNotEqual(original.stat().st_ino, published.stat().st_ino)
+            self.assertEqual(original.read_bytes(), published.read_bytes())
+
+    def test_cargo_executable_rejects_hardlink_outside_deps(self):
+        original = self.root / "target/release/radishlex-linux-maintenance"
+        binary(original)
+        (original.parent / "deps").mkdir(mode=0o700)
+        os.link(original, self.root / "radishlex_linux_maintenance-0123456789abcdef")
+        output = self.root / "copied"
+        error = self.reject(build.copy_cargo_executable, original, output)
+        self.assertIn("outside its expected deps path", str(error))
+        self.assertFalse(output.exists())
 
     def test_target_only_pipeline_preserves_source_and_validates_both_actual_artifacts(self):
         self.prepare_build()

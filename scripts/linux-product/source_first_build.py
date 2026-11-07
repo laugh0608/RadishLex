@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -17,7 +18,8 @@ import source_first as admission
 import source_first_contract as contract
 from source_first_io import (MAX_ELF, MAX_JSON, MAX_PACKAGE, FileSnapshot, SourceFirstError,
                              canonical, check_tree, digest, load_json, new_private_root,
-                             parse_json, publish, read_file, real_directory, write_exclusive)
+                             parse_json, publish, read_file, real_directory, stat_identity,
+                             write_exclusive)
 from source_first_process import BuildCommands
 from source_first_stage import read_source_inputs, stage_source
 
@@ -119,10 +121,31 @@ def unchanged_checkout(repository: Path, commit: str, candidate: dict[str, Any],
                        f"build committed input {path}")
 
 
-def copy_file(source: Path, destination: Path, mode: int, limit: int) -> FileSnapshot:
-    raw, before = read_file(source, mode=mode, limit=limit)
-    copied = write_exclusive(destination, raw, mode)
-    read_file(source, mode=mode, limit=limit, previous=before)
+def copy_cargo_executable(source: Path, destination: Path) -> FileSnapshot:
+    real_directory(source.parent)
+    original = source.lstat()
+    identity = stat_identity(original)
+    alias = None
+    if original.st_nlink == 2:
+        deps = source.parent / "deps"
+        real_directory(deps)
+        name = re.escape(source.name.replace("-", "_"))
+        alias = next((entry for entry in deps.iterdir()
+                      if re.fullmatch(name + r"-[0-9a-f]{16}", entry.name)
+                      and stat_identity(entry.lstat()) == identity), None)
+        if alias is None:
+            raise SourceFirstError(f"Cargo executable hardlink is outside its expected deps path: {source}")
+
+    links = 2 if alias is not None else 1
+    raw, before = read_file(source, mode=0o755, limit=MAX_ELF, links=links)
+    if before.identity != identity:
+        raise SourceFirstError(f"Cargo executable changed before copy: {source}")
+    copied = write_exclusive(destination, raw, 0o755)
+    read_file(source, mode=0o755, limit=MAX_ELF, previous=before, links=links)
+    if alias is not None:
+        real_directory(alias.parent)
+        if stat_identity(alias.lstat()) != identity:
+            raise SourceFirstError(f"Cargo executable hardlink changed during copy: {alias}")
     return copied
 
 
@@ -180,7 +203,7 @@ def assemble_artifact(repository: Path, work: Path, handoff: Path, commit: str,
     files: dict[str, FileSnapshot] = {}
     executables = {}
     for role, binary in roles.items():
-        files[binary] = copy_file(repository / "target/release" / binary, handoff / binary, 0o755, MAX_ELF)
+        files[binary] = copy_cargo_executable(repository / "target/release" / binary, handoff / binary)
         executables[role] = executable_record(handoff / binary, commit, role)
     if len({value["file"]["sha256"] for value in executables.values()}) != len(roles):
         raise SourceFirstError("build executables are not distinct")

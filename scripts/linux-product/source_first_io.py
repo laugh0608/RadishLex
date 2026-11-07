@@ -95,12 +95,12 @@ class FileSnapshot:
 
 def read_file(path: Path, *, limit: int = MAX_JSON, mode: int = 0o600,
               expected: dict[str, Any] | None = None,
-              previous: FileSnapshot | None = None) -> tuple[bytes, FileSnapshot]:
+              previous: FileSnapshot | None = None, links: int = 1) -> tuple[bytes, FileSnapshot]:
     """Pin the descriptor and compare both pathname and descriptor across the read."""
     real_directory(path.parent)
     before = path.lstat()
     if (not stat.S_ISREG(before.st_mode) or before.st_uid != os.getuid() or
-            before.st_nlink != 1 or stat.S_IMODE(before.st_mode) != mode or
+            before.st_nlink != links or stat.S_IMODE(before.st_mode) != mode or
             before.st_size <= 0 or before.st_size > limit):
         raise SourceFirstError(f"unsafe file owner/mode/link/size: {path}")
     identity = stat_identity(before)
