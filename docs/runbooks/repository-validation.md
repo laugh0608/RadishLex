@@ -105,7 +105,7 @@
 
 ## CI 触发与聚合
 
-`Dev Checks` 只监听目标为 `dev` 的 PR，一个 Ubuntu 作业调用 `--component dev --pr-diff BASE HEAD`，汇报 `Dev Quality`。`PR Checks` 只监听目标为 `master` 的 PR，汇报 `Candidate Quality`。普通分支 push 不触发这两个工作流。
+`Dev Checks` 只监听目标为 `dev` 的 PR，一个 Ubuntu 作业调用 `--component dev --pr-diff BASE HEAD`，汇报 `Dev Quality`。PR 参数用来检查 merge-base 差异的空白错误，日常组件按固定清单执行。`PR Checks` 只监听目标为 `master` 的 PR，汇报 `Candidate Quality`。普通分支 push 不触发这两个工作流。
 
 `master` 的 `validation_impact.py` 使用整个 PR 的 merge-base diff，关闭 rename 合并以同时检查删除和新增路径，并沿 workspace 的普通、开发、构建、target 和继承 path 依赖向消费者传播。
 
@@ -113,7 +113,7 @@
 
 `.github/workflows/quality.yml` 是 PR/tag 共用质量工作流；Rust/原生覆盖 Linux 与 macOS，Go 和 Manager 独立并行。Rust固定1.96.0、Flutter固定3.44.0，Go依go.mod；Cargo 缓存只复用构建产物，Cargo 仍核验输入，不复用门禁结果。首次冷编译/runner差异须单列。
 
-Ubuntu 在同一作业内先跑合同，再启动常规 Rust。`macOS Product and Contracts` 独立准备 Manager 锁定依赖与 Homebrew `librime`，从当前 checkout 构建双 bundle 和 Installer payload，并在同一 runner 校验。产品装配和 payload 每轮重建。[产品装配入口](macos-product-assembly.md)
+Ubuntu 在同一作业内先跑合同，再启动常规 Rust。`macOS Product and Contracts` 独立准备 Manager 锁定依赖与 Homebrew `librime`，从当前 checkout 构建双 bundle 和 Installer payload，并在同一 runner 校验。两端合同作业检出完整 Git 历史，供 L6 读取固定的历史提交。产品装配和 payload 每轮重建。[产品装配入口](macos-product-assembly.md)
 
 macOS 前置作业成功后，常规 Rust 与适用的恢复专项在各自 runner 并行。两者检出本轮候选，使用各自的 Cargo 构建缓存。macOS 前置、常规 Rust、恢复专项的作业超时分别为 20、30、60 分钟。Ubuntu 合同与常规 Rust 共用 30 分钟。
 

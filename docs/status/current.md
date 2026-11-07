@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-11-01，source-first本批完整自动通过，VM不操作。macOS现场为09-09 source39恢复，外层`rolled_back`/数据`aborted_preserved`，材料保留、双组件停止，未复验。常态分支`dev`，主线`master`。
+- 复核：2026-11-07。macOS现场为09-09 source39恢复，外层`rolled_back`/数据`aborted_preserved`，材料保留、双组件停止，未复验。常态分支`dev`，主线`master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，本批完整自动通过，V3–V5另批。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -76,8 +76,8 @@
 
 M5候选与B1–B6门槛见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)；macOS支线不作为Linux退出前置。
 
-1. **source-first V1/V2已获批**：[合同](../remediation/linux-m5-source-first-contract.md)固定S的`40-2`真实构建/seed安装、R的审阅锚点、T的`40-3`后继pair；仓库实现已提交`fde0ecb`/`8800142`并完整自动通过，V3–V5另批。当前无实际锚点或载体资格；不改旧pair、编造摘要或扩展`38→40`跨合同升级。
-2. **接续V3构建审阅**。`a31152b` 的 `40-2` 预审与 Debian ARM64 环境核验通过。S 的实际构建另行审阅。[核验记录](../devlogs/2026-W45.md#2026-11-07-v3-离线环境核验)
+1. **source-first V1/V2 已通过自动验证**。[合同](../remediation/linux-m5-source-first-contract.md)固定 S 的 `40-2` 构建和 seed 安装、R 审阅锚点及 T 的 `40-3` 后继 pair。实现提交为 `fde0ecb` 和 `8800142`，V3–V5 按实机步骤另批。旧 pair 与 `38→40` 跨合同升级仍在停止线内。
+2. **离线复用通用 Debian13-ARM64**。`c038602` 的 `40-2` handoff 已核验。下一步只读核对包、receipt、安装状态与指定 XDG。符合 fresh-absent 后在同一台机单独安排安装和测试。遇到不符先报告，确有隔离需求才另议新 VM。seed、R 与新 pair 尚未进入。[只读前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)
 3. **依次闭合产品证据**：在获准资源中建立新source/pair，完成第三代表crash及其对新pair的适用域审阅、同一新guest连续L6和当前候选隐私/学习/删除/重启，随后独立guest P05C及M5退出；旧分散结果不拼作新候选通过。
 4. **支线后置**：macOS action`10–13`、reader/observer及`90e7717`自动通过保留；Q2保持当前账户/会话、F0来源未定，catalog为空、issuer/最终取消关闭，W0与内部I/O宿主延期，不重试真实40。性能优化由新热点触发，常规5分钟未达/CI10分钟未测不无限阻塞M5。
 

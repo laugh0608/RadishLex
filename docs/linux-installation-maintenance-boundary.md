@@ -131,6 +131,7 @@ Fcitx5 的 addon metadata 会按 XDG data 目录查找，但 shared-library addo
 - Fcitx metadata 的 `Library=radishlex` 与 input-method `Addon=radishlex` 保持精确配对；`Version` 必须来自产品版本真相源，不能继续使用 CMake 项目占位版本。
 - `radishlex.so` 只以 `$ORIGIN` 加载同目录 FFI；Rime shared data 改由编译进 product layout contract 的 `/usr/share/radishlex/rime` 取得，并通过同一 product manifest 复验，不能读取仓库、工作目录、用户 Rime 或在线资源作为 fallback。
 - addon 与 Manager 各自携带一份普通文件形式的 `libradishlex_ime_ffi.so`。两份必须字节相同、ABI 相同且由 manifest 绑定相同 SHA-256，但不得用 hardlink 或 symlink 合并生命周期。
+- Manager 与 addon 的 ELF `DT_NEEDED` 均须以 `libradishlex_ime_ffi.so` 文件名声明 FFI，且不含任何带路径的依赖。装配与整包门禁清除 `LD_LIBRARY_PATH`、`LD_PRELOAD` 和 `LD_AUDIT` 后核对实际解析位置，分别要求 Manager bundle 的 `lib/` 与 addon 同目录副本。
 - RimeData 必须从现有 `packaging/rime/product-rime-data.json` 离线装配，包含来源 manifest 与逐资产许可证；P02 仅复制三个 YAML 的 staged layout 不能直接成为产品 payload。
 - `librime`、Fcitx5 Core、GTK/Flutter 系统 closure 与字体走 Debian dependency；package 不复制发行版 shared library。首个 profile 至少绑定 Fcitx5 5.1.9+ 与 Debian 13 的 `librime1t64` 1.13.1+，最终 Depends 还必须由 ELF/shlibs 扫描补全。
 - package 不创建 `/etc/radishlex`、systemd service、XDG autostart 副本或会话环境文件；首版没有系统级可修改配置。
@@ -325,7 +326,9 @@ M5-P05 最终需要以下分层证据：
 
 P05A 已在 2026-08-06 使用 committed `e1ce740` 的全新源码通过 Debian 13.6 ARM64 L1-L3 rootfs/载荷层：真实 Manager bundle、product-profile addon、双 FFI、ARM64 ELF、RPATH、依赖闭包、ABI symbol、系统字体解析、构建路径与临时 rootfs manifest 均通过。首次真实构建暴露的 Rust/Cargo/C++ 路径泄漏和调用方 `umask=0002` 漂移已在门禁层修复，权限规则未放宽。授权安装的 `fonts-noto-cjk` 只是目标环境 hard dependency，不是 RadishLex package 安装事实。
 
-P05B 载体子批随后以 committed `ce74981` 固定 `debian-local-deb-v1`：ar 成员只允许 `debian-binary`、`control.tar`、`data.tar` 且顺序固定；control/data 使用无压缩 canonical USTAR、epoch 0、root owner/mode，`md5sums` 只作 dpkg 兼容 inventory，产品和 evidence 身份使用 SHA-256。`dpkg-shlibdeps` 在临时 Debian package tree 扫描全部六个 ELF，必须输出单一已解析依赖行；私有未版本化 Flutter/FFI 库与 `libc6` usrmerge 只接受固定诊断 multiset，并独立复验私有 ELF、副本 hash、loader owner 与 diversion，未使用 `--ignore-missing-info` 或伪造公共 shlibs mapping。
+P05B 载体子批以 `ce74981` 固定 `debian-local-deb-v1`。ar 成员只允许 `debian-binary`、`control.tar`、`data.tar` 且顺序固定。control/data 使用无压缩 canonical USTAR、epoch 0 和固定 root owner/mode。`md5sums` 用于 dpkg 兼容清单，产品和 evidence 身份使用 SHA-256。`dpkg-shlibdeps` 在临时 Debian package tree 扫描全部六个 ELF，必须输出单一已解析依赖行。
+
+当前诊断门禁独立核对私有 ELF、双 FFI 摘要、loader owner 和 diversion，并匹配精确告警数量。FFI 无 `DT_SONAME` 时预期零条 FFI 告警，SONAME 为固定 FFI 文件名时预期两条，其他 SONAME 或无法读取动态段时拒绝。Flutter 与 `libc6` usrmerge 的固定诊断按原数量校验。扫描禁用 `--ignore-missing-info`，也不接受伪造的公共 shlibs mapping。
 
 同一真实 rootfs 连续两次构建的 `.deb` 与 evidence 均逐字节一致；package SHA-256 为 `b56ba9494e715df847a778a59a09bea2ccef091ce023a596849c13c9f1db27cd`，evidence SHA-256 为 `858fe66515f41b20b29b023c53970a7cb23219575fb077aba2107db3eb045fba`，product manifest SHA-256 仍为 `41b5d98ce0bc77ad2b2138737b5891a7d862c28edec5d7ae603618492a34a6de`。`dpkg-deb` 结构检查通过，guest package database 明确为 `not-installed`。该证据补齐载体输出与 L1-L3 交叉身份，不创建 receipt，不进入 L4-L6，也不证明系统安装。
 

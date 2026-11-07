@@ -196,13 +196,15 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - RimeData 使用仓库已锁定的产品来源、hash 和逐资产许可证；
 - native library、ABI version、userdb schema、RimeData version 和 addon metadata 在构建时一致；
 - 默认 `staged` profile 让 addon、共享 FFI 与锁定 RimeData 形成单一 addon-relative 开发装配；`system` product profile 只装配 addon/FFI/metadata，并把 Rime shared data 固定为 `/usr/share/radishlex/rime`；两者都不从编译期仓库绝对路径加载；
-- ELF runpath 只允许 `$ORIGIN`，动态 metadata 不保留仓库或临时构建路径；
+- ELF runpath 只允许 `$ORIGIN`，动态 metadata 不保留仓库或临时构建路径。system product 的 addon 以文件名声明 FFI 的 `DT_NEEDED`，装配门禁核对加载器解析到暂存目录中的同目录 FFI；
 - 运行时拒绝缺失资源、leaf symlink、group/other 可写 addon 目录或资源，并以稳定原因失败关闭；
 - 构建不从运行时下载 schema、词库、模型或二进制；
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
-- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成确定性 `.deb`、actual package relationship、恢复型事务、production mutable port/CLI、只读 startup gate、L6 format v1、compile-isolated controller 与真实 ARM64 release pair；独立 guest 已真实完成 source install、一次自动 source recovery、修复后的 target terminal、repair、rollback、默认remove与reinstall。首个`install_prepared`实机case已在共享父目录策略修复后由独立clean clone闭合；第二个case仍停在host clone/start失败关闭，剩余crash、linked product startup 与 P05C 未完成。
+- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过。P05B 已形成确定性 `.deb`、actual package relationship、恢复型事务、production mutable port/CLI、只读 startup gate、L6 format v1、compile-isolated controller 与真实 ARM64 release pair。旧 `38` 链路已有 source install、source recovery、target terminal、repair、rollback、默认 remove 和 reinstall 的实机记录，以及前两项代表 crash 证据。第三项代表 crash、连续 L6 与 P05C 的当前顺位见[当前状态](status/current.md)。
 
-当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境同时编译 staged/system runtime-layout、development/system startup identity，以及 symbol-origin binding 对象；`--require-fcitx` 继续只证明 staged addon/FFI/RimeData/metadata、ELF `$ORIGIN`、构建路径和 `dlopen(RTLD_NOW)`。`./scripts/build-linux-product-addon-stage.sh` 另以 metadata 中的产品版本、`system` runtime profile 与 `debian-system-product` startup identity 形成临时 addon stage，不复制 sibling RimeData；两个入口都不写系统目录或启用输入法。当前 CMake/CTest 合同总数为 10 项，新增的两项固定两种 startup 编译身份及 allow 映射；真实 ARM64 source package 已安装，两份 installed FFI 的 production read-only gate 均返回 `AllowedProduct + InstalledReceiptVerified`。精确 C++ linked sibling origin、preload/错误 sibling 与实际 Manager/Fcitx 进程启动的动态正负证据仍未形成。
+当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime FFI 构建输入路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境同时编译 staged/system runtime-layout、development/system startup identity，以及 symbol-origin binding 对象。`--require-fcitx` 验证 staged addon/FFI/RimeData/metadata、ELF `$ORIGIN`、构建路径和 `dlopen(RTLD_NOW)`。`./scripts/build-linux-product-addon-stage.sh` 另以 metadata 中的产品版本、`system` runtime profile 与 `debian-system-product` startup identity 形成临时 addon stage，不复制 sibling RimeData。两个入口都不写系统目录或启用输入法。当前 CMake/CTest 合同共 10 项，含两种 startup 编译身份及 allow 映射。
+
+旧 ARM64 `38-1` 已有安装后两份 FFI 的 `AllowedProduct + InstalledReceiptVerified` 只读证据。当前 `40-2` 的独立解包核验通过 addon `dlopen` 和双端包内 FFI 加载。其首次安装、真实产品进程启动以及 preload/错误 sibling 的动态负向验证仍待实机。[当前包核验](devlogs/2026-W45.md#2026-11-07-v3-第六次真实-arm64-source-构建)
 
 `platforms/linux-fcitx5/dev/Dockerfile` 以 digest 固定 Debian 13 ARM64 基础镜像，安装发行版提供的 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12、librime 1.13.1 development package 和 P05A metadata 工具。`./scripts/build-linux-fcitx5-container.sh` 只读挂载仓库，使用独立 named volume 缓存 Cargo registry/target，构建启用 `native-rime` 的 ARM64 ELF cdylib，再执行 staged 强门禁、平台无关 rootfs contract 和 system-profile addon stage。真实 product Manager/addon/rootfs 强门禁由 Debian 13.6 ARM64 guest 的全新 committed-source 目录另行完成，不把容器结果冒充桌面或安装证据。
 

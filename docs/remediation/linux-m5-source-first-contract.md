@@ -1,6 +1,6 @@
 # Linux M5 source-first 交付基线合同
 
-本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。状态：**2026-11-01 合同已批准，`fde0ecb`/`8800142`已提交准入与装配/seed/target仓库实现；本批完整常规及22项可靠性通过，V3–V5未执行；没有新包、source 锚点或新 pair 资格。** 上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
+本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。合同于 2026-11-01 获批，`fde0ecb`/`8800142` 实现仓库准入、装配和 seed 归集，本批完整常规及 22 项可靠性已通过。2026-11-07，`c038602` 的 ARM64 source handoff 完成独立产物核验，正式 seed、R 和新 pair 尚未形成。上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
 
 ## 目标与边界
 
@@ -58,6 +58,8 @@ seed artifact 构建复用已有 [Manager](../../scripts/build-manager-linux-pro
 现有[production maintenance](../../platforms/linux-product/src/system/host.rs)的 `start/kind=install`只需要target `.deb`/evidence。seed安装时该target角色承载未来pair的source包；不把它误记成`40-3`，不新增operation kind、不用acceptance程序伪装生产入口，也不手工调用dpkg代替事务。
 
 系统申请须先固定真实guest/boot、专用合成用户、精确输入目录、preflight、执行器、单一operation、预算和保留方式。guest初始package为not-installed，安装state root、目标程序和指定XDG路径均满足fresh-absent预期；未知旧receipt、历史、半配置、guard或运行中程序均拒绝，不能清理后继续冒充fresh。
+
+Fresh-absent 由实际安装前状态判定。已使用过的通用 guest 只要通过上述前门，就可承担首次安装。常规安装和测试优先复用通用 Debian，确有无法满足的隔离需求才评估新增 VM。[只读前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)
 
 一次授权只允许一次production安装调用。成功准入必须同时满足：
 

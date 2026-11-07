@@ -21,7 +21,7 @@
 - 仅允许通过 Pull Request 合并。
 - 单人维护阶段不要求额外审批，但仍要求已解决会话。
 - 仅要求聚合检查 `Candidate Quality` 通过，并启用 strict/up-to-date policy。它汇总仓库规范、macOS 装配及合同、Linux/macOS Rust、Flutter Manager、Go 与适用的恢复专项。
-- `Repo Hygiene` 覆盖文本、文档、治理、相对链接、自检及 PR diff 空白；Rust job 各覆盖对应平台的 Rust 与原生/合成合同，Go 与 Manager 各自负责语言质量。仅明确不适用的可靠性专项允许跳过，失败、取消和缺项均阻断。
+- `Repo Hygiene` 覆盖文本、文档、治理、相对链接、自检及 PR diff 空白。Ubuntu 在 Rust 作业内先跑合同，macOS 由独立前置作业负责装配和合同，再启动常规 Rust 与适用恢复专项。Go 与 Manager 各自负责语言质量。仅明确不适用的可靠性专项允许跳过，失败、取消和缺项均阻断。
 - 允许 `merge` 与 `rebase` 两种合并方式，禁用 `squash`。
 - 管理员仅可通过 Pull Request 方式绕过规则，不开放直接 push。
 

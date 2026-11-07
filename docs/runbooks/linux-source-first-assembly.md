@@ -16,9 +16,11 @@
 
 source handoff含artifacts、S production/verifier、build-environment.json、source.json和inventory.json；target handoff另含精确source拷贝、T production/verifier/acceptance和pair.evidence.json。闭合inventory覆盖包、evidence、执行器及record，inventory不把自己反向纳入清单。根0700、发行文件0644/ELF0755、结构化记录0600；Debian builder所需artifacts子目录暂用0755，受外层0700保护，发布前恢复0700。逐文件/目录fsync、重哈希、no-replace及父目录fsync成功才返回。
 
+复制 Cargo 在 `target/release` 生成的执行器时，允许源文件有两个硬链接，条件是另一个目录项位于同一 release 目录的 `deps/` 下，符合 Cargo 的名称规则且与原件身份一致。读取前后复验原件和别名，独占写出单链接的 `0755` 执行器。包、证据、其他输入和发布后的 handoff 仍须满足各自的单链接要求。
+
 work包含request、命令/日志、temporary及失败时failure.json；失败不清理、重跑或覆盖。三个既有shell入口新增仅供本调用使用的`RADISHLEX_PRESERVE_BUILD_FAILURES=1`，保留其失败临时根，默认行为不变。每条命令共享总deadline，单日志最多8MiB，超时/超限失败而非截断后冒充成功。父目录同步失败或发布期间超预算时，已发布目录也保留并返回失败；未知状态不得自动继续。
 
-这些是未审阅artifact，不生成baseline，不表示SQLite 3.51.3实际source ID、L1–L5完整平台资格、真实输入或新pair已验收。真实ARM64编译、双FFI/SQLite身份和离线工具/缓存可行性均须V3/V4实测；缺项仍停止，不放宽合同。
+构建产出待独立核验的 artifact。ARM64 包、双 FFI 加载、SQLite 实际 source ID 及 Rime payload 以实物核验为准。正式 baseline 还需真实 seed 及独立审阅。
 
 ## Seed 私有 capture 输入与归集
 
@@ -42,9 +44,17 @@ receipt report的非摘要facts必须与Rust结果完全相同；root/staging材
 
 collector核验S verifier实际文件/ELF和source在Git中的S metadata/锁/配方、读取窗口内全部私有材料、source包/evidence及执行器前后identity/hash，再生成12个脱敏附件和seed.evidence.json，复用closed-seed/guest-host一致性核验并独占发布。raw receipt及私有材料留原根，work另保留private inventory摘要与raw-material-review=required。错误、panic或发布后同步失败均保留已产生材料，没有R生产锚点自动生成。
 
+## V3 seed 只读前门
+
+`c038602` 的 `26.7.1+40-2` 已在通用 `Debian13-ARM64` 离线构建并完成独立产物核验。下一步继续使用同一载体。先在宿主核对实际登记路径与隔离配置，启动时保持唯一 VM。guest 只读核对 Debian 13 ARM64、boot、仅 loopback 且双主路由为空，以及以下安装前状态。[正式 handoff 记录](../devlogs/2026-W45.md#2026-11-07-v3-第六次真实-arm64-source-构建)
+
+- 查询实际 dpkg 状态和 audit，要求 `radishlex` 严格为 `not-installed`。核对安装状态根、receipt、staging、guard、目标程序路径及进程和映射，拒绝未知残留、半配置或非静止现场。
+- 在选定的合成账号下确认指定 XDG 和 Fcitx profile 路径满足 fresh-absent。仅记录必要的路径状态与身份，不读取已有输入历史，不重置配置。
+- 复核确切的 source 包、artifact evidence、生产执行器和离线依赖。符合前门后，固定同一 guest/boot 和输入，按正式 seed 合同单独安排一次生产安装及只读验收。若不符合，保留现有状态并先报告缺项。通用机无法满足隔离要求时才评估专用 VM。
+
 ## V3 源码预审与环境核验申请
 
-2026-11-07 仓库预审通过。拟将 `a31152b6688946aaface232de9ddd1184b128456` 列为 S 的源码候选。该提交是 `8800142` 的后继，已提交的 Linux product metadata 与 candidate 的 `source_metadata` 逐字段一致。产物配置指向 `radishlex_26.7.1+40-2_arm64.deb` 及同名 `.evidence.json`。以下 SHA-256 来自已提交字节，元数据与配方摘要使用 source-first 的 canonical 编码。三份锁及 18 个配方文件与 `8800142` 的字节一致。
+以下保留 2026-11-07 首轮环境核验的原参数。`a31152b6688946aaface232de9ddd1184b128456` 是当时的 S 源码候选。该提交是 `8800142` 的后继，已提交的 Linux product metadata 与 candidate 的 `source_metadata` 逐字段一致。产物配置指向 `radishlex_26.7.1+40-2_arm64.deb` 及同名 `.evidence.json`。以下 SHA-256 来自已提交字节，元数据与配方摘要使用 source-first 的 canonical 编码。三份锁及 18 个配方文件与 `8800142` 的字节一致。
 
 | 输入 | SHA-256 |
 | --- | --- |
