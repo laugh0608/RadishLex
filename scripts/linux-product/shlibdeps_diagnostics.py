@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import collections
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -17,15 +18,15 @@ PRIVATE_LIBRARY_NAMES = (
     "libflutter_linux_gtk.so",
     "libradishlex_ime_ffi.so",
 )
+FFI_WARNING = (
+    "dpkg-shlibdeps: warning: can't extract name and version from "
+    "library name 'libradishlex_ime_ffi.so'"
+)
 EXPECTED_DIAGNOSTICS = collections.Counter(
     {
         (
             "dpkg-shlibdeps: warning: can't extract name and version from "
             "library name 'libflutter_linux_gtk.so'"
-        ): 2,
-        (
-            "dpkg-shlibdeps: warning: can't extract name and version from "
-            "library name 'libradishlex_ime_ffi.so'"
         ): 2,
         "dpkg-shlibdeps: warning: diversions involved - output may be incorrect": 2,
         " diversion by libc6 from: /lib/ld-linux-aarch64.so.1": 1,
@@ -41,7 +42,7 @@ class ShlibdepsDiagnosticsError(RuntimeError):
     pass
 
 
-def validate_diagnostics(value: bytes) -> None:
+def validate_diagnostics(value: bytes, *, ffi_has_soname: bool) -> None:
     if len(value) > MAX_DIAGNOSTICS_SIZE:
         raise ShlibdepsDiagnosticsError(
             "dpkg-shlibdeps diagnostics exceed the size limit"
@@ -57,9 +58,12 @@ def validate_diagnostics(value: bytes) -> None:
             "dpkg-shlibdeps diagnostics are not canonical text"
         )
     actual = collections.Counter(text[:-1].split("\n"))
-    if actual != EXPECTED_DIAGNOSTICS:
-        unexpected = actual - EXPECTED_DIAGNOSTICS
-        missing = EXPECTED_DIAGNOSTICS - actual
+    expected = EXPECTED_DIAGNOSTICS.copy()
+    if ffi_has_soname:
+        expected[FFI_WARNING] = 2
+    if actual != expected:
+        unexpected = actual - expected
+        missing = expected - actual
         details = []
         if unexpected:
             details.append(f"unexpected={dict(unexpected)}")
@@ -74,7 +78,7 @@ def validate_diagnostics(value: bytes) -> None:
 def require_private_libraries(
     product_rootfs: Path,
     metadata: product_metadata.LinuxProductMetadata,
-) -> None:
+) -> Path:
     manager_library_root = (
         product_rootfs
         / "usr/lib"
@@ -105,6 +109,7 @@ def require_private_libraries(
         raise ShlibdepsDiagnosticsError(
             "Manager and Fcitx private FFI libraries differ"
         )
+    return paths[1]
 
 
 def checked_output(arguments: list[str]) -> str:
@@ -126,13 +131,30 @@ def checked_output(arguments: list[str]) -> str:
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise ShlibdepsDiagnosticsError(
-            f"cannot verify Debian loader ownership: {exc}"
+            f"cannot inspect Debian artifact with {arguments[0]}: {exc}"
         ) from exc
     if result.stderr:
         raise ShlibdepsDiagnosticsError(
-            f"Debian loader ownership command wrote stderr: {arguments[0]}"
+            f"Debian artifact inspection command wrote stderr: {arguments[0]}"
         )
     return result.stdout
+
+
+def ffi_has_fixed_soname(ffi_path: Path) -> bool:
+    dynamic = checked_output(["readelf", "-dW", "--", str(ffi_path)])
+    if not re.search(
+        r"^Dynamic section at offset 0x[0-9a-f]+ contains \d+ entries:",
+        dynamic,
+        re.MULTILINE,
+    ):
+        raise ShlibdepsDiagnosticsError("private FFI has no readable ELF dynamic section")
+    sonames = [line.partition("(SONAME)")[2].strip()
+               for line in dynamic.splitlines() if "(SONAME)" in line]
+    if not sonames:
+        return False
+    if sonames != [f"Library soname: [{ffi_path.name}]"]:
+        raise ShlibdepsDiagnosticsError("private FFI SONAME differs from the fixed library name")
+    return True
 
 
 def require_libc6_usrmerge(metadata: product_metadata.LinuxProductMetadata) -> None:
@@ -185,8 +207,8 @@ def verify(product_rootfs: Path, diagnostics_path: Path) -> None:
         diagnostics = diagnostics_path.read_bytes()
     except (OSError, rootfs_contract.LinuxRootfsError) as exc:
         raise ShlibdepsDiagnosticsError(str(exc)) from exc
-    validate_diagnostics(diagnostics)
-    require_private_libraries(product_rootfs, metadata)
+    ffi_path = require_private_libraries(product_rootfs, metadata)
+    validate_diagnostics(diagnostics, ffi_has_soname=ffi_has_fixed_soname(ffi_path))
     require_libc6_usrmerge(metadata)
 
 
