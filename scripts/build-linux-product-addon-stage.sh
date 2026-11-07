@@ -93,9 +93,19 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 
 addon_library="${stage_dir}/usr/lib/aarch64-linux-gnu/fcitx5/radishlex.so"
 staged_ffi="${stage_dir}/usr/lib/aarch64-linux-gnu/fcitx5/libradishlex_ime_ffi.so"
+addon_dynamic="$(LC_ALL=C readelf -d "${addon_library}")"
+if ! rg -q '\(NEEDED\).*\[libradishlex_ime_ffi\.so\]$' <<<"${addon_dynamic}" ||
+    rg -q '\(NEEDED\).*\[[^]]*/' <<<"${addon_dynamic}"; then
+  echo "Linux product addon must name its FFI dependency by basename and use no path-based dependencies." >&2
+  exit 1
+fi
+if ! rg -q '\((RUNPATH|RPATH)\).*\[\$ORIGIN\]$' <<<"${addon_dynamic}"; then
+  echo 'Linux product addon search path must be $ORIGIN.' >&2
+  exit 1
+fi
 for library in "${addon_library}" "${staged_ffi}"; do
   file "${library}" | rg -q 'ELF 64-bit.*ARM aarch64'
-  if ! dependency_output="$(ldd "${library}" 2>&1)"; then
+  if ! dependency_output="$(env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT LC_ALL=C ldd "${library}" 2>&1)"; then
     echo "Linux product addon stage dependency inspection failed." >&2
     echo "${dependency_output}" >&2
     exit 1
@@ -104,9 +114,13 @@ for library in "${addon_library}" "${staged_ffi}"; do
     echo "Linux product addon stage has an unresolved dependency." >&2
     exit 1
   fi
+  if [[ "${library}" == "${addon_library}" ]] &&
+      ! rg -Fq "libradishlex_ime_ffi.so => ${staged_ffi} (" <<<"${dependency_output}"; then
+    echo "Linux product addon must resolve its FFI from the staged sibling file." >&2
+    exit 1
+  fi
 done
-readelf -d "${addon_library}" | rg -q '\[\$ORIGIN\]'
-if readelf -d "${addon_library}" | rg -n '/tmp|/workspace|RadishLex'; then
+if rg -n '/tmp|/workspace|RadishLex' <<<"${addon_dynamic}"; then
   echo "Linux product addon contains a build path in dynamic metadata." >&2
   exit 1
 fi

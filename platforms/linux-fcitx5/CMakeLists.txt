@@ -107,6 +107,7 @@ if(RADISHLEX_BUILD_FCITX_ADDON)
   add_library(radishlex_ime_ffi SHARED IMPORTED GLOBAL)
   set_target_properties(radishlex_ime_ffi PROPERTIES
     IMPORTED_LOCATION "${RADISHLEX_IME_FFI_LIBRARY}"
+    IMPORTED_NO_SONAME TRUE
   )
 
   add_library(radishlex SHARED
