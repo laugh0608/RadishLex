@@ -6,7 +6,7 @@
 
 1. 日常开发提交到 `dev` 或功能分支。
 2. 串行普通开发直接在 `dev` 推进；只有外部贡献、并行写入、风险隔离或明确评审需求才通过主题分支合入 `dev`。
-3. 直接 push 到 `dev` 不触发 GitHub Actions；以 `dev` 或 `master` 为目标的 Pull Request 触发 `PR Checks`。
+3. 直接 push 到 `dev` 不触发 GitHub Actions。以 `dev` 为目标的 PR 触发 `Dev Checks`，以 `master` 为目标的 PR 触发完整 `PR Checks`。
 4. 以 `dev` 为目标的检查为协作反馈，不作为当前未保护 `dev` 的强制门禁。
 5. 阶段性稳定后，从 `dev` 发起到 `master` 的 Pull Request；聚合 `Candidate Quality` 和已解决会话共同构成合并门禁。
 6. PR 合并后，在下一批常规开发前把最新 `master` merge 回 `dev` 并推送，确认 `master` 是 `dev` 的祖先；该回同步 push 不触发 Actions。
@@ -20,7 +20,7 @@
 - 禁止删除分支。
 - 仅允许通过 Pull Request 合并。
 - 单人维护阶段不要求额外审批，但仍要求已解决会话。
-- 仅要求聚合检查 `Candidate Quality` 通过，并启用 strict/up-to-date policy；它汇总共享质量工作流的 `Repo Hygiene`、Linux/macOS `Rust Quality`、`Flutter Manager`、`Go Quality` 与适用 `Recovery Reliability`。
+- 仅要求聚合检查 `Candidate Quality` 通过，并启用 strict/up-to-date policy。它汇总仓库规范、macOS 装配及合同、Linux/macOS Rust、Flutter Manager、Go 与适用的恢复专项。
 - `Repo Hygiene` 覆盖文本、文档、治理、相对链接、自检及 PR diff 空白；Rust job 各覆盖对应平台的 Rust 与原生/合成合同，Go 与 Manager 各自负责语言质量。仅明确不适用的可靠性专项允许跳过，失败、取消和缺项均阻断。
 - 允许 `merge` 与 `rebase` 两种合并方式，禁用 `squash`。
 - 管理员仅可通过 Pull Request 方式绕过规则，不开放直接 push。
@@ -29,7 +29,7 @@
 
 - `dev` 是当前常态开发分支。
 - 当前阶段不启用 branch protection。
-- 直接 push 到 `dev` 不触发 GitHub Actions；以 `dev` 为目标的 Pull Request 会触发完整 `PR Checks`，供其他开发者和并行分支协作使用。
+- 以 `dev` 为目标的 Pull Request 触发单作业 `Dev Checks`，使用 `./scripts/check-repo.sh --component dev` 提供日常反馈。
 - 因 `dev` 当前未保护，这些检查不会强制阻止合并；提交者仍须记录风险匹配的本地验证。
 - Agent 不因默认流程自动创建 `codex/*` 主题分支或额外 worktree。
 - 每次 `dev -> master` PR 合并后，必须把最新 `master` merge 回 `dev`；该回同步是阶段性 PR 的收尾，不是可选的反向功能流。
@@ -46,7 +46,7 @@
 - Linux / macOS / Git Bash：`./scripts/check-repo.sh`
 - 提交前本地仍执行：`git diff --check`
 
-`PR Checks` 只监听目标为 `dev` 或 `master` 的 Pull Request，并在 PR base/head 范围执行 `git diff --check`。普通分支 push、直接 push 到 `dev`、PR 合并后的 `master` push 和手动 dispatch 都不会触发该工作流。
+`Dev Checks` 和 `PR Checks` 分别监听 `dev` 和 `master` 的 Pull Request，两者都在 PR base/head 范围检查差异空白。普通分支 push 和手动 dispatch 不触发 PR 工作流。
 
 原生 macOS 检查进入 macOS job；Ubuntu 不能代替该覆盖。发布 tag 只触发 `Release Checks`，共用质量工作流并强制可靠性专项，不重复触发 PR 工作流，也不替代真实发布资格。详见[门禁手册](../../docs/runbooks/repository-validation.md)。
 

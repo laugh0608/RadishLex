@@ -13,10 +13,18 @@ from pathlib import Path
 from unittest.mock import patch
 
 from validation_process import run_command
-from validation_suites import PHASES, ROOT, SUITES, repository_rust_commands, run_suite, verify_reliability_inventory
+from validation_suites import DEV_RUST_COMMANDS, PHASES, ROOT, SUITES, repository_rust_commands, run_suite, verify_reliability_inventory
 
 
 class ValidationPlanTests(unittest.TestCase):
+    def test_dev_only_runs_selected_session_and_install_upgrade_tests(self):
+        tests = [command for command in DEV_RUST_COMMANDS if command[1] == "test"]
+        self.assertEqual(tests, [
+            ["cargo", "test", "--locked", "-p", "radishlex-ime-core", "--test", "session_lifecycle"],
+            ["cargo", "test", "--locked", "--lib", "-p", "radishlex-ime-product-install",
+             "-p", "radishlex-ime-product-upgrade"],
+        ])
+
     def test_full_repository_runs_default_targets_and_docs_once(self):
         commands = repository_rust_commands("darwin", "tests")
         self.assertEqual(commands[:2], [

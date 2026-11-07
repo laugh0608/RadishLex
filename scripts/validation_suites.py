@@ -14,6 +14,16 @@ UPGRADE = "radishlex-macos-upgrade-coordinator"
 CORE = "radishlex-ime-product-install"
 ADAPTER = "radishlex-macos-product-install"
 INSTALLER = [f"radishlex-macos-installer-{part}" for part in ("driver", "executor", "bridge")]
+WORKSPACE_STATIC = [
+    ["cargo", "fmt", "--all", "--", "--check"],
+    ["cargo", "clippy", "--locked", "--workspace", "--all-targets", "--", "-D", "warnings"],
+]
+DEV_RUST_COMMANDS = [
+    *WORKSPACE_STATIC,
+    ["cargo", "test", "--locked", "-p", "radishlex-ime-core", "--test", "session_lifecycle"],
+    ["cargo", "test", "--locked", "--lib", "-p", "radishlex-ime-product-install",
+     "-p", "radishlex-ime-product-upgrade"],
+]
 
 
 def cargo(verb: str, package: str, *args: str) -> list[str]:
@@ -85,8 +95,7 @@ def available_suites(platform: str) -> list[str]:
 def repository_rust_commands(platform: str, phase: str) -> list[list[str]]:
     if phase == "static":
         commands = [
-            ["cargo", "fmt", "--all", "--", "--check"],
-            ["cargo", "clippy", "--locked", "--workspace", "--all-targets", "--", "-D", "warnings"],
+            *WORKSPACE_STATIC,
             clippy("radishlex-ime-userdb", "--all-targets", "--features", "synthetic-schema-observer"),
             clippy("radishlex-linux-product-install", "--all-targets", "--features", "l6-acceptance-checkpoints"),
         ]

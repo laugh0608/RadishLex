@@ -91,7 +91,9 @@ M5候选与B1–B6门槛见[基线审计](../remediation/linux-m5-delivery-basel
 
 ## 验证入口
 
-2026-11-01：fde0ecb加22文件快照，常规723.57秒、22项可靠性1044.31秒通过，合计29分27.88秒，未超20/45分钟。monitor077/gate022、单层nice19、并发1；前后快照一致，无重跑/遗留。结果见[周志](../devlogs/2026-W44.md)，口径见[门禁手册](../runbooks/repository-validation.md)。仅自动验证，不替代V3–V5；未推送。本批未改代码时，结果文档/提交仅静态检查，不重跑全套。
+- `dev` 首轮 CI 通过，耗时 3 分 32 秒。[CI 精简专题](../remediation/ci-critical-path-optimization.md)
+
+2026-11-01 的 `fde0ecb` 加 22 文件快照通过常规与 22 项可靠性专项。耗时、调度和快照核对见[周志](../devlogs/2026-W44.md)，V3–V5 资格仍按[装配入口](../runbooks/linux-source-first-assembly.md)接续。
 
 ```bash
 ./scripts/check-linux-product-metadata.sh
@@ -122,4 +124,4 @@ git diff --check
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
 - [Linux L6 Debian package matrix runbook](../runbooks/linux-l6-package-matrix.md)
 - [Linux L6 收敛与本地资产生命周期](../runbooks/linux-l6-asset-lifecycle.md)
-- [本周周志](../devlogs/2026-W44.md)
+- [本周周志](../devlogs/2026-W45.md)

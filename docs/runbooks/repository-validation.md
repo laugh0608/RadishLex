@@ -6,21 +6,24 @@
 
 | 层级 | 内容 | 适用条件 |
 | --- | --- | --- |
-| 常规质量 | hygiene、Rust、contracts、Go、Manager 五个组件 | PR 必需；本地日常按风险定向验证 |
-| 可靠性专项 | 安装执行及升级历史的全故障点、全进程退出和深生命周期组合 | 受影响 PR 必需，发布候选全部执行 |
+| 日常反馈 | 差异与 hygiene、Rust 格式和 Clippy、会话与安装升级核心测试、Go、Manager | `dev` PR 与本地日常入口 |
+| 常规质量 | hygiene、Rust、contracts、Go、Manager 五个组件 | `master` 晋级与发布 tag 必需 |
+| 可靠性专项 | 安装执行及升级历史的全故障点、全进程退出和深生命周期组合 | 受影响的 `master` PR 必需，发布候选全部执行 |
 | 平台与真实资格 | 实际安装、连续事务、真实程序资格、人工输入、容量实验 | 按对应 Boundary/runbook 单独授权，不能由前两层代替 |
 
-`./scripts/check-repo.sh` 执行五个常规组件。它通过只能声明常规质量通过，不表示可靠性专项或真实资格已通过。正式 PR 结论由同一被验证 revision 的常规组件和所有适用专项共同形成；不能用旧日志、另一 revision 或局部结果拼成当前通过。
+`./scripts/check-repo.sh` 执行五个常规组件。晋级与发布由同一被验证 revision 的常规组件和所有适用专项共同验收。真实平台资格使用对应 runbook 的独立证据。
 
 完整常规门禁、完整可靠性专项及完整平台回归，每轮仍须提前说明必要性、具体命令、环境、预计耗时、资源影响并取得明确允许。不能通过组件入口拆分绕过授权；定向静态检查、具体用例和 repository-only smoke 按协作规则执行。失败或中断不自动授权重跑。
 
-热缓存本机常规约5分钟、常规CI约10分钟是优化验收目标，尚非已达承诺；不包含完整可靠性，冷编译单列。2026-11-01 干净`90e7717`实测常规12分53.82秒、可靠性18分8.23秒，合计31分2.05秒，覆盖本批observer及核心修复；本机5分钟目标未达，CI10分钟未实测。结果见[W44周志](../devlogs/2026-W44.md)；收尾文档检查不构成另一次完整运行，自动通过不替代实机或生产资格。CI timeout是失败上限，超时不得改为成功。
+日常 `dev` CI 的作业预算为十分钟，超时视为失败。完整门禁单独记录耗时及缓存状态。2026-11-01 干净 `90e7717` 的本机完整常规用时 12 分 53.82 秒，恢复专项用时 18 分 8.23 秒。具体覆盖见[W44 周志](../devlogs/2026-W44.md)。
 
 本地开发按风险使用定向测试和静态检查；完整验收集中在改动稳定后的明确阶段交付点，不因每个小批次、文档收尾或本地提交自动重跑。涉及核心边界的改动仍保留最终完整验证义务，待验可以如实记录，不能写成已通过或借此开放产品。性能问题先诊断、优化，再为稳定快照制定常规及适用专项计划；不削减安全/恢复覆盖，不用反复全量运行寻找热点。
 
 ## 入口和唯一归属
 
 `./scripts/check-repo.sh --plan` 只展示计划，不执行检查。`--component` 选择职责明确的组件，不是 quick 或完整验收替身；旧 `--skip-*` 参数不再提供。
+
+本地日常执行 `./scripts/check-repo.sh --component dev`，使用现有 Rust、Go、Flutter 和锁定的 Manager 依赖。默认检查相对 `HEAD` 的已跟踪文件改动。检查已提交的 PR 范围时使用 `--pr-diff BASE HEAD`，传入两个完整 commit SHA。入口执行 hygiene、workspace Rust fmt 与 Clippy、`ime-core` 的 `session_lifecycle`、`ime-product-install` 与 `ime-product-upgrade` 的库级单测，以及原 Go、Manager 组件。
 
 | 组件 | 命令与覆盖 |
 | --- | --- |
@@ -102,15 +105,19 @@
 
 ## CI 触发与聚合
 
-`PR Checks` 仍只监听目标为 dev/master 的 PR，普通分支 push 不触发。`validation_impact.py` 使用整个 PR 的 merge-base diff，关闭 rename 合并以同时检查删除和新增路径，并沿 workspace 的普通、开发、构建、target 和继承 path 依赖向消费者传播。
+`Dev Checks` 只监听目标为 `dev` 的 PR，一个 Ubuntu 作业调用 `--component dev --pr-diff BASE HEAD`，汇报 `Dev Quality`。`PR Checks` 只监听目标为 `master` 的 PR，汇报 `Candidate Quality`。普通分支 push 不触发这两个工作流。
+
+`master` 的 `validation_impact.py` 使用整个 PR 的 merge-base diff，关闭 rename 合并以同时检查删除和新增路径，并沿 workspace 的普通、开发、构建、target 和继承 path 依赖向消费者传播。
 
 安装/升级、userdb、FFI 及相应 macOS 包受影响时要求可靠性专项；工具链、Cargo/lockfile、验证脚本、平台桥及未知路径从严要求。纯文档、已分类 Manager Dart 或 sync-server 改动不单独触发安装恢复专项，但全部常规质量仍必需。空 diff 或无法完成判定不能豁免。
 
 `.github/workflows/quality.yml` 是 PR/tag 共用质量工作流；Rust/原生覆盖 Linux 与 macOS，Go 和 Manager 独立并行。Rust固定1.96.0、Flutter固定3.44.0，Go依go.mod；Cargo 缓存只复用构建产物，Cargo 仍核验输入，不复用门禁结果。首次冷编译/runner差异须单列。
 
-两台 runner 先执行原生与仓库合同，再启动常规 Rust 测试。macOS runner 先按锁文件准备 Manager 依赖、提供 Homebrew `librime`，使用[产品装配入口](macos-product-assembly.md)从当前 checkout 构建并校验双 bundle 和 Installer payload。Cargo 缓存只包含依赖及 Rust 构建目录，产品装配和 payload 每轮重建。Rust 作业超时上限为 Linux 30 分钟、macOS 45 分钟，后者包含冷启动装配时间。
+Ubuntu 在同一作业内先跑合同，再启动常规 Rust。`macOS Product and Contracts` 独立准备 Manager 锁定依赖与 Homebrew `librime`，从当前 checkout 构建双 bundle 和 Installer payload，并在同一 runner 校验。产品装配和 payload 每轮重建。[产品装配入口](macos-product-assembly.md)
 
-`Candidate Quality` 名称及远端 ruleset 绑定保持不变。仅明确不适用的 reliability 可为 skipped；其他缺失、失败、取消、跳过均拒绝。发布 tag 调用同一质量工作流且强制可靠性专项，避免旧 Release Checks 缺少独立语言质量检查；它仍不代表真实平台发布资格。
+macOS 前置作业成功后，常规 Rust 与适用的恢复专项在各自 runner 并行。两者检出本轮候选，使用各自的 Cargo 构建缓存。macOS 前置、常规 Rust、恢复专项的作业超时分别为 20、30、60 分钟。Ubuntu 合同与常规 Rust 共用 30 分钟。
+
+`Candidate Quality` 聚合 macOS 前置、Ubuntu 和 macOS 常规 Rust、hygiene、Go、Manager 与恢复专项。仅明确不适用的恢复专项允许 skipped，其他缺失、失败、取消和跳过均拒绝。发布 tag 调用同一质量工作流且强制恢复专项。真实平台发布资格按对应 runbook 验收。
 
 ## 调度、构建与进程收尾
 

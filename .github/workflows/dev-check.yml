@@ -1,0 +1,55 @@
+name: Dev Checks
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dev-quality:
+    name: Dev Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/sync-server/go.mod
+          cache-dependency-path: server/sync-server/go.sum
+      - name: Select pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt
+          rustup override set 1.96.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/debug
+          key: ${{ runner.os }}-dev-rust-1.96.0-${{ hashFiles('Cargo.lock', '**/Cargo.toml') }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          cache: true
+      - name: Resolve locked Manager dependencies
+        working-directory: apps/radishlex-manager
+        run: flutter pub get --enforce-lockfile
+      - name: Run shared dev checks
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/check-repo.sh --component dev --pr-diff "$BASE_SHA" "$HEAD_SHA"

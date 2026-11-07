@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -11,7 +12,7 @@ from typing import Any
 
 from repository_governance import check_community_governance, check_markdown_links
 from validation_process import run_command as run_validation_command
-from validation_suites import repository_rust_commands, run_suite, run_reliability_command
+from validation_suites import DEV_RUST_COMMANDS, repository_rust_commands, run_suite, run_reliability_command
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,7 @@ REQUIRED_FILES = [
     ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/rulesets/README.md",
     ".github/rulesets/master-protection.json",
+    ".github/workflows/dev-check.yml",
     ".github/workflows/pr-check.yml",
     ".github/workflows/release-check.yml",
     "AGENTS.md",
@@ -422,7 +424,9 @@ REQUIRED_FILES = [
 ]
 PR_QUALITY_COMPONENTS = {
     "Repo Hygiene",
-    "Rust Quality",
+    "Rust Quality (ubuntu-latest)",
+    "macOS Product and Contracts",
+    "Rust Quality (macos-latest)",
     "Flutter Manager",
     "Go Quality",
     "Recovery Reliability",
@@ -689,13 +693,21 @@ def check_ruleset_and_workflows() -> None:
     if approving_review_count != 0:
         raise SystemExit("ruleset must not require extra approval during single-maintainer stage")
 
+    dev_workflow = read_text(".github/workflows/dev-check.yml")
     pr_workflow = read_text(".github/workflows/pr-check.yml")
     quality_workflow = read_text(".github/workflows/quality.yml")
     release_workflow = read_text(".github/workflows/release-check.yml")
     for context in PR_QUALITY_COMPONENTS:
         if f"name: {context}" not in quality_workflow:
             raise SystemExit(f"shared quality workflow is missing {context}")
-    for phrase in ("name: PR Checks", "pull_request:", "      - dev", "      - master",
+    for phrase in ("name: Dev Checks", "pull_request:\n    branches:\n      - dev\n\n",
+                   "name: Dev Quality", "timeout-minutes: 10", "fetch-depth: 0",
+                   './scripts/check-repo.sh --component dev --pr-diff "$BASE_SHA" "$HEAD_SHA"'):
+        if phrase not in dev_workflow:
+            raise SystemExit(f"dev workflow contract missing: {phrase}")
+    if any(trigger in dev_workflow for trigger in ("push:", "workflow_dispatch:", "name: Candidate Quality")):
+        raise SystemExit("Dev Checks must use a separate status and only run for dev pull requests")
+    for phrase in ("name: PR Checks", "pull_request:\n    branches:\n      - master\n\n",
                    "name: Candidate Quality", "needs: [plan, quality]",
                    "./.github/workflows/quality.yml", "validation_impact.py plan",
                    'QUALITY_RESULT: ${{ needs.quality.result }}',
@@ -783,14 +795,21 @@ def check_sync_local_https() -> None:
     run_script("check-sync-server-local-https.py", ["--self-test"])
 
 
-COMPONENTS = ("hygiene", "rust", "contracts", "go", "manager", "reliability")
+ROUTINE_COMPONENTS = ("hygiene", "rust", "contracts", "go", "manager")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="RadishLex quality components; reliability is an explicit specialist.")
-    parser.add_argument("--component", choices=COMPONENTS)
+    parser.add_argument("--component", choices=(*ROUTINE_COMPONENTS, "reliability", "dev"))
+    parser.add_argument("--pr-diff", nargs=2, metavar=("BASE", "HEAD"),
+                        help="Check the PR merge-base diff for the dev component instead of local changes.")
     parser.add_argument("--plan", action="store_true", help="Show command ownership without executing validation.")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.pr_diff and (args.component != "dev" or not all(
+        re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", sha) for sha in args.pr_diff
+    )):
+        parser.error("--pr-diff requires --component dev and complete base and head commit SHAs")
+    return args
 
 
 def check_hygiene() -> None:
@@ -861,7 +880,23 @@ def run_component(name: str) -> None:
 def main() -> int:
     started = time.monotonic()
     args = parse_args()
-    selected = (args.component,) if args.component else COMPONENTS[:-1]
+    if args.component == "dev":
+        diff_ref = "...".join(args.pr_diff) if args.pr_diff else "HEAD"
+        diff_command = ["git", "diff", "--check", diff_ref, "--"]
+        if args.plan:
+            print("Dev checks: diff whitespace, hygiene, Rust static and selected tests, Go, Manager.")
+            for command in [diff_command, *DEV_RUST_COMMANDS]:
+                print("  " + " ".join(command))
+            return 0
+        run_command(diff_command)
+        run_component("hygiene")
+        for command in DEV_RUST_COMMANDS:
+            run_command(command)
+        run_component("go")
+        run_component("manager")
+        print(f"Dev checks passed in {time.monotonic() - started:.2f}s.", flush=True)
+        return 0
+    selected = (args.component,) if args.component else ROUTINE_COMPONENTS
     if args.plan:
         print("Selected components: " + ", ".join(selected))
         print("Reliability: explicit specialist; required by affected PRs and release candidates.")
