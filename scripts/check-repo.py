@@ -422,7 +422,9 @@ REQUIRED_FILES = [
 ]
 PR_QUALITY_COMPONENTS = {
     "Repo Hygiene",
-    "Rust Quality",
+    "Rust Quality (ubuntu-latest)",
+    "macOS Product and Contracts",
+    "Rust Quality (macos-latest)",
     "Flutter Manager",
     "Go Quality",
     "Recovery Reliability",

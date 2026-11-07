@@ -60,9 +60,23 @@ class AggregateTests(unittest.TestCase):
         check_quality(results, False)
         with self.assertRaises(ValueError):
             check_quality(results, True)
-        results['rust']['result'] = 'skipped'
+        results['rust-macos']['result'] = 'skipped'
         with self.assertRaises(ValueError):
             check_quality(results, False)
+
+    def test_macos_contracts_are_required_even_without_reliability(self):
+        for state in ('failure', 'cancelled', 'skipped'):
+            with self.subTest(state=state):
+                results = self.results()
+                results['macos-contracts']['result'] = state
+                results['reliability']['result'] = 'skipped'
+                with self.assertRaisesRegex(ValueError, 'required quality job macos-contracts'):
+                    check_quality(results, False)
+
+        results = self.results()
+        del results['macos-contracts']
+        with self.assertRaisesRegex(ValueError, 'quality job inventory mismatch'):
+            check_quality(results, True)
 
     def test_failure_cancellation_missing_and_unexpected_jobs_are_rejected(self):
         for state in ('failure', 'cancelled', None):

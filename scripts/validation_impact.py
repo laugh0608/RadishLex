@@ -16,7 +16,7 @@ RELIABILITY_PACKAGES = {
     "radishlex-macos-product-install-coordinator", "radishlex-macos-installer-driver",
     "radishlex-macos-installer-executor", "radishlex-macos-installer-bridge",
 }
-QUALITY_JOBS = {"hygiene", "rust", "manager", "go", "reliability"}
+QUALITY_JOBS = {"hygiene", "rust-linux", "macos-contracts", "rust-macos", "manager", "go", "reliability"}
 
 
 def reliability_required(paths: list[str], root: Path = ROOT) -> bool:

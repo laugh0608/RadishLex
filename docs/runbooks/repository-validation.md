@@ -108,9 +108,11 @@
 
 `.github/workflows/quality.yml` 是 PR/tag 共用质量工作流；Rust/原生覆盖 Linux 与 macOS，Go 和 Manager 独立并行。Rust固定1.96.0、Flutter固定3.44.0，Go依go.mod；Cargo 缓存只复用构建产物，Cargo 仍核验输入，不复用门禁结果。首次冷编译/runner差异须单列。
 
-两台 runner 先执行原生与仓库合同，再启动常规 Rust 测试。macOS runner 先按锁文件准备 Manager 依赖、提供 Homebrew `librime`，使用[产品装配入口](macos-product-assembly.md)从当前 checkout 构建并校验双 bundle 和 Installer payload。Cargo 缓存只包含依赖及 Rust 构建目录，产品装配和 payload 每轮重建。Rust 作业超时上限为 Linux 30 分钟、macOS 45 分钟，后者包含冷启动装配时间。
+Ubuntu 在同一作业内先跑合同，再启动常规 Rust。`macOS Product and Contracts` 独立准备 Manager 锁定依赖与 Homebrew `librime`，从当前 checkout 构建双 bundle 和 Installer payload，并在同一 runner 校验。产品装配和 payload 每轮重建。[产品装配入口](macos-product-assembly.md)
 
-`Candidate Quality` 名称及远端 ruleset 绑定保持不变。仅明确不适用的 reliability 可为 skipped；其他缺失、失败、取消、跳过均拒绝。发布 tag 调用同一质量工作流且强制可靠性专项，避免旧 Release Checks 缺少独立语言质量检查；它仍不代表真实平台发布资格。
+macOS 前置作业成功后，常规 Rust 与适用的恢复专项在各自 runner 并行。两者检出本轮候选，使用各自的 Cargo 构建缓存。macOS 前置、常规 Rust、恢复专项的作业超时分别为 20、30、60 分钟。Ubuntu 合同与常规 Rust 共用 30 分钟。
+
+`Candidate Quality` 聚合 macOS 前置、Ubuntu 和 macOS 常规 Rust、hygiene、Go、Manager 与恢复专项。仅明确不适用的恢复专项允许 skipped，其他缺失、失败、取消和跳过均拒绝。发布 tag 调用同一质量工作流且强制恢复专项。真实平台发布资格按对应 runbook 验收。
 
 ## 调度、构建与进程收尾
 

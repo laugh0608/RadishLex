@@ -51,6 +51,7 @@
 | 安装、升级与产品载体 | [macOS WAL 升级恢复](remediation/macos-wal-upgrade-recovery-2026-09.md)、[源库准备](remediation/macos-wal-source-preparation-design.md)、[取消兼容](remediation/macos-preparation-cancellation-compatibility.md) | 程序 / 数据恢复与 action 10–13 的原范围、B 段及最终取消缺口；[联合验收](runbooks/macos-rev01-rev02-acceptance.md)与周志，不设置为 Linux M5 的新增退出前置 |
 | 安装、升级与产品载体 | [source39 资格](remediation/macos-source39-qualification-plan.md)、[schema 观察](remediation/macos-source-schema-observation-contract.md)、[资格 reader](remediation/macos-cancellation-qualification-reader-contract.md) | Q2、F0、W0、catalog / issuer 与真实程序资格各自满足原条件；合成结果和方案不能解除当前冻结现场与最终取消关闭状态 |
 | 质量、供应链与发布 | [产品审阅 REV](remediation/product-review-2026-09.md) | 跨输入、隐私、数据、安装和工具链的整合审阅；每项关闭条件在原专题，具体修复由对应能力主线承担，不复制第二张状态表 |
+| 质量、供应链与发布 | [CI 精简](remediation/ci-critical-path-optimization.md) | 以 PR #12 的测量为基线，验证 macOS 前置作业、长测试并行及覆盖对照 |
 
 M5 审计中旧 VM 数量、路径与 Move/adopt 候选是当时的资源输入；恢复系统工作前必须先读 current 的最新资源与路径绑定条件，不能直接按旧审计操作。平台恢复、VM、完整门禁、真实输入及发布都不是本页附带授权。
 

@@ -44,14 +44,10 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: git diff --check "$BASE_SHA...$HEAD_SHA"
 
-  rust:
-    name: Rust Quality (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.os == 'macos-latest' && 45 || 30 }}
+  rust-linux:
+    name: Rust Quality (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
         with:
@@ -80,25 +76,57 @@ jobs:
       - name: Require contract tools
         run: |
           if ! command -v rg >/dev/null; then
-            if [ "${{ runner.os }}" = Linux ]; then
-              sudo apt-get update
-              sudo apt-get install --yes ripgrep
-            else
-              brew install ripgrep
-            fi
+            sudo apt-get update
+            sudo apt-get install --yes ripgrep
+          fi
+          command -v c++
+      - name: Native and repository contracts
+        run: ./scripts/check-repo.sh --component contracts
+      - name: Rust static checks and routine tests
+        run: ./scripts/check-repo.sh --component rust
+
+  macos-contracts:
+    name: macOS Product and Contracts
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # L6 release-pair checks read files from pinned historical commits.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/sync-server/go.mod
+          cache-dependency-path: server/sync-server/go.sum
+      - name: Select pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup override set 1.96.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/release
+          key: ${{ runner.os }}-rust-1.96.0-contracts-${{ hashFiles('Cargo.lock', '**/Cargo.toml') }}
+      - name: Require contract tools
+        run: |
+          if ! command -v rg >/dev/null; then
+            brew install ripgrep
           fi
           command -v c++
       - uses: subosito/flutter-action@v2
-        if: runner.os == 'macOS'
         with:
           flutter-version: '3.44.0'
           cache: true
       - name: Resolve macOS Manager dependencies
-        if: runner.os == 'macOS'
         working-directory: apps/radishlex-manager
         run: flutter pub get --enforce-lockfile
       - name: Assemble macOS product and Installer payload
-        if: runner.os == 'macOS'
         run: |
           xcodebuild -version
           brew install librime
@@ -110,6 +138,42 @@ jobs:
           ./scripts/build-macos-install-payload.sh
       - name: Native and repository contracts
         run: ./scripts/check-repo.sh --component contracts
+
+  rust-macos:
+    name: Rust Quality (macos-latest)
+    needs: macos-contracts
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/sync-server/go.mod
+          cache-dependency-path: server/sync-server/go.sum
+      - name: Select pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component clippy,rustfmt
+          rustup override set 1.96.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/debug
+            target/release
+          key: ${{ runner.os }}-rust-1.96.0-${{ hashFiles('Cargo.lock', '**/Cargo.toml') }}
+      - name: Require test tools
+        run: |
+          if ! command -v rg >/dev/null; then
+            brew install ripgrep
+          fi
+          command -v c++
       - name: Rust static checks and routine tests
         run: ./scripts/check-repo.sh --component rust
 
@@ -149,7 +213,7 @@ jobs:
   reliability:
     name: Recovery Reliability
     if: inputs.reliability
-    needs: rust
+    needs: macos-contracts
     runs-on: macos-latest
     # Specialist budget, not the routine ten-minute performance target.
     timeout-minutes: 60
@@ -177,7 +241,7 @@ jobs:
   aggregate:
     name: Quality Components
     if: always()
-    needs: [hygiene, rust, manager, go, reliability]
+    needs: [hygiene, rust-linux, macos-contracts, rust-macos, manager, go, reliability]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
