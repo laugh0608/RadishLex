@@ -6,7 +6,7 @@
 
 | 层级 | 内容 | 适用条件 |
 | --- | --- | --- |
-| 日常反馈 | 差异与 hygiene、Rust 格式和 Clippy、三个库的单测、Go、Manager | `dev` PR 与本地日常入口 |
+| 日常反馈 | 差异与 hygiene、Rust 格式和 Clippy、会话与安装升级核心测试、Go、Manager | `dev` PR 与本地日常入口 |
 | 常规质量 | hygiene、Rust、contracts、Go、Manager 五个组件 | `master` 晋级与发布 tag 必需 |
 | 可靠性专项 | 安装执行及升级历史的全故障点、全进程退出和深生命周期组合 | 受影响的 `master` PR 必需，发布候选全部执行 |
 | 平台与真实资格 | 实际安装、连续事务、真实程序资格、人工输入、容量实验 | 按对应 Boundary/runbook 单独授权，不能由前两层代替 |
@@ -23,7 +23,7 @@
 
 `./scripts/check-repo.sh --plan` 只展示计划，不执行检查。`--component` 选择职责明确的组件，不是 quick 或完整验收替身；旧 `--skip-*` 参数不再提供。
 
-本地日常执行 `./scripts/check-repo.sh --component dev`，使用现有 Rust、Go、Flutter 和锁定的 Manager 依赖。默认检查相对 `HEAD` 的已跟踪文件改动。检查已提交的 PR 范围时使用 `--pr-diff BASE HEAD`，传入两个完整 commit SHA。入口执行 hygiene、workspace Rust fmt 与 Clippy、`ime-core`、`ime-product-install`、`ime-product-upgrade` 的库级单测，以及原 Go、Manager 组件。
+本地日常执行 `./scripts/check-repo.sh --component dev`，使用现有 Rust、Go、Flutter 和锁定的 Manager 依赖。默认检查相对 `HEAD` 的已跟踪文件改动。检查已提交的 PR 范围时使用 `--pr-diff BASE HEAD`，传入两个完整 commit SHA。入口执行 hygiene、workspace Rust fmt 与 Clippy、`ime-core` 的 `session_lifecycle`、`ime-product-install` 与 `ime-product-upgrade` 的库级单测，以及原 Go、Manager 组件。
 
 | 组件 | 命令与覆盖 |
 | --- | --- |

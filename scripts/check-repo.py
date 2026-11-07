@@ -884,7 +884,7 @@ def main() -> int:
         diff_ref = "...".join(args.pr_diff) if args.pr_diff else "HEAD"
         diff_command = ["git", "diff", "--check", diff_ref, "--"]
         if args.plan:
-            print("Dev checks: diff whitespace, hygiene, Rust static and selected libraries, Go, Manager.")
+            print("Dev checks: diff whitespace, hygiene, Rust static and selected tests, Go, Manager.")
             for command in [diff_command, *DEV_RUST_COMMANDS]:
                 print("  " + " ".join(command))
             return 0

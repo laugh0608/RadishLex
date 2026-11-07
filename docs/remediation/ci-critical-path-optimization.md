@@ -30,11 +30,11 @@ PR #13 的 Rust 缓存未命中样本在 **37 分 52 秒**通过 `Candidate Qual
 
 项目所有者提出将 CI 压到十分钟以内，并简化日常入口。现有完整口径下，PR #13 的 Ubuntu workspace 测试耗时 11 分 35 秒，macOS 装配与合同作业耗时 13 分 36 秒，恢复专项的升级历史测试体耗时 13 分 28 秒。已有本机记录中，常规全量也用时超过十二分钟。十分钟方案需要重新界定哪些检查阻断日常 PR。[PR #13 日志](https://github.com/laugh0608/RadishLex/actions/runs/42345747026) · [本机门禁记录](../runbooks/repository-validation.md#正式分层与授权)
 
-- 日常进入 `dev` 的 PR 用一个 Ubuntu 作业，调用本地共用的 `./scripts/check-repo.sh --component dev`。它执行差异与 hygiene、workspace Rust fmt 和 Clippy、`ime-core`、`ime-product-install`、`ime-product-upgrade` 库级单测，以及原 Go 与 Manager 组件。
+- 日常进入 `dev` 的 PR 用一个 Ubuntu 作业，调用本地共用的 `./scripts/check-repo.sh --component dev`。它执行差异与 hygiene、workspace Rust fmt 和 Clippy、`ime-core` 的 `session_lifecycle`、安装与升级核心库单测，以及原 Go 与 Manager 组件。
 - 阶段晋级 `master` 与发布 tag 继续要求各自候选的完整平台质量和适用的恢复专项。日常 `dev` 的绿灯只证明上述检查范围。macOS 装配、全 workspace 测试及恢复矩阵的完整结果在阶段晋级前取得。
 - 先核对入口、路由、工作流聚合和失败语义，再用一轮 Rust 缓存未命中的 `dev` PR 测实际用时。记录作业运行与排队时间。作业预算十分钟，超时视为失败。仅按需要逐轮批准远端或完整验证。
 
-项目所有者已确认此范围，批准更新 PR #13 并测量一轮日常 CI。
+PR #13 的 `508ad84` 只运行 `Dev Quality`，从创建到完成 **3 分 32 秒**，共用入口执行 **2 分 30 秒**。Rust 缓存未命中，Go 与 Flutter 缓存命中。日志显示 `ime-core --lib` 执行零项测试，已在本地换成 `session_lifecycle`，三项会话测试通过。更新后的选择待远端验证。[日常 CI 结果](https://github.com/laugh0608/RadishLex/actions/runs/42349490232)
 
 ## 后续切片
 

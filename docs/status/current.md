@@ -91,7 +91,7 @@ M5候选与B1–B6门槛见[基线审计](../remediation/linux-m5-delivery-basel
 
 ## 验证入口
 
-- `dev` 十分钟门禁在 PR #13 验证，晋级继续完整门禁。[CI 精简专题](../remediation/ci-critical-path-optimization.md)
+- `dev` 首轮 CI 通过，耗时 3 分 32 秒。[CI 精简专题](../remediation/ci-critical-path-optimization.md)
 
 2026-11-01 的 `fde0ecb` 加 22 文件快照通过常规与 22 项可靠性专项。耗时、调度和快照核对见[周志](../devlogs/2026-W44.md)，V3–V5 资格仍按[装配入口](../runbooks/linux-source-first-assembly.md)接续。
 

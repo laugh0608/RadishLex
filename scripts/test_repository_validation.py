@@ -17,12 +17,13 @@ from validation_suites import DEV_RUST_COMMANDS, PHASES, ROOT, SUITES, repositor
 
 
 class ValidationPlanTests(unittest.TestCase):
-    def test_dev_only_runs_the_selected_rust_library_tests(self):
+    def test_dev_only_runs_selected_session_and_install_upgrade_tests(self):
         tests = [command for command in DEV_RUST_COMMANDS if command[1] == "test"]
-        self.assertEqual(tests, [[
-            "cargo", "test", "--locked", "--lib", "-p", "radishlex-ime-core",
-            "-p", "radishlex-ime-product-install", "-p", "radishlex-ime-product-upgrade",
-        ]])
+        self.assertEqual(tests, [
+            ["cargo", "test", "--locked", "-p", "radishlex-ime-core", "--test", "session_lifecycle"],
+            ["cargo", "test", "--locked", "--lib", "-p", "radishlex-ime-product-install",
+             "-p", "radishlex-ime-product-upgrade"],
+        ])
 
     def test_full_repository_runs_default_targets_and_docs_once(self):
         commands = repository_rust_commands("darwin", "tests")

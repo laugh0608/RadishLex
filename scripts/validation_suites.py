@@ -20,8 +20,9 @@ WORKSPACE_STATIC = [
 ]
 DEV_RUST_COMMANDS = [
     *WORKSPACE_STATIC,
-    ["cargo", "test", "--locked", "--lib", "-p", "radishlex-ime-core",
-     "-p", "radishlex-ime-product-install", "-p", "radishlex-ime-product-upgrade"],
+    ["cargo", "test", "--locked", "-p", "radishlex-ime-core", "--test", "session_lifecycle"],
+    ["cargo", "test", "--locked", "--lib", "-p", "radishlex-ime-product-install",
+     "-p", "radishlex-ime-product-upgrade"],
 ]
 
 
