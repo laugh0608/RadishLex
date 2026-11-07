@@ -48,6 +48,7 @@ endif()
 add_library(radishlex_manager_ffi SHARED IMPORTED GLOBAL)
 set_target_properties(radishlex_manager_ffi PROPERTIES
   IMPORTED_LOCATION "${RADISHLEX_MANAGER_FFI_LIBRARY}"
+  IMPORTED_NO_SONAME TRUE
 )
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent

@@ -80,7 +80,7 @@ payload_binaries=(
 )
 for library in "${payload_binaries[@]}"; do
   file "${library}" | rg -q 'ELF 64-bit.*ARM aarch64'
-  if ! dependency_output="$(ldd "${library}" 2>&1)"; then
+  if ! dependency_output="$(env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT LC_ALL=C ldd "${library}" 2>&1)"; then
     echo "Linux product dependency inspection failed: ${library}" >&2
     echo "${dependency_output}" >&2
     exit 1
@@ -89,20 +89,30 @@ for library in "${payload_binaries[@]}"; do
     echo "Linux product payload has an unresolved dependency: ${library}" >&2
     exit 1
   fi
+  case "${library}" in
+    "${manager_executable}") expected_ffi="${manager_ffi}"; expected_runpath='$ORIGIN/lib' ;;
+    "${addon_library}") expected_ffi="${addon_ffi}"; expected_runpath='$ORIGIN' ;;
+    *) continue ;;
+  esac
+  dynamic="$(LC_ALL=C readelf -d "${library}")"
+  runpath="$(sed -nE 's/.*\((RUNPATH|RPATH)\).*\[([^]]*)\]$/\2/p' <<<"${dynamic}")"
+  if [[ "${runpath}" != "${expected_runpath}" ]] ||
+      ! rg -q '\(NEEDED\).*\[libradishlex_ime_ffi\.so\]$' <<<"${dynamic}" ||
+      rg -q '\(NEEDED\).*\[[^]]*/' <<<"${dynamic}" ||
+      ! rg -Fq "libradishlex_ime_ffi.so => ${expected_ffi} (" <<<"${dependency_output}"; then
+    echo "Linux product payload must resolve its FFI by basename via ${expected_runpath}: ${library}" >&2
+    exit 1
+  fi
+  if rg -n '/tmp|/workspace|RadishLex' <<<"${dynamic}"; then
+    echo "Linux product payload contains a build path in dynamic metadata." >&2
+    exit 1
+  fi
 done
 
-readelf -d "${manager_executable}" | rg -q '\[\$ORIGIN/lib\]'
-readelf -d "${addon_library}" | rg -q '\[\$ORIGIN\]'
 strings "${addon_library}" | rg -F '/usr/share/radishlex/rime' >/dev/null
 for binary in "${manager_executable}" "${addon_library}"; do
   strings "${binary}" | \
     rg -F 'radishlex-linux-startup:debian-system-product-v1' >/dev/null
-done
-for binary in "${manager_executable}" "${addon_library}"; do
-  if readelf -d "${binary}" | rg -n '/tmp|/workspace|RadishLex'; then
-    echo "Linux product payload contains a build path in dynamic metadata." >&2
-    exit 1
-  fi
 done
 for binary in "${payload_binaries[@]}"; do
   if strings "${binary}" | rg -F "${repo_root}" >/dev/null; then

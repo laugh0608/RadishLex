@@ -98,11 +98,26 @@ if [[ ! -x "${executable}" || ! -f "${bundled_ffi}" ]]; then
 fi
 
 file "${executable}" "${bundled_ffi}"
-if ldd "${executable}" "${bundled_ffi}" | rg -n 'not found'; then
-  echo "Linux Manager staged bundle has an unresolved dynamic dependency." >&2
+manager_dynamic="$(LC_ALL=C readelf -d "${executable}")"
+if ! rg -q '\(NEEDED\).*\[libradishlex_ime_ffi\.so\]$' <<<"${manager_dynamic}" ||
+    rg -q '\(NEEDED\).*\[[^]]*/' <<<"${manager_dynamic}"; then
+  echo "Linux Manager must name its FFI dependency by basename and use no path-based dependencies." >&2
   exit 1
 fi
-readelf -d "${executable}" | rg -q '\$ORIGIN/lib'
+if ! rg -q '\((RUNPATH|RPATH)\).*\[\$ORIGIN/lib\]$' <<<"${manager_dynamic}"; then
+  echo 'Linux Manager search path must be $ORIGIN/lib.' >&2
+  exit 1
+fi
+if ! dependencies="$(env -u LD_LIBRARY_PATH -u LD_PRELOAD -u LD_AUDIT LC_ALL=C ldd "${executable}" "${bundled_ffi}" 2>&1)" ||
+    rg -n 'not found' <<<"${dependencies}"; then
+  echo "Linux Manager staged bundle has an unresolved dynamic dependency." >&2
+  echo "${dependencies}" >&2
+  exit 1
+fi
+if ! rg -Fq "libradishlex_ime_ffi.so => ${bundled_ffi} (" <<<"${dependencies}"; then
+  echo "Linux Manager must resolve its FFI from the bundled lib directory." >&2
+  exit 1
+fi
 strings "${executable}" | \
   rg -Fq "radishlex-linux-startup:${startup_identity_marker}-v1"
 
