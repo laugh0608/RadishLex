@@ -74,4 +74,4 @@ git diff --check
 ./scripts/check-repo.sh
 ```
 
-正式验收还须包含[门禁手册](docs/runbooks/repository-validation.md)规定的所有适用可靠性专项；`--component` 是明确覆盖范围，不能单独冒充完整验收。PR 的常规质量与适用专项在同一 revision 上聚合，不强制本地全量后远端重复全量。实现改动继续按范围执行相应门禁，例如 Rust 的 `cargo fmt --check`、`cargo check`、相关 `cargo test` 和 `clippy`，Go 的 `gofmt` 与 `go test ./...`，Flutter 的 `dart format`、`flutter analyze` 和相关测试，以及平台壳的 build/smoke。PR 只记录真实执行过的命令，并明确列出未执行项和残余风险。
+日常 `dev` PR 与本地共用 `./scripts/check-repo.sh --component dev`。`master` 晋级的常规质量与适用可靠性专项在同一 revision 聚合，范围见[门禁手册](docs/runbooks/repository-validation.md)。实现改动继续按风险执行相应的语言检查、定向测试与平台验证。PR 记录实际执行的命令、未执行项和残余风险。

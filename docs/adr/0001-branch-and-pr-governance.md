@@ -58,7 +58,7 @@ git rev-list --left-right --count origin/master...dev
 ### 自动化触发策略
 
 - 直接 push 到 `dev` 不触发 GitHub Actions；日常直接推进继续依赖风险匹配的本地验证。
-- 以 `dev` 或 `master` 为目标的 Pull Request 触发同一套 `PR Checks`。`dev` 检查为协作反馈，`master` 检查由 ruleset 配置为 strict required checks。
+- 以 `dev` 为目标的 Pull Request 触发 `Dev Checks`，使用与本地共用的日常入口提供协作反馈。以 `master` 为目标的 Pull Request 触发完整 `PR Checks`，由 ruleset 配置 strict required checks。
 - `master` 禁止直接 push，只能通过聚合 `Candidate Quality` 和会话解决门禁的 Pull Request 进入；单人维护阶段不要求额外审批，合并后的 `master` push 不重复触发 `PR Checks`。
 - `Release Checks` 只监听 `v*-dev`、`v*-test` 与 `v*-release` tag。普通分支 push、非发布 tag 和 PR 不触发发布工作流。
 - 准备阶段性 `dev -> master` PR 时，本地先执行与风险匹配的静态检查、定向测试和可执行的平台补充，记录精确 revision 与未执行项。正式合并由该 PR 常规质量及所有适用可靠性专项共同阻断，不再无条件要求本地完整一轮后远端重复完整一轮。完整本地门禁或专项仍须逐轮授权；远端合成检查不替代真实资格，详见[门禁手册](../runbooks/repository-validation.md)。
