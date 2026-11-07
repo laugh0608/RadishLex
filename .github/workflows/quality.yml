@@ -51,7 +51,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 45 || 30 }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -74,7 +74,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
+            target/debug
+            target/release
           key: ${{ runner.os }}-rust-1.96.0-${{ hashFiles('Cargo.lock', '**/Cargo.toml') }}
       - name: Require contract tools
         run: |
@@ -87,10 +88,30 @@ jobs:
             fi
           fi
           command -v c++
-      - name: Rust static checks and routine tests
-        run: ./scripts/check-repo.sh --component rust
+      - uses: subosito/flutter-action@v2
+        if: runner.os == 'macOS'
+        with:
+          flutter-version: '3.44.0'
+          cache: true
+      - name: Resolve macOS Manager dependencies
+        if: runner.os == 'macOS'
+        working-directory: apps/radishlex-manager
+        run: flutter pub get --enforce-lockfile
+      - name: Assemble macOS product and Installer payload
+        if: runner.os == 'macOS'
+        run: |
+          xcodebuild -version
+          brew install librime
+          rime_prefix="$(brew --prefix librime)"
+          test -r "$rime_prefix/include/rime_api.h"
+          test -r "$rime_prefix/lib/librime.dylib"
+          RIME_INCLUDE_DIR="$rime_prefix/include" RIME_LIB_DIR="$rime_prefix/lib" \
+            ./scripts/build-macos-product.sh
+          ./scripts/build-macos-install-payload.sh
       - name: Native and repository contracts
         run: ./scripts/check-repo.sh --component contracts
+      - name: Rust static checks and routine tests
+        run: ./scripts/check-repo.sh --component rust
 
   manager:
     name: Flutter Manager

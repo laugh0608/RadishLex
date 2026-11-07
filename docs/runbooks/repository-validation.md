@@ -108,6 +108,8 @@
 
 `.github/workflows/quality.yml` 是 PR/tag 共用质量工作流；Rust/原生覆盖 Linux 与 macOS，Go 和 Manager 独立并行。Rust固定1.96.0、Flutter固定3.44.0，Go依go.mod；Cargo 缓存只复用构建产物，Cargo 仍核验输入，不复用门禁结果。首次冷编译/runner差异须单列。
 
+两台 runner 先执行原生与仓库合同，再启动常规 Rust 测试。macOS runner 先按锁文件准备 Manager 依赖、提供 Homebrew `librime`，使用[产品装配入口](macos-product-assembly.md)从当前 checkout 构建并校验双 bundle 和 Installer payload。Cargo 缓存只包含依赖及 Rust 构建目录，产品装配和 payload 每轮重建。Rust 作业超时上限为 Linux 30 分钟、macOS 45 分钟，后者包含冷启动装配时间。
+
 `Candidate Quality` 名称及远端 ruleset 绑定保持不变。仅明确不适用的 reliability 可为 skipped；其他缺失、失败、取消、跳过均拒绝。发布 tag 调用同一质量工作流且强制可靠性专项，避免旧 Release Checks 缺少独立语言质量检查；它仍不代表真实平台发布资格。
 
 ## 调度、构建与进程收尾
