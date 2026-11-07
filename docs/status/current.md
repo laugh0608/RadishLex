@@ -77,17 +77,17 @@
 M5候选与B1–B6门槛见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)；macOS支线不作为Linux退出前置。
 
 1. **source-first V1/V2已获批**：[合同](../remediation/linux-m5-source-first-contract.md)固定S的`40-2`真实构建/seed安装、R的审阅锚点、T的`40-3`后继pair；仓库实现已提交`fde0ecb`/`8800142`并完整自动通过，V3–V5另批。当前无实际锚点或载体资格；不改旧pair、编造摘要或扩展`38→40`跨合同升级。
-2. **接续先审V3计划**：按[装配入口](../runbooks/linux-source-first-assembly.md)只读审阅S候选、Debian13 ARM64 builder、离线工具/缓存清单及L1–L5/双FFI/SQLite/Rime取证；固定命令、预算、资源和失败保留，再申请实际环境核验。`8800142`不自动成为S/R；今晚收尾，不操作VM或下载依赖。
+2. **接续V3构建审阅**。`a31152b` 的 `40-2` 预审与 Debian ARM64 环境核验通过。S 的实际构建另行审阅。[核验记录](../devlogs/2026-W45.md#2026-11-07-v3-离线环境核验)
 3. **依次闭合产品证据**：在获准资源中建立新source/pair，完成第三代表crash及其对新pair的适用域审阅、同一新guest连续L6和当前候选隐私/学习/删除/重启，随后独立guest P05C及M5退出；旧分散结果不拼作新候选通过。
 4. **支线后置**：macOS action`10–13`、reader/observer及`90e7717`自动通过保留；Q2保持当前账户/会话、F0来源未定，catalog为空、issuer/最终取消关闭，W0与内部I/O宿主延期，不重试真实40。性能优化由新热点触发，常规5分钟未达/CI10分钟未测不无限阻塞M5。
 
 ## Linux M5 系统操作停止线
 
-目录整理见[本机README](/Users/luobo/VirtualMachines/README.md)：日常复用Debian13-ARM64/Windows11-ARM64，基线只备份。`utms/`集中10份载体，`datas/`收纳106个结果根，`images/`保留；UTM9台原UUID/新路径核对且全停，另1份同UUID备份不注册。未启动guest。
+目录整理见[本机README](/Users/luobo/VirtualMachines/README.md)：日常复用Debian13-ARM64/Windows11-ARM64，基线只备份。`utms/`集中10份载体，`datas/`收纳106个结果根，`images/`保留；迁移时UTM9台原UUID/新路径核对且全停，另1份同UUID备份不注册。
 
 1. 旧证据内容不改写；迁移映射与核对见`datas/_organization/2026-11-01/`。partial仍为壳，不能直接运行旧Move/adopt/物化控制；恢复工作前先审迁后路径/身份绑定，系统动作另批。
 2. 普通任务复用两台日常机；确有fresh/隔离验收需求才申请专属VM，不启动或复用冻结机。旧项目预算不因整理扩大，保留材料不自动授权删除/退休。
-3. 连续L6/P05C的必要独立guest及完整门禁仍单独授权；V1/V2仓库实现已提交，VM暂不操作。冻结、输入热路径、同步和后续平台边界保持。
+3. 连续L6/P05C的必要独立guest及完整门禁仍单独授权。冻结、输入热路径、同步和后续平台边界保持。
 
 ## 验证入口
 

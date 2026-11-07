@@ -42,6 +42,113 @@ receipt report的非摘要facts必须与Rust结果完全相同；root/staging材
 
 collector核验S verifier实际文件/ELF和source在Git中的S metadata/锁/配方、读取窗口内全部私有材料、source包/evidence及执行器前后identity/hash，再生成12个脱敏附件和seed.evidence.json，复用closed-seed/guest-host一致性核验并独占发布。raw receipt及私有材料留原根，work另保留private inventory摘要与raw-material-review=required。错误、panic或发布后同步失败均保留已产生材料，没有R生产锚点自动生成。
 
+## V3 源码预审与环境核验申请
+
+2026-11-07 仓库预审通过。拟将 `a31152b6688946aaface232de9ddd1184b128456` 列为 S 的源码候选。该提交是 `8800142` 的后继，已提交的 Linux product metadata 与 candidate 的 `source_metadata` 逐字段一致。产物配置指向 `radishlex_26.7.1+40-2_arm64.deb` 及同名 `.evidence.json`。以下 SHA-256 来自已提交字节，元数据与配方摘要使用 source-first 的 canonical 编码。三份锁及 18 个配方文件与 `8800142` 的字节一致。
+
+| 输入 | SHA-256 |
+| --- | --- |
+| Linux product metadata | `806412de2cb2e120d0098497718156d0b81417c9ddad0a5c0ace22aa82016c73` |
+| `Cargo.lock` | `c6389589be716706fb0d3c0f61d2d40f75c83d2b29d2a1d017b01b9a2c83a67a` |
+| Manager `pubspec.lock` | `a0c0468f85ad4cbd3f19bc85a8f92e258bb76588eb51e8f17f2233343be504cd` |
+| RimeData 来源锁 | `5722b2f31769758d392db395e0c367f2a30e189f25e7cc23bf05a3e3385698a1` |
+| 18 项配方摘要映射 | `9c25926084c69045d1df9802583f16027524bc7be6dac9c1949bba6271e5d3eb` |
+
+预审时 macOS 工作区含 CI 记录改动。实际 builder 须另有绑定该 SHA 的干净 checkout。正式 S 选择、ARM64 产物、seed 安装及 R 锚点各按后续证据审阅。[环境核验结果](../devlogs/2026-W45.md#2026-11-07-v3-离线环境核验)
+
+### 离线输入清单
+
+| 组别 | 构建前应具备 | 本次可核对的范围 |
+| --- | --- | --- |
+| Builder | Debian 13 trixie ARM64，`aarch64-linux-gnu`，已隔离且仅有 `lo` 的执行会话 | OS、架构、Debian 包架构与当前网络接口 |
+| Rust | 可用的 ARM64 Rust/Cargo 工具链，`Cargo.lock` 对应的 registry index 及 crate 缓存，编译器、链接器与 ARM64 sysroot | 工具版本、registry 目录和工具可见性。锁内全部 crate 的离线解析及构建留待构建批 |
+| Flutter | 已初始化的 Linux ARM64 Flutter SDK、Dart SDK、tool snapshot/stamp、release engine，锁定的 pub 缓存与该 checkout 的 `.dart_tool/package_config.json` | release engine 目录、snapshot 与 stamp 存在，记录 Flutter 版本和 pub 配置 SHA-256。包配置引用是否完整可用留待构建批 |
+| 原生与打包 | C/C++、Clang、CMake/CTest、Ninja、pkg-config、Fcitx5Core ≥ 5.1.9、librime ≥ 1.13.1、GTK/GLib/GIO 开发库，Debian 打包工具、ELF 工具及 fontconfig | 工具可见性、限定包安装状态与版本、Rime/GTK pkg-config。实际 Fcitx CMake 解析、字体匹配、ELF 和 `dpkg-shlibdeps` 关系留待构建批 |
+| 载体与数据 | 提交内锁定 RimeData 及许可证，Debian 的 `fcitx5`、`librime1t64`、DejaVu 和 Noto CJK 字体 | 已提交 Rime 锁摘要与目标 metadata 一致，builder 上只读核对依赖包。双 FFI、SQLite 3.51.3/source ID、Rime payload 与 L1–L5 取证留待实际产物 |
+
+### 一次 90 秒核验
+
+拟使用日常 `Debian13-ARM64`，迁移记录中的载体为 VM 根下的 `utms/Debian13-ARM64.utm`。历史登记 UUID `755199B1-1C18-4441-8A1E-D423C8DE0022` 同时用于未注册的 `DependencyFrozen` 备份，因此须核对实际载体路径。执行前由操作者确认是已准备好的日常机，会话已经运行且无其他运行中的 VM。若需要启动 VM、配置隔离、准备 checkout 或补缓存，先停在对应缺项并单独确定范围。[本机 VM 约定](/Users/luobo/VirtualMachines/README.md)
+
+拟定持久工作根为 guest 内 `/srv/radishlex-v3/a31152b`。其 `checkout`、`inputs/flutter`、`inputs/cargo`、`inputs/rustup` 和 `inputs/pub-cache` 须事先准备，由当前专用非 root 账号拥有，与其他任务和冻结资产隔离。批准范围为在该会话执行下面命令一次，在新建的 `probe-01` 写私有日志和 `environment.json`。Flutter 版本命令可能刷新 SDK stamp 和该专用账号的工具状态，因此写入范围也涵盖该专用 Flutter SDK 缓存和工具状态。会话应无转发代理，工具探测串行，不占用第二台 VM。
+
+```bash
+/usr/bin/env -u BASH_ENV -u ENV /usr/bin/timeout --verbose --signal=TERM \
+  --kill-after=5s 85s /bin/bash --noprofile --norc -s <<'V3_PROBE'
+set -eEuo pipefail
+umask 077
+root=/srv/radishlex-v3/a31152b
+checkout="$root/checkout"
+attempt="$root/probe-01"
+export FLUTTER_ROOT="$root/inputs/flutter" CARGO_HOME="$root/inputs/cargo"
+export RUSTUP_HOME="$root/inputs/rustup" PUB_CACHE="$root/inputs/pub-cache"
+export PATH="$FLUTTER_ROOT/bin:$CARGO_HOME/bin:/usr/bin:/bin"
+export LC_ALL=C PYTHONDONTWRITEBYTECODE=1 GIT_OPTIONAL_LOCKS=0
+export CARGO_NET_OFFLINE=true RUSTUP_AUTO_INSTALL=0
+
+trap 'printf "V3 probe stopped at line %s\n" "$LINENO" >&2' ERR
+builder_uid="$(id -u)"
+test "$builder_uid" != 0
+test "$(uname -s)/$(uname -m)" = Linux/aarch64
+test "$(printf '%s\n' /sys/class/net/*)" = /sys/class/net/lo
+for dir in "$root" "$checkout" "$FLUTTER_ROOT" "$CARGO_HOME" "$RUSTUP_HOME" "$PUB_CACHE"; do
+  test -d "$dir"
+  test "$(realpath -e -- "$dir")" = "$dir"
+  test "$(stat -c %u -- "$dir")" = "$builder_uid"
+done
+test "$(stat -c %a -- "$root")" = 700
+mkdir -m 0700 -- "$attempt"
+exec >"$attempt/probe.log" 2>&1
+cd -- "$checkout"
+test "$(git -c core.fsmonitor=false rev-parse --show-toplevel)" = "$checkout"
+test "$(git -c core.fsmonitor=false rev-parse HEAD)" = a31152b6688946aaface232de9ddd1184b128456
+checkout_status="$(git -c core.fsmonitor=false status --porcelain=v1 --untracked-files=all --ignore-submodules=none)"
+test -z "$checkout_status"
+for output in target apps/radishlex-manager/build apps/radishlex-manager/linux/flutter/ephemeral; do
+  test ! -e "$output" && test ! -L "$output" || exit 1
+done
+
+test "$(dpkg --print-architecture)" = arm64
+for tool in python3 cargo rustc cmake ctest clang clang++ cc c++ ninja pkg-config \
+    dpkg-query dpkg-deb dpkg-shlibdeps rg file ldd readelf nm strings fc-match; do
+  command -v "$tool"
+done
+test -d "$CARGO_HOME/registry/index"
+[[ -d "$CARGO_HOME/registry/cache" || -d "$CARGO_HOME/registry/src" ]]
+test "$(command -v cargo)" = "$CARGO_HOME/bin/cargo"
+test "$(command -v rustc)" = "$CARGO_HOME/bin/rustc"
+test "$(command -v flutter)" = "$FLUTTER_ROOT/bin/flutter"
+test "$(realpath -e "$FLUTTER_ROOT/bin/flutter")" = "$FLUTTER_ROOT/bin/flutter"
+test "$(realpath -e "$FLUTTER_ROOT/bin/cache")" = "$FLUTTER_ROOT/bin/cache"
+test -x "$FLUTTER_ROOT/bin/cache/dart-sdk/bin/dart"
+test -s "$FLUTTER_ROOT/bin/cache/flutter_tools.snapshot"
+flutter_revision="$(git -c core.fsmonitor=false -C "$FLUTTER_ROOT" rev-parse HEAD)"
+test "$(cat "$FLUTTER_ROOT/bin/cache/flutter_tools.stamp")" = "$flutter_revision:"
+test -s "$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock"
+test ! "$FLUTTER_ROOT/packages/flutter_tools/pubspec.yaml" -nt "$FLUTTER_ROOT/packages/flutter_tools/pubspec.lock"
+pkg-config --atleast-version=1.13.1 rime
+pkg-config --modversion rime gtk+-3.0 glib-2.0 gio-2.0
+for package in libfcitx5core-dev librime-dev libgtk-3-dev fcitx5 librime1t64 \
+    fonts-dejavu-core fonts-noto-cjk; do
+  test "$(dpkg-query -W -f='${Status}' "$package")" = 'install ok installed'
+  dpkg-query -W -f='${binary:Package}\t${Version}\t${Architecture}\n' "$package"
+done
+fcitx_version="$(dpkg-query -W -f='${Version}' libfcitx5core-dev)"
+dpkg --compare-versions "$fcitx_version" ge 5.1.9
+
+python3 -B scripts/linux-product/source_first_build.py inspect-environment \
+  --output "$attempt/environment.json"
+test -s "$attempt/environment.json"
+test "$(stat -c '%u:%a:%h' -- "$attempt/environment.json")" = "$builder_uid:600:1"
+test "$(git -c core.fsmonitor=false rev-parse HEAD)" = a31152b6688946aaface232de9ddd1184b128456
+checkout_status="$(git -c core.fsmonitor=false status --porcelain=v1 --untracked-files=all --ignore-submodules=none)"
+test -z "$checkout_status"
+sha256sum -- "$attempt/environment.json"
+V3_PROBE
+```
+
+外层预算包含目录前检、工具核对、探测与输出回读。第 85 秒向本次调用的进程组发送 TERM，五秒后仍运行则发送 KILL。既有进程与会话不在此收尾范围。任一前检失败、探测非零、超时或输出身份不符，保留已有日志和文件，按失败记录一次，后续重新执行需重新批准。成功须同时有退出码 0、同一 checkout、独占写入的 0600 环境 JSON 和摘要，之后只进入环境结果审阅。[Debian timeout 手册](https://manpages.debian.org/trixie/coreutils/timeout.1.en.html)
+
 ## 首次仓库定向验证计划与执行记录
 
 以下保留初批计划和失败诊断；后续批准的复验及完整自动结果按时间记录在后续小节。仓库实现已提交`8800142`，不因本节命令仍列出而自动重跑；下一执行顺位只读current。
