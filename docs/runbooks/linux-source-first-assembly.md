@@ -78,7 +78,7 @@ collector核验S verifier实际文件/ELF和source在Git中的S metadata/锁/配
 
 ### 一次 90 秒核验
 
-拟使用日常 `Debian13-ARM64`，迁移记录中的载体为 VM 根下的 `utms/Debian13-ARM64.utm`。历史登记 UUID `755199B1-1C18-4441-8A1E-D423C8DE0022` 同时用于未注册的 `DependencyFrozen` 备份，因此须核对实际载体路径。执行前由操作者确认是已准备好的日常机，会话已经运行且无其他运行中的 VM。若需要启动 VM、配置隔离、准备 checkout 或补缓存，先停在对应缺项并单独确定范围。[本机 VM 约定](/Users/luobo/VirtualMachines/README.md)
+拟使用日常 `Debian13-ARM64`。核对登记 UUID `755199B1-1C18-4441-8A1E-D423C8DE0022` 与 VM 根下实际载体 `utms/Debian13-ARM64.utm`，执行前由操作者确认日常机会话已准备且无其他运行中的 VM。若需要启动 VM、配置隔离、准备 checkout 或补缓存，先停在对应缺项并单独确定范围。[本机 VM 约定](/Users/luobo/VirtualMachines/README.md)
 
 拟定持久工作根为 guest 内 `/srv/radishlex-v3/a31152b`。其 `checkout`、`inputs/flutter`、`inputs/cargo`、`inputs/rustup` 和 `inputs/pub-cache` 须事先准备，由当前专用非 root 账号拥有，与其他任务和冻结资产隔离。批准范围为在该会话执行下面命令一次，在新建的 `probe-01` 写私有日志和 `environment.json`。Flutter 版本命令可能刷新 SDK stamp 和该专用账号的工具状态，因此写入范围也涵盖该专用 Flutter SDK 缓存和工具状态。会话应无转发代理，工具探测串行，不占用第二台 VM。
 

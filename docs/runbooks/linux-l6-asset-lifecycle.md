@@ -6,6 +6,8 @@
 
 同日后续项目所有者另行授权本机目录整理：全部10份`.utm`统一到`/Users/luobo/VirtualMachines/utms/`，106个结果根整体迁入`datas/`，`images/`保留，9台UTM原UUID/新路径均核对且全停。精确映射/摘要存于`datas/_organization/2026-11-01/`，本机README规定两台日常机及仅作备份的基线。下文旧绝对路径、预期目标、manifest与冻结账本保留历史事实；本次不是旧case既定目的地的Move/adopt验收，partial未物化S2、未启动。后续先审迁后真实路径/身份绑定，禁止直接复跑旧控制器或改写旧证据；新专机需求与系统动作仍另批，source-first后续实现已按要求暂停。
 
+2026-11-08 起专机配额按[根协作约定](../../AGENTS.md)执行。经项目所有者单独授权，旧 PairBuilder、registration shell、partial、`DependencyFrozen` 与 S2/S3 两份 qcow2 已退役，RadishLex 仅保留冻结的 P04 专机。旧 `upgrade_quiesced` 无法原样续跑。下文旧配额、数量、磁盘读数和候选仅为历史账本。后续操作以[当前停止线](../status/current.md#linux-m5-系统操作停止线)和精确授权为准。[本轮核对与结果](../devlogs/2026-W45.md#2026-11-08-vm-配额与资产盘点)
+
 ## 1. 收敛判断
 
 P05B 不再把八个 crash checkpoint 全部执行为真实系统阻塞项。八个场景仍由 committed matrix、compile-isolated acceptance controller、checkpoint/resume 合同、fake runner 和 canonical evidence schema 完整覆盖；真实系统只保留三个具有不同恢复边界的代表场景：
@@ -23,7 +25,7 @@ P05B 剩余阻塞项为：
 - 同一连续 session 复验 dependency/font、startup 正负向、XDG 零写入/保留、process/package-manager lifecycle、断网与 guest reboot 对照；
 - P05C 仍使用另一台独立 guest，并重新取得系统授权。
 
-真实 RadishLex VM 数量受预算约束：常驻注册锚点目标为 5 台，任一时刻最多增加 1 台 P05B disposable target，因此 managed 注册预算上限为 6 台。五批删除已把 managed 注册项由22台降至5台，唯一`upgrade_quiesced` clone v2现新增1台stopped partial target并达到6台上限；另有2台foreign overlay，不进入RadishLex预算但必须保持全停且身份不变。当前target形成持久终态并退休前，不允许创建替代clone。
+历史预算允许 5 台常驻注册锚点与 1 台 P05B disposable target。五批删除将 managed 注册项由 22 台降至 5 台，随后 `upgrade_quiesced` clone v2 增加 1 台停机 partial，达到当时的 6 台上限。另有 2 台当时的 foreign overlay。
 
 ## 2. 审计基线与计量口径
 
@@ -36,7 +38,7 @@ P05B 剩余阻塞项为：
 - 7 个 APFS snapshot 的 `du` 合计为 65.25 GiB；
 - Data volume 当次只读观察约有 527 GiB 可用，不构成立即容量事故。
 
-五个batch先后删除17个注册bundle、clone v2新增partial target后，当前为7个RadishLex物理`.utm`、6个managed注册项和1个故意未注册的DependencyFrozen bundle；另有2个foreign注册overlay，不列入本账本；snapshot仍为7个。此处不以`df`变化反推实际回收量。
+五个 batch 先后删除 17 个注册 bundle。clone v2 新增 partial target 后，历史账本包含 6 个 managed 注册项、1 个故意未注册的 `DependencyFrozen` bundle 和 7 个 snapshot。另有 2 个 foreign 注册 overlay。此处不以 `df` 变化反推实际回收量。
 
 表中 GiB 是 `du -sk / 1048576` 的账面值。APFS clonefile 和 clone 共享物理块，逐项求和会重复计算共享块；删除候选的账面值只用于排序，不能承诺同等可回收容量。host evidence、handoff 和 control root 体积远小于 VM/snapshot，默认保留而不是优先清理。
 

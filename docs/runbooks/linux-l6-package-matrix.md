@@ -15,6 +15,8 @@
 
 ## 当前执行状态
 
+2026-11-08 已退休旧 PairBuilder、registration shell、partial、`DependencyFrozen` 和 S2/S3 磁盘。下文保留当时的现场身份与证据关系。当前停止线与后续资格见[当前状态](../status/current.md#linux-m5-系统操作停止线)。
+
 截至 2026-08-23：
 
 - production transaction/startup 代码、actual `.deb` verifier 和 fake command/crash matrix 已完成；

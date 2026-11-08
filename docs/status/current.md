@@ -45,17 +45,16 @@
 
 - Linux 输入与 Manager 已有 P04 实机记录；P05 的六类 operation 为分散证据，尚不能证明连续 L6。
 - `install_prepared` 与 `install_artifacts_staged` 已取得代表 crash 恢复终态；第二场景 transaction 权威为 `7fcef38e…0e3d/completed`，停止权威为 `096fe01f…e133/stopped-verified`。
-- `upgrade_quiesced`旧`move-ready`及`fa6e7335…33ea5`冻结。本轮维护仅迁partial至`utms/`，不是旧case的Move/adopt验收，未物化S2或启动；旧路径绑定不可直接沿用。
-- 五批 VM 退休共 17 个 raw bundle 已 absent，旧 snapshot/handoff 与失败证据保留。
+- `upgrade_quiesced` 的旧 `move-ready` 和 `fa6e7335…33ea5` 作为历史证据冻结。旧 registration shell、partial 与 S2 磁盘已退役，旧场景无法原样续跑，第三个代表 crash 仍未闭合。
+- 前五批已退休 17 个 raw bundle。11 月 8 日另退休 4 份旧载体及 S2/S3 磁盘，保留快照配置、EFI、handoff、清单和失败证据。
 - 原入口中的精确证据流水已原样移入[本周周志的入口归档](../devlogs/2026-W36.md#2026-09-05入口历史证据归档)。这是文档迁移，不是现场复验；操作前仍需按 runbook 重新满足资格与授权。
 
 ## 停止线
 
 - macOS `aad9cf8ac2dae71b2b659e96a91ea706` 已为外层 `rolled_back` / 数据 `aborted_preserved`。源 39 双程序已恢复，target 40 保留在同 operation 的两个 `staged.app`；原 DB/WAL/SHM、snapshot/candidate/settings backup、独立恢复证据、原 39/40 与恢复 Installer 全部保留。输入源未选中、Manager/InputMethod 停止、privacy false，恢复 Installer 保持终态窗口。实际恢复授权已完成，不点“重新执行”/移除，不手动 checkpoint/删除 sidecar，不清理或启动双组件/输入测试；后续 WAL 新升级合同及系统动作另行确定范围。
 - 五批均闭合`deleted`，第五批manifest为`a65abab2…1b106`；授权均已消费，不得复跑。
-- 第五批证据、projection与S2冻结，三台bundle已absent；不得恢复、重建、注册或复用。
+- 第五批证据、projection 与 S2 的留存证据冻结，三台 bundle 已 absent；不得恢复、重建、注册或复用。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
-- 五批共17个raw bundle已absent，账面157.60 GiB；prepare/delete证据与旧snapshot/handoff保留，其余disk不得启动、恢复、清理或复用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
 - 第三台rollback `EFD15599…BBDD`、remove `5EA2BAA2…27A2`与reinstall `E671DB9C…D465`的bundle均已删除；终态与退休证据冻结，不得恢复、重建、注册或复用。
 - 旧pair与新pair失败现场只保留持久证据；已删除的`FD24ADFF…17C056`、`B0B826F6…87B3`、`5B19AEF1…7DAB`及`BE3579E0…37F8`不得恢复package、重新注册、重建或复用。
@@ -67,7 +66,7 @@
 - fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
 - transaction-state v1/v2、deferred-result及terminal-stop根冻结。21项结果只证明该boot的transaction为`completed`，28项stop结果只证明同一授权调用内目标已正常停止并完成host交叉检查；不得补拉、复跑probe、query/start/stop、resume/dpkg/retry/repair/cleanup或改写现场。
 - registration shell v1-v3 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结；不得覆盖、复用或解释为已创建。
-- clone v1/v2根、`Evidence-v5`与默认Documents partial target冻结；不得reclone、start、delete、手工搬移或冒充S2。
+- clone v1/v2 根与 `Evidence-v5` 冻结。曾位于默认 Documents 的 partial 已退役，不得重建或冒充 S2。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
@@ -83,11 +82,11 @@ M5候选与B1–B6门槛见[基线审计](../remediation/linux-m5-delivery-basel
 
 ## Linux M5 系统操作停止线
 
-目录整理见[本机README](/Users/luobo/VirtualMachines/README.md)：日常复用Debian13-ARM64/Windows11-ARM64，基线只备份。`utms/`集中10份载体，`datas/`收纳106个结果根，`images/`保留；迁移时UTM9台原UUID/新路径核对且全停，另1份同UUID备份不注册。
+日常复用 `Debian13-ARM64` / `Windows11-ARM64`，通用干净基线只作备份。2026-11-08 复验 UTM 6 台全部停机，RadishLex 仅保留冻结的 P04 专机。资产明细见[本机清单](/Users/luobo/VirtualMachines/README.md)与[周志](../devlogs/2026-W45.md#2026-11-08-vm-配额与资产盘点)。
 
-1. 旧证据内容不改写；迁移映射与核对见`datas/_organization/2026-11-01/`。partial仍为壳，不能直接运行旧Move/adopt/物化控制；恢复工作前先审迁后路径/身份绑定，系统动作另批。
-2. 普通任务复用两台日常机；确有fresh/隔离验收需求才申请专属VM，不启动或复用冻结机。旧项目预算不因整理扩大，保留材料不自动授权删除/退休。
-3. 连续L6/P05C的必要独立guest及完整门禁仍单独授权。冻结、输入热路径、同步和后续平台边界保持。
+1. 旧证据内容不改写；迁移映射见 `datas/_organization/2026-11-01/`。旧 Move、adopt 和物化控制仅用于审阅历史，后续实机前门按新 source/pair 和实际载体重新建立。
+2. 通用测试机之外最多保留一台 RadishLex 专用 VM，按根协作约定计数。现有专用载体超额时暂停新增，按精确清单取得退役授权并核验后再安排专用 guest。
+3. 连续 L6 与 P05C 的独立 guest 按顺序安排。更换专机前先确认上一轮证据已保留、旧专机退役已核验。各轮实机动作与完整门禁分别授权。
 
 ## 验证入口
 
