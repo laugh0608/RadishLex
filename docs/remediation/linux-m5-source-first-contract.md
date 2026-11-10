@@ -7,9 +7,17 @@
 - 首个新 source 从 build40 的真实产品包及一次正常首次安装终态建立，不借用旧38包或手写 receipt。
 - target 只消费该精确 source，来自其后继 clean commit，保持完整同数据合同；默认保留用户 XDG、既有 production transaction/startup gate、receipt 编码与 FFI ABI 不变。
 - 不支持 `38 → 40` 跨 Rime 合同迁移，不改旧 pair/refresh/partial case，不把 macOS Q2/F0/W0 作为前置，不新增签名或远端策略服务。
-- 新 source seed 只使用全新获准的 Debian13 ARM64 合成验收环境；不扫描真实 home，不导入 P04/旧 snapshot 数据，不复用已冻结的 guest 或 operation。
+- 新 source seed 使用通过 fresh-absent 前门的获准 Debian13 ARM64 合成验收环境，优先复用通用 guest；“全新”约束本次安装/数据初态，不强制新建 VM。不扫描真实 home，不导入 P04/旧 snapshot 数据，不复用已冻结的 guest 或 operation。
 
 设计审阅基线为干净 `dev / 8ab4095`，只表示本轮文档来源；以下 S/R/T 是未来提交角色，均未分配真实 SHA。
+
+## 当前收口与验收出口（2026-11-10）
+
+本合同继续作为唯一 source-first 交付路径，机器格式、S/R/T、配额与授权条件不变。已核验 c038602 的 source handoff，下一动作是通用 Debian 只读前门；随后 seed→R→T/pair→代表 crash/连续 L6/当前输入行为→独立 P05C，不重复建设 V1/V2 或 source 装配入口。
+
+旧 upgrade_quiesced 载体已退役，原历史未完成状态保留，不再恢复旧现场；新 pair 对应边界另取实际证据。旧两项 crash 只在显式适用性审阅后使用，不自动继承。安装维护 XDG 零写入与产品学习/删除写入分开验证，独立 P05C 不由同一连续 L6 session 替代。
+
+退出仍需当前候选完整产品行为、连续维护链、八个自动 crash 合同、三个代表真实恢复边界与独立 P05C，具体按[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)。macOS 遗留、其余五个真实 crash、额外平台和公开发布不是本合同出口。新增任务限当前真实失败直接阻塞该出口；无此依据不扩张环境/验收框架。
 
 ## 三个提交角色与证据顺序
 

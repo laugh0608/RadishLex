@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-11-07。macOS现场为09-09 source39恢复，外层`rolled_back`/数据`aborted_preserved`，材料保留、双组件停止，未复验。常态分支`dev`，主线`master`。
+- 规划复核：2026-11-10（无新增实机证据）。macOS现场为09-09 source39恢复，外层`rolled_back`/数据`aborted_preserved`，材料保留、双组件停止，未复验。常态分支`dev`，主线`master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，本批完整自动通过，V3–V5另批。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -25,14 +25,12 @@
 
 ## 综合审阅跟踪
 
-- 激活[2026-09 产品审阅与改进跟踪](../remediation/product-review-2026-09.md)，初审基线 `a5345b8`；2026-09-08 完成隔离诊断，随后按批准方案修复 REV-01 并升级 REV-02 Rust SQLite 依赖；新构建的真实输入复验尚未完成。
-- REV-01 已落实 RadishLex 独占学习与 composition 最严格策略保留；升级 SQLite 后 native 48 进程存储/旧合成库回归及 12 进程配置回归通过。REV-02 Rust 链已升至 bundled SQLite 3.51.3，WAL/旧库/备份恢复与新 macOS FFI 身份核验通过；Go 依赖和冻结产物未更换。两项的平台复验、输入质量与工具链限制仍开放，结果与关闭条件只在专题维护。
-- macOS `26.7.1 (39)` 双组件与本地 ad-hoc Installer 已构建，包内 FFI 合成 smoke、资源/载荷身份、完整仓库门禁及 Manager 99 项测试通过。2026-09-09 首次安装到达 `completed`，双程序身份与无 quarantine 检查通过；Manager 从固定路径启动，显示 `local_only`。项目所有者已手动添加/选择输入源，固定 TextEdit `shi → 时` 两次选择与本地学习增量通过，候选由 2 升至 1。后续按[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md)验证隐私及其余矩阵；此载体无历史升级源，未制作新 DMG、未发布。
-- 项目所有者选择本机现有账户测试；此前 17 个旧目录根已原样归档，545 个节点核对通过。build 39 新验收库未导入旧资料，全程隐私零学习与目标词普通恢复已验证；先前混合输入区间不作为单次精确用例。另行授权的 composition 隐私→普通组观察到零学习，但新普通对照在 TextEdit 提交后记入 `code` 而非 `editor`，已暂停后两组。暂停时隐私键已恢复显式 false、临时基线已消费，输入源选中且 InputMethod 运行；后续仓库修复未再操作该现场。
-- `6a55782` 已修复 IMK 客户端身份来源，build 40 升级曾停于 `data_coordinating` / `candidate_verified`。错误呈现、合法 WAL 特征回归及显式恢复入口已实现，原生/全仓门禁与真实程序副本资格通过。项目所有者随后单独确认实际恢复：独立 Installer 对同一 `aad9cf8a…a706` 完成 source 39 双程序原 inode 恢复，外层 `rolled_back`、内层 `aborted_preserved`；原 DB/WAL/SHM、snapshot/candidate/settings backup 的身份、metadata 和摘要保留，target 40 留在 staging。source 双端及数据只读 startup gate 允许，target 双端拒绝；未启动双组件或执行新输入。继续激活 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md)：永久 WAL 源库准备的 A 段原语与合同已实现，B–D 编排和产品资格待完成，不能直接重试 40。REV-01/REV-02 继续开放，实际结果见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#切换前中止与-source-39-实机恢复完成2026-09-09)。
-- 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
-- WAL 新升级已完成 A 段、准备/旧槽保留/handoff、取消证明与生命周期核心；接续任务现已在连续双锁下连接程序、data、成功/失败恢复及终态封存/释放，并支持进展态重新授权。完整交接/封存的 action `10` 及新准备/续跑/取消保存 `11–13` 已接 Driver/Bridge/AppKit；最终取消释放、独立 source 39 正常双程序资格与 WAL/pager 内部断电仍开放，B 段未退出。本批只在合成目录验证，未操作冻结现场；本批记录见[2026-W42](../devlogs/2026-W42.md)，前批准备/准入记录见[2026-W41](../devlogs/2026-W41.md)。
-- 当前 Rime 来源锁已变化，不能作为冻结 Linux L6 pair 的新 target；现有构建资格检查继续拒绝混配。旧 pair、M5 系统操作顺位和冻结现场保持原状；新 pair 或平台实机动作仍须单独明确范围。
+- [2026-09 产品审阅](../remediation/product-review-2026-09.md)继续开放。REV-01 独占学习/隐私修复与 REV-02 SQLite 升级已有源码和限定产物证据，当前 Linux 候选仍需实际复验；输入质量、工具链及其余未覆盖项不由历史通过自动关闭。
+- macOS build 39 曾完成安装、普通选词和学习；后续发现上下文归类问题并修复。build 40 升级中止后，同一 operation 已恢复 source 39，外层 `rolled_back`、数据 `aborted_preserved`；双端停止，原数据与恢复材料保留。当前不重试 40，精确停止线见下文。[联合验收](../runbooks/macos-rev01-rev02-acceptance.md)与[WAL 方案](../remediation/macos-wal-upgrade-recovery-2026-09.md)继续承载剩余任务。
+- macOS action `10–13`、WAL 准备/恢复编排已有合成证据，最终取消、source 正常资格及内部故障仍开放；这些支线不作为 Linux M5 前置。当前 Rime 锁不能配给冻结 Linux 旧 pair，新候选按 source-first 合同验收。
+- [客户端连接规划](../client-server-connection-plan.md)保持同包官方/自部署方向，真实用户同步仍关闭。性能由新热点触发，输入质量、Manager 易用性和早期反馈按原审阅跟踪。
+
+整理前逐批摘要原样保存在[本周入口归档](../devlogs/2026-W46.md#整理前综合审阅跟踪)，仅保留历史语境，不恢复当时授权或顺位。
 
 ## 冻结基线与固定边界
 
@@ -73,12 +71,25 @@
 
 ## 下一阶段：Linux M5 交付收口
 
-M5候选与B1–B6门槛见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)；macOS支线不作为Linux退出前置。
+2026-11-10 所有者确认继续执行已批准的 source-first 合同，不重新设计基线。本轮文档记录见[周志](../devlogs/2026-W46.md#2026-11-10-linux-m5-收口规划)。**下一交付是一个固定 Debian13 ARM64 候选的安装维护、离线输入、个人化与独立验收闭环**。M5 候选与 B1–B6 见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)；macOS 支线不作为 Linux 退出前置。
 
-1. **source-first V1/V2 已通过自动验证**。[合同](../remediation/linux-m5-source-first-contract.md)固定 S 的 `40-2` 构建和 seed 安装、R 审阅锚点及 T 的 `40-3` 后继 pair。实现提交为 `fde0ecb` 和 `8800142`，V3–V5 按实机步骤另批。旧 pair 与 `38→40` 跨合同升级仍在停止线内。
-2. **离线复用通用 Debian13-ARM64**。`c038602` 的 `40-2` handoff 已核验。下一步只读核对包、receipt、安装状态与指定 XDG。符合 fresh-absent 后在同一台机单独安排安装和测试。遇到不符先报告，确有隔离需求才另议新 VM。seed、R 与新 pair 尚未进入。[只读前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)
-3. **依次闭合产品证据**：在获准资源中建立新source/pair，完成第三代表crash及其对新pair的适用域审阅、同一新guest连续L6和当前候选隐私/学习/删除/重启，随后独立guest P05C及M5退出；旧分散结果不拼作新候选通过。
-4. **支线后置**：macOS action`10–13`、reader/observer及`90e7717`自动通过保留；Q2保持当前账户/会话、F0来源未定，catalog为空、issuer/最终取消关闭，W0与内部I/O宿主延期，不重试真实40。性能优化由新热点触发，常规5分钟未达/CI10分钟未测不无限阻塞M5。
+| 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
+| --- | --- | --- |
+| 1 | 复用通用 Debian13-ARM64，核对 source 安装前门 | `c038602` 的 `40-2` handoff 已核验；只读核对包、receipt、安装状态及指定 XDG。符合 fresh-absent 后才另行安排安装，不重建已合格 source |
+| 2 | 取得 source seed 终态并形成 R 锚点 | 真实 production 安装终态、host 交叉核对和独立审阅齐备；无 seed 不填 R，不以手写 receipt 补齐 |
+| 3 | 形成同合同 `40-3` target / 新 pair | 沿既有 S→R→T 谱系，锁定依赖与 Rime 合同，逐侧 actual artifact 核验；不混入 `38→40` 迁移或依赖升级 |
+| 4 | 连续 L6、代表恢复边界与当前产品行为 | 同一合格 guest 的连续六类 operation，三个代表 crash 的新候选适用证据，当前隐私/普通恢复/学习/删除/tombstone/Manager 同库与重启；维护 XDG 零写入与学习场景分开验收 |
+| 5 | 独立 P05C 与 M5 退出评审 | 在资源上限内串行安排独立 guest，关闭严重数据、隐私和安装缺陷，登记残余限制；不是公开发布 |
+
+V1/V2 仓库实现与自动验证已完成；seed、R、新 pair 及后续实机链尚未完成。[source-first 合同](../remediation/linux-m5-source-first-contract.md)与[只读前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用。前门不符先处理具体冲突，不能自动清理、clone 或重建环境。
+
+旧 `upgrade_quiesced` 现场及相关载体已退役，保留“历史未完成”，不安排原现场续跑。该恢复边界在新 pair 取得实际证据；旧两项 crash 只在明确审阅适用性后引用，不自动平移。连续 L6 和 P05C 的独立性、专机配额与冻结 P04 不变。
+
+出口沿[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)：固定 Debian13 ARM64 本地 `.deb`，当前输入/个人化/隐私/持久化通过，连续 L6、八个 crash 自动合同、三个代表实际恢复边界和独立 P05C 闭合。不增加全部 Linux 平台、macOS 遗留清零或公开发布为 M5 条件。
+
+后置：macOS WAL 新升级及 Q2/F0/W0/最终取消、其余五个真实 crash hardening、新 VM 管理/clone/迁移框架、Android/Windows/iOS、真实用户同步，以及无新热点的性能/CI 极限优化。macOS action `10–13` 与已有自动证据保留，冻结现场不重试真实 40；完整发布顺序不变。
+
+停止扩张：只有当前候选真实失败且直接阻塞上述出口，才增加修复与相关回归；环境受阻时登记具体资源决定，不自动扩大矩阵。每项真实安装、VM、完整门禁和发布仍按原授权边界执行，本次只改文档。
 
 ## Linux M5 系统操作停止线
 

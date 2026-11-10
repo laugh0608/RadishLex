@@ -218,6 +218,12 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 
 完整运行边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)，安装维护边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
 
+### M5 收口范围
+
+2026-11-10 所有者确认沿已批准 source-first 路线完成上述出口，范围固定为 Debian13 ARM64 系统级本地 `.deb`；不追加“全部 Linux 平台”“macOS 遗留清零”或公开发布为 M5 前置。当前候选的隐私、输入与个人化必须有适用证据，不能从旧 P04 或旧 pair 直接推定。
+
+连续 L6 的“新 guest”表示满足本轮初态和身份条件的验收环境，不要求为名称再新建 VM；P05C 仍须另一独立 guest，按配额串行安排。旧现场退役后不得重建以补历史结果；代表 crash 在新 pair 取得或经明确适用性审阅引用，具体顺位与冻结对象只见[current](status/current.md)。其余五个真实 crash 后置不免除八个自动合同，严重隐私、数据或安装缺陷仍阻塞退出。
+
 ## 后续平台与统一发布评审
 
 M5 退出后依次推进 Android `InputMethodService`、Windows TSF 和 iOS Keyboard Extension；不得并行展开多条真实平台主线。每个平台都必须复用 Rust core、userdb、ranker、sync、privacy 和稳定 FFI，平台壳不得复制业务真相源。
