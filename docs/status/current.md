@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 规划复核：2026-11-10（无新增实机证据）。macOS现场为09-09 source39恢复，外层`rolled_back`/数据`aborted_preserved`，材料保留、双组件停止，未复验。常态分支`dev`，主线`master`。
+- 规划复核：2026-11-10；11-13 `40-2` seed 已封存并完成独立只读审阅，所有者材料审阅及 R 待批。macOS仍为09-09 source39恢复，`rolled_back`/`aborted_preserved`，材料保留、双组件停止。常态分支`dev`，主线`master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，本批完整自动通过，V3–V5另批。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -49,6 +49,7 @@
 
 ## 停止线
 
+- 11-13 `40-2` install 为 `completed`/chain1；获准将单个 candidate `0600→0644` 后，新根[seed-seal-20261113-02](../devlogs/2026-W46.md#2026-11-13-candidate-权限处置与-seed-归集封存)单次归集、回读及独立只读审阅通过。VM 最终停机，授权已消费；原安装、失败、诊断和新封存材料保留，不重跑、恢复、清理或启动，不创建 baseline/R。
 - macOS `aad9cf8ac2dae71b2b659e96a91ea706` 已为外层 `rolled_back` / 数据 `aborted_preserved`。源 39 双程序已恢复，target 40 保留在同 operation 的两个 `staged.app`；原 DB/WAL/SHM、snapshot/candidate/settings backup、独立恢复证据、原 39/40 与恢复 Installer 全部保留。输入源未选中、Manager/InputMethod 停止、privacy false，恢复 Installer 保持终态窗口。实际恢复授权已完成，不点“重新执行”/移除，不手动 checkpoint/删除 sidecar，不清理或启动双组件/输入测试；后续 WAL 新升级合同及系统动作另行确定范围。
 - 五批均闭合`deleted`，第五批manifest为`a65abab2…1b106`；授权均已消费，不得复跑。
 - 第五批证据、projection 与 S2 的留存证据冻结，三台 bundle 已 absent；不得恢复、重建、注册或复用。
@@ -75,13 +76,13 @@
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | 复用通用 Debian13-ARM64，核对 source 安装前门 | `c038602` 的 `40-2` handoff 已核验；只读核对包、receipt、安装状态及指定 XDG。符合 fresh-absent 后才另行安排安装，不重建已合格 source |
-| 2 | 取得 source seed 终态并形成 R 锚点 | 真实 production 安装终态、host 交叉核对和独立审阅齐备；无 seed 不填 R，不以手写 receipt 补齐 |
+| 1 | 所有者审阅已封存的 source seed 材料 | 13 项 portable 文件及独立只读备忘录已完成，seed `d0bd5b7c…c820b`；核对旧失败关联、权限处置、原安装/停机及新归集证据，不重复安装 |
+| 2 | 获准后形成 R 锚点 | source 为 S `c038602`，安装为 `completed`/chain1；尚无合同 review/baseline/R，不以独立备忘录代替所有者审阅及授权 |
 | 3 | 形成同合同 `40-3` target / 新 pair | 沿既有 S→R→T 谱系，锁定依赖与 Rime 合同，逐侧 actual artifact 核验；不混入 `38→40` 迁移或依赖升级 |
 | 4 | 连续 L6、代表恢复边界与当前产品行为 | 同一合格 guest 的连续六类 operation，三个代表 crash 的新候选适用证据，当前隐私/普通恢复/学习/删除/tombstone/Manager 同库与重启；维护 XDG 零写入与学习场景分开验收 |
 | 5 | 独立 P05C 与 M5 退出评审 | 在资源上限内串行安排独立 guest，关闭严重数据、隐私和安装缺陷，登记残余限制；不是公开发布 |
 
-V1/V2 仓库实现与自动验证已完成；seed、R、新 pair 及后续实机链尚未完成。[source-first 合同](../remediation/linux-m5-source-first-contract.md)与[只读前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用。前门不符先处理具体冲突，不能自动清理、clone 或重建环境。
+V1/V2 已完成；V3 安装、只读验收、seed 封存及独立只读审阅完成，所有者审阅/R、新 pair 与后续实机链待续。[source-first 合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用；guest 已安装，不清理后冒充 fresh。
 
 旧 `upgrade_quiesced` 现场及相关载体已退役，保留“历史未完成”，不安排原现场续跑。该恢复边界在新 pair 取得实际证据；旧两项 crash 只在明确审阅适用性后引用，不自动平移。连续 L6 和 P05C 的独立性、专机配额与冻结 P04 不变。
 
@@ -89,11 +90,11 @@ V1/V2 仓库实现与自动验证已完成；seed、R、新 pair 及后续实机
 
 后置：macOS WAL 新升级及 Q2/F0/W0/最终取消、其余五个真实 crash hardening、新 VM 管理/clone/迁移框架、Android/Windows/iOS、真实用户同步，以及无新热点的性能/CI 极限优化。macOS action `10–13` 与已有自动证据保留，冻结现场不重试真实 40；完整发布顺序不变。
 
-停止扩张：只有当前候选真实失败且直接阻塞上述出口，才增加修复与相关回归；环境受阻时登记具体资源决定，不自动扩大矩阵。每项真实安装、VM、完整门禁和发布仍按原授权边界执行，本次只改文档。
+停止扩张：只有当前候选真实失败且直接阻塞上述出口，才增加修复与相关回归；环境受阻时登记具体资源决定，不自动扩大矩阵。每项真实安装、VM、完整门禁和发布仍须各自授权；11-10 规划批只改文档，11-13 单次安装授权已消费。
 
 ## Linux M5 系统操作停止线
 
-日常复用 `Debian13-ARM64` / `Windows11-ARM64`，通用干净基线只作备份。2026-11-08 复验 UTM 6 台全部停机，RadishLex 仅保留冻结的 P04 专机。资产明细见[本机清单](/Users/luobo/VirtualMachines/README.md)与[周志](../devlogs/2026-W45.md#2026-11-08-vm-配额与资产盘点)。
+日常复用 `Debian13-ARM64` / `Windows11-ARM64`，干净基线只作备份。11-13 新归集封存收尾复验 UTM 6 台全停；RadishLex 仍只有冻结 P04 专机。资产见[本机清单](/Users/luobo/VirtualMachines/README.md)与[盘点](../devlogs/2026-W45.md#2026-11-08-vm-配额与资产盘点)。
 
 1. 旧证据内容不改写；迁移映射见 `datas/_organization/2026-11-01/`。旧 Move、adopt 和物化控制仅用于审阅历史，后续实机前门按新 source/pair 和实际载体重新建立。
 2. 通用测试机之外最多保留一台 RadishLex 专用 VM，按根协作约定计数。现有专用载体超额时暂停新增，按精确清单取得退役授权并核验后再安排专用 guest。
