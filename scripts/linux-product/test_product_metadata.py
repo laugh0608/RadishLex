@@ -15,22 +15,34 @@ class LinuxProductMetadataTest(unittest.TestCase):
 
         self.assertEqual(metadata.product_version, "26.7.1")
         self.assertEqual(metadata.build_number, "40")
-        self.assertEqual(metadata.package_version, "26.7.1+40-2")
+        self.assertEqual(
+            metadata.package_version,
+            f"{metadata.product_version}+{metadata.build_number}-{metadata.debian_revision}",
+        )
         self.assertEqual(layout["layout_id"], "debian-system-v1")
         self.assertEqual(layout["installation_scope"], "system")
 
     def test_control_rendering_is_deterministic_and_strict(self) -> None:
-        metadata = product_metadata.LinuxProductMetadata.load()
+        repository_metadata = json.loads(
+            product_metadata.METADATA_PATH.read_text(encoding="utf-8")
+        )
+        for revision, version in (("2", "26.7.1+40-2"), ("3", "26.7.1+40-3")):
+            with self.subTest(version=version):
+                value = dict(
+                    repository_metadata, debian_revision=revision, package_version=version
+                )
+                with self.temporary_file("product.json", value) as path:
+                    metadata = product_metadata.LinuxProductMetadata.load(path)
 
-        first = product_metadata.render_control(metadata)
-        second = product_metadata.render_control(metadata)
+                first = product_metadata.render_control(metadata)
+                second = product_metadata.render_control(metadata)
 
-        self.assertEqual(first, second)
-        self.assertIn("Version: 26.7.1+40-2\n", first)
-        self.assertIn("Architecture: arm64\n", first)
-        self.assertIn("fonts-dejavu-core, fonts-noto-cjk\n", first)
-        self.assertNotIn("Recommends:", first)
-        self.assertNotRegex(first, r"@[A-Z_]+@")
+                self.assertEqual(first, second)
+                self.assertIn(f"Version: {version}", first.splitlines())
+                self.assertIn("Architecture: arm64\n", first)
+                self.assertIn("fonts-dejavu-core, fonts-noto-cjk\n", first)
+                self.assertNotIn("Recommends:", first)
+                self.assertNotRegex(first, r"@[A-Z_]+@")
 
     def test_shlibdeps_control_is_a_fixed_ephemeral_source_view(self) -> None:
         metadata = product_metadata.LinuxProductMetadata.load()
