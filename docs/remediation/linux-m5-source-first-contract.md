@@ -1,6 +1,6 @@
 # Linux M5 source-first 交付基线合同
 
-本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。合同于 2026-11-01 获批，`fde0ecb`/`8800142` 实现仓库准入、装配和 seed 归集，本批完整常规及 22 项可靠性已通过。2026-11-07，`c038602` 的 ARM64 source handoff 完成独立产物核验，正式 seed、R 和新 pair 尚未形成。上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
+本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。合同于 2026-11-01 获批，`fde0ecb`/`8800142` 实现仓库准入、装配和 seed 归集，该批完整常规及 22 项可靠性已通过。11-07，`c038602` 的 ARM64 source handoff 完成独立产物核验；11-13 已完成真实 seed 封存、独立审阅及所有者确认，正式 review 与 baseline 随本次 R 提交固定，新 pair 尚未形成。上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
 
 ## 目标与边界
 
@@ -9,11 +9,11 @@
 - 不支持 `38 → 40` 跨 Rime 合同迁移，不改旧 pair/refresh/partial case，不把 macOS Q2/F0/W0 作为前置，不新增签名或远端策略服务。
 - 新 source seed 使用通过 fresh-absent 前门的获准 Debian13 ARM64 合成验收环境，优先复用通用 guest；“全新”约束本次安装/数据初态，不强制新建 VM。不扫描真实 home，不导入 P04/旧 snapshot 数据，不复用已冻结的 guest 或 operation。
 
-设计审阅基线为干净 `dev / 8ab4095`，只表示本轮文档来源；以下 S/R/T 是未来提交角色，均未分配真实 SHA。
+原设计审阅基线为干净 `dev / 8ab4095`，只表示设计文档来源；实际 S 为 `c038602`，R 为首次提交受审 baseline 的本次提交，T 尚未形成。
 
-## 当前收口与验收出口（2026-11-10）
+## 当前收口与验收出口（2026-11-13）
 
-本合同继续作为唯一 source-first 交付路径，机器格式、S/R/T、配额与授权条件不变。已核验 c038602 的 source handoff，下一动作是通用 Debian 只读前门；随后 seed→R→T/pair→代表 crash/连续 L6/当前输入行为→独立 P05C，不重复建设 V1/V2 或 source 装配入口。
+本合同继续作为唯一 source-first 交付路径，机器格式、S/R/T、配额与授权条件不变。S `c038602` 的真实安装为 `completed`/chain1，seed `d0bd5b7c…c820b` 已经独立审阅及所有者认可；[baseline](../../packaging/linux/source-first-baseline.json)固定正式 review 和 portable 附件摘要。后续 T/pair→代表 crash/连续 L6/当前输入行为→独立 P05C 另批授权；本次不进入 T，不以 R 运行要求独立 T 的 `preflight-pair`。材料与两次临时校验失败的保留记录见[周志](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)。
 
 旧 upgrade_quiesced 载体已退役，原历史未完成状态保留，不再恢复旧现场；新 pair 对应边界另取实际证据。旧两项 crash 只在显式适用性审阅后使用，不自动继承。安装维护 XDG 零写入与产品学习/删除写入分开验证，独立 P05C 不由同一连续 L6 session 替代。
 
@@ -100,7 +100,7 @@ raw receipt（现有限额64KiB）和必要系统原文仅在获准的私有现�
 首版采用**显式新profile + 新命名的仓库声明**，保留旧38 pair、`SOURCE_COMMIT/SOURCE_CHAIN_ANCHOR`、refresh及历史case原样。不把旧工具放宽为接受任意外部JSON/public key，也不自动寻找“最新通过”的seed。
 
 - candidate声明（`packaging/linux/source-first-candidate.json`）只定义本合同的版本/平台/seed要求，允许源包构建与准入材料采集；它没有source锚点，不能进入pair target构建。
-- baseline声明（`packaging/linux/source-first-baseline.json`，尚不存在）只在R阶段、真实材料审阅后产生，含上述source锚点及目标相邻revision约束；这是首版唯一可供新pair入口采用的来源。两类声明分别严格解析，不能将缺anchor当作首次路径。
+- baseline声明（`packaging/linux/source-first-baseline.json`）只在R阶段、真实材料审阅后产生，含上述source锚点及目标相邻revision约束；这是首版唯一可供新pair入口采用的来源。两类声明分别严格解析，不能将缺anchor当作首次路径。
 - 新profile及portable格式分别为 `debian13-arm64-source-first-v1` / `radishlex-linux-source-seed-evidence-v1` / `radishlex-linux-source-first-pair-evidence-v1`；仓库已实现严格解析，格式存在不代表生产许可。
 
 上述baseline profile与既有matrix profile分开：复用`debian13-arm64-ephemeral-v1`的六operation、八自动crash、路径/字体/startup合同及acceptance evidence编码，不改其格式。新case另绑定baseline、真实pair摘要和精确执行器；digest未产生前不填占位case，旧case不能因共享matrix profile而认领新pair。
@@ -139,7 +139,7 @@ V5的crash样本可各自使用获准的新snapshot/guest并保留各自失败�
 
 具体文件分工由实施批固定在`scripts/linux-product/`浅层和少量`scripts/`入口；保留旧接口与常量，不预建通用profile registry或空转wrapper。新命名的candidate配置可随实现提交；包含真实source摘要的baseline配置必须等V3完成，不能先提交测试值。原receipt/事务/data contract/FFI、默认数据保留、锁和production/acceptance隔离均不更改，无新依赖或SDK下载。
 
-原设计批仅交付合同和状态同步。2026-11-01 已批准恢复 V1/V2 仓库实现；这不等于批准V3–V5实机动作。第一实施批只允许仓库实现与有界定向检查，完整验收另行申请。候选编号、环境、目标或协议范围实质变化时重新审阅；失败先诊断、不自动重跑、不推送。当前仍无source锚点、pair或M5退出证据。
+原设计批仅交付合同和状态同步。2026-11-01 已批准恢复 V1/V2 仓库实现；这不等于批准V3–V5实机动作。第一实施批只允许仓库实现与有界定向检查，完整验收另行申请。候选编号、环境、目标或协议范围实质变化时重新审阅；失败先诊断、不自动重跑、不推送。该实施批当时尚无source锚点、pair或M5退出证据；当前资格以上节为准。
 
 ## V1/V2 首批实施记录（2026-11-01，fde0ecb）
 
