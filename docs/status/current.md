@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 规划复核：2026-11-10；11-13 `40-2` seed 已获所有者认可，正式 review 与 [baseline](../../packaging/linux/source-first-baseline.json)随本次 R 提交固定，T/pair 待批。macOS仍为09-09 source39恢复，`rolled_back`/`aborted_preserved`，材料保留、双组件停止。常态分支`dev`，主线`master`。
+- 规划复核：2026-11-10；R `65a4147` 已固定受审 `40-2` seed，11-14 批次 A 将 `40-3` 配置随本次 T 提交固定；真实构建/pair 待批。macOS仍为09-09 source39恢复，`rolled_back`/`aborted_preserved`，材料保留、双组件停止。常态分支`dev`，主线`master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，本批完整自动通过，V3–V5另批。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -49,7 +49,7 @@
 
 ## 停止线
 
-- 11-13 `40-2` install 为 `completed`/chain1，seed 封存及所有者审阅完成；[R 记录](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)固定 S `c038602` 与既有材料。VM 最后核验为停机；原安装、失败、诊断和封存材料不改写、不重跑、恢复、清理或启动。R 仅本地提交，未授权 T/40-3、推送或发布。
+- `40-2` install 为 `completed`/chain1；[R 记录](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)固定 S `c038602` 与材料。VM 最后核验为停机；旧材料不改写、重跑、恢复、清理或启动。11-14 仅批准 T 配置、文档、定向验证与本地提交，未授权完整门禁、构建、VM、推送或发布。
 - macOS `aad9cf8ac2dae71b2b659e96a91ea706` 已为外层 `rolled_back` / 数据 `aborted_preserved`。源 39 双程序已恢复，target 40 保留在同 operation 的两个 `staged.app`；原 DB/WAL/SHM、snapshot/candidate/settings backup、独立恢复证据、原 39/40 与恢复 Installer 全部保留。输入源未选中、Manager/InputMethod 停止、privacy false，恢复 Installer 保持终态窗口。实际恢复授权已完成，不点“重新执行”/移除，不手动 checkpoint/删除 sidecar，不清理或启动双组件/输入测试；后续 WAL 新升级合同及系统动作另行确定范围。
 - 五批均闭合`deleted`，第五批manifest为`a65abab2…1b106`；授权均已消费，不得复跑。
 - 第五批证据、projection 与 S2 的留存证据冻结，三台 bundle 已 absent；不得恢复、重建、注册或复用。
@@ -76,11 +76,11 @@
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | 另行批准同合同 `40-3` target / 新 pair | 沿既有 S→R→T 谱系，保留 R baseline 字节、锁和 Rime 合同；独立 T 后才运行 pair 准入并逐侧 actual artifact 核验，不混入 `38→40` 迁移或依赖升级 |
+| 1 | 另批验证 T、准备环境并构建新 pair | T 仅更新相邻 revision；保留 R baseline、candidate、锁及合同。按[分批入口](../runbooks/linux-source-first-assembly.md#t40-3-仓库准备与后续执行分批2026-11-14)固定环境、预算和授权，再准入、构建及逐侧 actual artifact 核验 |
 | 2 | 连续 L6、代表恢复边界与当前产品行为 | 同一合格 guest 的连续六类 operation，三个代表 crash 的新候选适用证据，当前隐私/普通恢复/学习/删除/tombstone/Manager 同库与重启；维护 XDG 零写入与学习场景分开验收 |
 | 3 | 独立 P05C 与 M5 退出评审 | 在资源上限内串行安排独立 guest，关闭严重数据、隐私和安装缺陷，登记残余限制；不是公开发布 |
 
-V1/V2 已完成；V3 安装、只读验收、seed 封存、独立审阅和所有者确认已完成，R 固定 seed `d0bd5b7c…c820b`；新 pair 与后续实机链待续。[合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用；guest 已安装，不清理后冒充 fresh。
+V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`；T 仅为仓库配置准备，新 pair 与实机链待续。[合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用；guest 已安装，不清理后冒充 fresh。
 
 旧 `upgrade_quiesced` 现场及相关载体已退役，保留“历史未完成”，不安排原现场续跑。该恢复边界在新 pair 取得实际证据；旧两项 crash 只在明确审阅适用性后引用，不自动平移。连续 L6 和 P05C 的独立性、专机配额与冻结 P04 不变。
 

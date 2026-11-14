@@ -22,6 +22,20 @@ work包含request、命令/日志、temporary及失败时failure.json；失败�
 
 构建产出待独立核验的 artifact。ARM64 包、双 FFI 加载、SQLite 实际 source ID 及 Rime payload 以实物核验为准。正式 baseline 还需真实 seed 及独立审阅。
 
+## T/40-3 仓库准备与后续执行分批（2026-11-14）
+
+S 为 `c03860212cbd4a9b8681a2b220f85841cb0996ef`；R 为 `65a414779acbeca538bf90d4a5ef56f2aca79232`。所有者已批准批次 A：仅将 `product.json` 的 Debian revision/package version 与 `debian/artifact.json` 的两个产物文件名更新为 `40-3`，同步文档并完成定向验证后本地提交 T。本次提交为 T；实际 SHA 在提交后读取，不预填。R baseline、candidate、三份锁、ABI/schema、Rime、依赖、产品版本与 build number 均不变，没有新增业务行为。
+
+后续批次均未由 A 授权；当前没有 target 实物或新 pair：
+
+1. **仓库验证批**：按最终 T 差异另批申请必要的完整 source-first 专项、常规及适用可靠性；A 的定向合成用例不能替代完整验证或 ARM64 实物资格。完整命令、预算及单次失败停止条件须分别确认。
+2. **环境准备批**：优先复用通用 `Debian13-ARM64` / `755199B1-1C18-4441-8A1E-D423C8DE0022`，重新核对登记、载体与唯一运行 VM 条件。拟用 guest `/srv/radishlex-v4/target-01` 和宿主 `datas/RadishLex/source-first/target-01`，均须确认 absent、所有权及实际可用空间后另行批准创建。新 checkout 从本地 Git 离线传入完整 S/R/T 历史，检出精确 T；tracked/untracked 干净，`target`、Manager build、Flutter ephemeral 初始 absent。已有安装 `40-2`、receipt、staging、XDG 和冻结材料保留，不卸载或清理来冒充 fresh。
+3. **环境探测批**：核对 Debian13 ARM64、仅 loopback、双默认路由为空、无代理，复核已有 Rust/Cargo、Flutter ARM64 release engine、pub/native/打包依赖及所有引用路径。候选构建工具版本参考 S 的已封存环境，但必须重新取证；缺项不联网补齐。新 checkout 的 pub 配置须单独准备和核验，不能盲拷包含旧根路径的配置。`inspect-environment` 拟一次90秒，专用 Flutter stamp/cache 可能写入，须在执行申请中固定准确路径；不称为完全零写入探测。
+4. **构建与封存批**：前门通过后，另批申请一次 `source_first_build.py target`，拟预算1800秒，并发1、nice +19、Rust locked/offline、Flutter no-pub。明确授权该入口新建构建进程组的异常/超时终止，不能结束已有会话。`--review-commit` 固定上述 R；source包/evidence、13项portable seed和正式review使用已封存精确副本。work/output须absent、同卷、互不嵌套且位于checkout外；environment-file取本轮经审阅记录。先真实准入再复制source，仅构建T及其production/verifier/acceptance；T verifier逐侧检查实际包，生成pair与闭合inventory后no-replace发布。
+5. **实物核验与收尾批**：拟另留5–10分钟，核对包inventory/manifest/MD5/SHA、依赖、Rime、ELF/loader/RPATH、双FFI/ABI、SQLite实际version/source ID和执行器角色；回读全部handoff及证据，核对输入前后身份，执行获准的正常停机与host交叉检查。新pair封存不等于真实升级、代表crash、连续L6、输入/学习或P05C通过。
+
+空间须按本轮checkout、编译、解包与回读副本重新核算；历史9GiB门槛和132秒source构建耗时只作参考。依赖安装/下载、网络变更、旧资产清理、clone/快照、系统安装升级及推送均另行授权。任何验证失败、身份/摘要漂移或范围变化立即停止并保留现场，不自动修复、覆盖或重跑。宿主取证使用真实路径和私有父目录；辅助原始材料先核对清单摘要，正式review/baseline/pair仍严格canonical，不能复用此前临时脚本的错误假设。
+
 ## Seed 私有 capture 输入与归集
 
 入口为`scripts/linux-product/source_first_capture.py`，固定参数为`--capture-root /ABS/private --source-package /ABS/package --source-artifact-evidence /ABS/evidence --verifier /ABS/S-verifier --work /ABS/absent-work --output /ABS/absent-seed --budget-seconds N`，预算1–300秒。它读取明确的guest/host授权采集结果，不启动、查询或安装guest；正常production首次安装及guest/host现场采集仍单独申请。collector不是系统observer，也不会把退出码或自填成功值当作实际观察。
