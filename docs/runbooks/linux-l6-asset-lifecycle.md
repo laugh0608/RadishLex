@@ -6,7 +6,7 @@
 
 同日后续项目所有者另行授权本机目录整理：全部10份`.utm`统一到`/Users/luobo/VirtualMachines/utms/`，106个结果根整体迁入`datas/`，`images/`保留，9台UTM原UUID/新路径均核对且全停。精确映射/摘要存于`datas/_organization/2026-11-01/`，本机README规定两台日常机及仅作备份的基线。下文旧绝对路径、预期目标、manifest与冻结账本保留历史事实；本次不是旧case既定目的地的Move/adopt验收，partial未物化S2、未启动。后续先审迁后真实路径/身份绑定，禁止直接复跑旧控制器或改写旧证据；新专机需求与系统动作仍另批，source-first后续实现已按要求暂停。
 
-2026-11-08 起专机配额按[根协作约定](../../AGENTS.md)执行。经项目所有者单独授权，旧 PairBuilder、registration shell、partial、`DependencyFrozen` 与 S2/S3 两份 qcow2 已退役，RadishLex 仅保留冻结的 P04 专机。旧 `upgrade_quiesced` 无法原样续跑。下文旧配额、数量、磁盘读数和候选仅为历史账本。后续操作以[当前停止线](../status/current.md#linux-m5-系统操作停止线)和精确授权为准。[本轮核对与结果](../devlogs/2026-W45.md#2026-11-08-vm-配额与资产盘点)
+2026-11-08 起专机配额按[根协作约定](../../AGENTS.md)执行。经项目所有者单独授权，旧 PairBuilder、registration shell、partial、`DependencyFrozen` 与 S2/S3 两份 qcow2 已退役，当时 RadishLex 仅保留冻结的 P04 专机。11-14 所有者批准退役该专机，载体移入废纸篓且 UTM 登记已移除。历史账本保留原用途与状态。旧 `upgrade_quiesced` 无法原样续跑。下文旧配额、数量、磁盘读数和候选仅为历史账本。后续操作以[当前停止线](../status/current.md#linux-m5-系统操作停止线)和精确授权为准。[本轮核对与结果](../devlogs/2026-W45.md#2026-11-08-vm-配额与资产盘点)
 
 ## 1. 收敛判断
 

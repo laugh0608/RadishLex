@@ -1,6 +1,6 @@
 # Linux M5 source-first 交付基线合同
 
-本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。合同于 2026-11-01 获批，`fde0ecb`/`8800142` 实现仓库准入、装配和 seed 归集，该批完整常规及 22 项可靠性已通过。11-07，`c038602` 的 ARM64 source handoff 完成独立产物核验；11-13 已完成真实 seed 封存、独立审阅及所有者确认，正式 review 与 baseline 随本次 R 提交固定，新 pair 尚未形成。上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
+本文供 Linux 产品、构建和验收维护者审阅，定义新 source 的建立、`26.7.1+40-2 → 26.7.1+40-3` pair、证据连接与验证计划。合同于 2026-11-01 获批，`fde0ecb`/`8800142` 实现仓库准入、装配和 seed 归集，该批完整常规及 22 项可靠性已通过。11-07，`c038602` 的 ARM64 source handoff 完成独立产物核验；11-13 已完成真实 seed 封存、独立审阅及所有者确认，正式 review 与 baseline 在 R 固定。11-14，T 通过完整仓库验证，并完成真实 ARM64 pair 独立核验与回读。上游结论见[基线审计](linux-m5-delivery-baseline-audit.md)，执行优先级与冻结边界见 [current](../status/current.md)。本文不授权构建、账户/VM/网络/工具链操作、安装、清理、完整验收或发布。
 
 ## 目标与边界
 
@@ -9,11 +9,11 @@
 - 不支持 `38 → 40` 跨 Rime 合同迁移，不改旧 pair/refresh/partial case，不把 macOS Q2/F0/W0 作为前置，不新增签名或远端策略服务。
 - 新 source seed 使用通过 fresh-absent 前门的获准 Debian13 ARM64 合成验收环境，优先复用通用 guest；“全新”约束本次安装/数据初态，不强制新建 VM。不扫描真实 home，不导入 P04/旧 snapshot 数据，不复用已冻结的 guest 或 operation。
 
-原设计审阅基线为干净 `dev / 8ab4095`，只表示设计文档来源；实际 S 为 `c038602`，R 为首次提交受审 baseline 的本次提交，T 尚未形成。
+原设计审阅基线为干净 `dev / 8ab4095`，只表示设计文档来源；实际为 S `c038602`、R `65a4147`、T `fa3b2c5`。
 
-## 当前收口与验收出口（2026-11-13）
+## 当前收口与验收出口（2026-11-14）
 
-本合同继续作为唯一 source-first 交付路径，机器格式、S/R/T、配额与授权条件不变。S `c038602` 的真实安装为 `completed`/chain1，seed `d0bd5b7c…c820b` 已经独立审阅及所有者认可；[baseline](../../packaging/linux/source-first-baseline.json)固定正式 review 和 portable 附件摘要。后续 T/pair→代表 crash/连续 L6/当前输入行为→独立 P05C 另批授权；本次不进入 T，不以 R 运行要求独立 T 的 `preflight-pair`。材料与两次临时校验失败的保留记录见[周志](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)。
+本合同继续作为唯一 source-first 交付路径，机器格式、S/R/T、配额与授权条件不变。S `c038602` 的真实安装为 `completed`/chain1，seed `d0bd5b7c…c820b` 已经独立审阅及所有者认可；[baseline](../../packaging/linux/source-first-baseline.json)固定正式 review 和 portable 附件摘要。新 pair 的实物结果与 R/S/T 建立过程见[周志](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。之后按[当前顺位](../status/current.md#下一阶段linux-m5-交付收口)准备实际验收，代表 crash、连续 L6、当前输入行为与独立 P05C 仍待完成。
 
 旧 upgrade_quiesced 载体已退役，原历史未完成状态保留，不再恢复旧现场；新 pair 对应边界另取实际证据。旧两项 crash 只在显式适用性审阅后使用，不自动继承。安装维护 XDG 零写入与产品学习/删除写入分开验证，独立 P05C 不由同一连续 L6 session 替代。
 
