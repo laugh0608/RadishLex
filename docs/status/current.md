@@ -5,6 +5,7 @@
 ## 当前判断
 
 - 11-14 收尾：R `65a4147` 固定受审 `40-2` seed。T `fa3b2c5` 通过完整仓库验证，ARM64 `40-3` 新 pair 已完成独立实物核验及宿主回读。macOS仍为09-09 source39恢复，`rolled_back`/`aborted_preserved`，材料保留、双组件停止。常态分支`dev`，主线`master`。
+- 11-22，固定 Debian 13 ARM64 专用候选已按顺序完成首次安装 `40-2`、升级 `40-3`、同版 repair 和回退 `40-2`。终态为 `completed / rollback / chain=4`，下一步是同一候选上的默认程序移除和重装。[实机周志](../devlogs/2026-W47.md#2026-11-22-连续-l6-完成回退)
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，本批完整自动通过，V3–V5另批。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -17,7 +18,7 @@
 | --- | --- | --- | --- |
 | macOS 离线输入与本地管理 | runtime、FFI、Manager、产品 bundle 与合同测试 | build 38 历史验收；build 39 安装、双端启动及普通选词/学习通过，其余复验待执行 | 已验收范围可供受控本地使用；尚未公开发布 |
 | Linux 输入与本地管理 | Fcitx5 addon、共享 XDG/FFI、Manager | P04 Wayland/X11 与同库验收 | 受控本地验收；尚未公开发布 |
-| Linux 安装维护 | `.deb`、事务、startup gate、八个 crash 自动合同 | 六类 operation 分散证据、两个代表 crash 终态 | 第三个代表 crash、连续 L6 与 P05C 未闭合 |
+| Linux 安装维护 | `.deb`、事务、startup gate、八个 crash 自动合同 | 当前候选四步连续实机证据，另有六类历史分散证据和两个代表 crash 终态 | 连续 L6 待移除、重装及验收项核对，第三个代表 crash 与 P05C 待验收 |
 | 加密同步 | 协议、服务、客户端及受控合成资格链 | macOS key backend 与本地 HTTPS 资格记录 | 真实用户同步关闭；目标生产部署未验收 |
 | Android / Windows / iOS | Android 仅有 Keystore 能力桥；其他平台壳未落地 | 不构成完整 IME 验收 | 后续串行计划 |
 
@@ -41,7 +42,8 @@
 
 ## 当前证据摘要
 
-- Linux 输入与 Manager 已有 P04 历史实机记录。P05 六类 operation 仍为分散证据。新 `40-2 → 40-3` pair 已构建和核验，实际升级、连续 L6、当前输入与个人化、独立 P05C 仍待验收。
+- 当前 `40-2 → 40-3` 包对已在同一候选上按序走到回退终态。S2 冷启动后的升级、repair、回退均在同一离线 boot 完成，七节点 XDG 指纹逐项一致。移除和重装仍待执行。[事务与证据摘要](../devlogs/2026-W47.md#2026-11-22-连续-l6-完成回退)
+- Linux 输入与 Manager 已有 P04 历史实机记录。当前交付物的真实离线输入、隐私、个人化及独立 P05C 仍待验收。
 - `install_prepared` 与 `install_artifacts_staged` 已取得代表 crash 恢复终态；第二场景 transaction 权威为 `7fcef38e…0e3d/completed`，停止权威为 `096fe01f…e133/stopped-verified`。
 - `upgrade_quiesced` 的旧 `move-ready` 和 `fa6e7335…33ea5` 作为历史证据冻结。旧 registration shell、partial 与 S2 磁盘已退役，旧场景无法原样续跑，第三个代表 crash 仍未闭合。
 - 前五批已退休 17 个 raw bundle。11 月 8 日另退休 4 份旧载体及 S2/S3 磁盘，保留快照配置、EFI、handoff、清单和失败证据。
@@ -49,7 +51,7 @@
 
 ## 停止线
 
-- `40-2` install 为 `completed`/chain1；[R 记录](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)固定 S `c038602` 与材料。批次 D 完成后，通用 Debian 仍为 `40-2`，已正常停机。`40-3` 尚未安装。保留当前 source/receipt 和新 pair，旧失败不原地重跑。
+- [R 记录](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)固定 S `c038602` 和源材料。通用 Debian 保持源包 `40-2` 已停机，和连续 L6 候选分别记证。专用候选保持回退后的 `40-2`、同一离线 boot。保留 S0/S1/S2、固定包对和事务证据，下一真实操作另行授权。
 - macOS `aad9cf8ac2dae71b2b659e96a91ea706` 已为外层 `rolled_back` / 数据 `aborted_preserved`。源 39 双程序已恢复，target 40 保留在同 operation 的两个 `staged.app`；原 DB/WAL/SHM、snapshot/candidate/settings backup、独立恢复证据、原 39/40 与恢复 Installer 全部保留。输入源未选中、Manager/InputMethod 停止、privacy false，恢复 Installer 保持终态窗口。实际恢复授权已完成，不点“重新执行”/移除，不手动 checkpoint/删除 sidecar，不清理或启动双组件/输入测试；后续 WAL 新升级合同及系统动作另行确定范围。
 - 五批均闭合`deleted`，第五批manifest为`a65abab2…1b106`；授权均已消费，不得复跑。
 - 第五批证据、projection 与 S2 的留存证据冻结，三台 bundle 已 absent；不得恢复、重建、注册或复用。
@@ -72,13 +74,13 @@
 
 ## 下一阶段：Linux M5 交付收口
 
-2026-11-10 所有者确认继续执行已批准的 source-first 合同，不重新设计基线。本轮文档记录见[周志](../devlogs/2026-W46.md#2026-11-10-linux-m5-收口规划)。**下一交付是一个固定 Debian13 ARM64 候选的安装维护、离线输入、个人化与独立验收闭环**。M5 候选与 B1–B6 见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)；macOS 支线不作为 Linux 退出前置。
+沿已批准的 source-first 合同，下一段交付从同一候选的程序移除和重装开始，随后推进代表恢复边界与当前产品行为验收，最终进入独立 P05C。M5 候选与 B1–B6 见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)。
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | 准备新 pair 的实机验收前门 | 从 D 的闭合清单固定 source/target 包、pair 摘要和 T 执行器。先准备只读前门与新 case 的绑定方案，确定当前已安装 source 的通用机可用于哪些步骤、连续链的 fresh 起点及独立 P05C 环境。核对范围、命令和预算后另行申请 VM 和单步操作 |
-| 2 | 连续 L6、代表恢复边界与当前产品行为 | 同一合格 guest 的连续六类 operation，三个代表 crash 的新候选适用证据，当前隐私/普通恢复/学习/删除/tombstone/Manager 同库与重启；维护 XDG 零写入与学习场景分开验收 |
-| 3 | 独立 P05C 与 M5 退出评审 | 在资源上限内串行安排独立 guest，关闭严重数据、隐私和安装缺陷，登记残余限制；不是公开发布 |
+| 1 | 完成同一候选的连续维护序列 | 先为 `remove_source` 准备只读前门和单步审批。移除后核对 `chain=5`、程序树及包状态、双端 `RemovedProgram` 和 XDG 保留。再按同一移除终态单独准备 `reinstall_target`，核对 `chain=6`、固定 `40-3` 载荷、双端启动和 XDG，汇总六步证据并核对依赖、字体、断网与重启对照 |
+| 2 | 验证代表恢复边界并准备当前产品行为验收 | 绑定当前包对和合格前态，设计 `upgrade_quiesced` 的真实中断及恢复，单独审阅前两个代表样本的适用性。准备离线输入、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库及重启的合成场景，分开记录维护零写入与产品学习证据 |
+| 3 | 独立 P05C 与 M5 退出评审 | 在资源上限内串行安排独立 guest，实测当前产品路径，关闭严重数据、隐私和安装缺陷，登记残余限制，并完成退出评审 |
 
 V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair 见[日终记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。[合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用；guest 已安装，不清理后冒充 fresh。
 
@@ -88,11 +90,11 @@ V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair �
 
 后置：macOS WAL 新升级及 Q2/F0/W0/最终取消、其余五个真实 crash hardening、新 VM 管理/clone/迁移框架、Android/Windows/iOS、真实用户同步，以及无新热点的性能/CI 极限优化。macOS action `10–13` 与已有自动证据保留，冻结现场不重试真实 40；完整发布顺序不变。
 
-停止扩张：只有当前候选真实失败且直接阻塞上述出口，才增加修复与相关回归；环境受阻时登记具体资源决定，不自动扩大矩阵。11 月 18 日起，下一批固定使用 40-2 → 40-3。合格起点可用就按表中顺序实测，失败按候选上的复现修因；缺环境时登记具体 guest、起点及恢复条件。连续链、产品行为、恢复与独立 P05C 齐备后作 M5 退出评审。真实安装、VM、完整门禁和发布分项授权。
+继续使用固定 `40-2 → 40-3` 包对。先推进表中的现成验收路径，只有当前候选出现直接阻塞退出的实际缺陷时，才增加针对根因的修复和回归。环境受阻时记录具体 guest、起点与恢复条件。真实维护操作、VM 和完整门禁分项授权。
 
 ## Linux M5 系统操作停止线
 
-日常复用 `Debian13-ARM64` / `Windows11-ARM64`，干净基线只作备份。11-14 通用 Debian 正常停机后，UTM 当前四台登记均停止。P04 专机已注销，载体移入废纸篓；RadishLex 当前无登记专机。资产变动见[本周周志](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。
+日常复用 `Debian13-ARM64` / `Windows11-ARM64`，干净基线只作备份。11-22 回退终态核验时，专用 `RadishLex-Debian13-ARM64-L6-40-3` 是五台登记中唯一运行的 VM，配置无网卡，guest 只有 loopback。P04 专机已退役。[当前候选记录](../devlogs/2026-W47.md#2026-11-22-连续-l6-完成回退)
 
 1. 留存的旧证据只用于历史审阅。迁移映射见 `datas/_organization/2026-11-01/`。旧 Move、adopt 和物化控制仅用于审阅历史，后续实机前门按新 source/pair 和实际载体重新建立。
 2. 通用测试机之外最多保留一台 RadishLex 专用 VM，按根协作约定计数。现有专用载体超额时暂停新增，按精确清单取得退役授权并核验后再安排专用 guest。
@@ -133,4 +135,4 @@ git diff --check
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
 - [Linux L6 Debian package matrix runbook](../runbooks/linux-l6-package-matrix.md)
 - [Linux L6 收敛与本地资产生命周期](../runbooks/linux-l6-asset-lifecycle.md)
-- [本周周志](../devlogs/2026-W46.md)
+- [本周周志](../devlogs/2026-W47.md)
