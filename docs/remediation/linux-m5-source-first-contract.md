@@ -11,11 +11,11 @@
 
 原设计审阅基线为干净 `dev / 8ab4095`，只表示设计文档来源；实际为 S `c038602`、R `65a4147`、T `fa3b2c5`。
 
-## 当前收口与验收出口（2026-11-14）
+## 交付基线与验收出口
 
-本合同继续作为唯一 source-first 交付路径，机器格式、S/R/T、配额与授权条件不变。S `c038602` 的真实安装为 `completed`/chain1，seed `d0bd5b7c…c820b` 已经独立审阅及所有者认可；[baseline](../../packaging/linux/source-first-baseline.json)固定正式 review 和 portable 附件摘要。新 pair 的实物结果与 R/S/T 建立过程见[周志](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。之后按[当前顺位](../status/current.md#下一阶段linux-m5-交付收口)准备实际验收，代表 crash、连续 L6、当前输入行为与独立 P05C 仍待完成。
+本合同继续作为唯一 source-first 交付路径。S `c038602` 的真实安装为 `completed`/chain1，seed `d0bd5b7c…c820b` 已由独立审阅及所有者认可。11-14 的 [baseline](../../packaging/linux/source-first-baseline.json)固定正式 review 和 portable 附件摘要。实物核验与 S/R/T 建立过程见[周志](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)，实机维护取证与接续授权见[当前顺位](../status/current.md#下一阶段linux-m5-交付收口)。
 
-旧 upgrade_quiesced 载体已退役，原历史未完成状态保留，不再恢复旧现场；新 pair 对应边界另取实际证据。旧两项 crash 只在显式适用性审阅后使用，不自动继承。安装维护 XDG 零写入与产品学习/删除写入分开验证，独立 P05C 不由同一连续 L6 session 替代。
+`upgrade_quiesced` 在新包对取得独立实机证据，旧载体保留退役和历史未完成记录。前两项历史 crash 只在[已审阅的适用域](../devlogs/2026-W47.md#2026-11-22-两个历史-crash-的适用性)引用。安装维护 XDG 零写入在 L6 取证，产品学习和删除写入在独立 P05C 取证。[恢复记录](../devlogs/2026-W47.md#2026-11-22-upgrade_quiesced-恢复与停机)
 
 退出仍需当前候选完整产品行为、连续维护链、八个自动 crash 合同、三个代表真实恢复边界与独立 P05C，具体按[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)。macOS 遗留、其余五个真实 crash、额外平台和公开发布不是本合同出口。新增任务限当前真实失败直接阻塞该出口；无此依据不扩张环境/验收框架。
 

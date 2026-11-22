@@ -1,10 +1,10 @@
 # Linux M5 交付基线与剩余门槛审计
 
-本文面向 Linux 产品、构建与验收维护者，记录回归 M5 主线后的候选、源码约束、证据缺口和串行顺序。状态：**2026-11-14，source seed 和 R 已固定，T 的 `40-2 → 40-3` ARM64 pair 已独立核验并回读。实际升级、代表恢复、连续 L6、当前产品行为与独立 P05C 仍待验收。** 下节审计起点及只读结果保留 11 月 1 日语境，不覆盖后续产物或 11 月 8 日退役事实。 本文不授权修改冻结 pair、扩大 VM 预算、启动/移动 guest、安装、发布或下载依赖。执行优先级见 [current](../status/current.md)，长期退出标准见[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)。
+本文面向 Linux 产品、构建与验收维护者，记录候选、源码约束与 B1–B6 的关闭依据。11 月 1 日的审计起点及只读结果按历史保留，下方阻塞清单已同步 11 月 22 日取证。执行优先级由[当前状态](../status/current.md)维护，长期退出标准见[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)。本文不授权修改冻结 pair、扩大 VM 预算、启动或移动 guest、安装、发布或下载依赖。
 
 ## 审计结论
 
-项目所有者已明确同意回归 Linux M5：先审交付基线与剩余门槛，同步调整 current。起点为干净 `dev / 55325bafcbb06a10b7ae6c5f7b4967c9b0ad1c9a`，领先本地 `origin/dev` 11 个提交，未 fetch。该提交仅为审计起点，不是未来 source artifact 的冻结提交。
+11 月 1 日，项目所有者同意回归 Linux M5，先审交付基线与剩余门槛。起点为干净 `dev / 55325bafcbb06a10b7ae6c5f7b4967c9b0ad1c9a`，领先本地 `origin/dev` 11 个提交，未 fetch。以下四项保留该审计起点的判断。
 
 1. M5-P01–P04、P05A 的历史结果保留；P05B 已有包/事务/startup gate 和自动合同，但第三个代表 crash、连续 L6 与独立 P05C 未闭合。
 2. 当前产品元数据为 `26.7.1+40-2`；冻结 L6 是 `38-1 → 38-2`。不能用新代码直接接旧 pair，也不能把旧 pair 的历史结果当作 REV-01/REV-02 新候选资格。
@@ -16,9 +16,9 @@
 | 对象 | 可核实的仓库身份 | 当前用途与缺口 |
 | --- | --- | --- |
 | 历史 L6 source | `55351f2`，`26.7.1+38-1`；包 `09ed1228…69bec`、evidence `fe3d6297…fcf94`，完整值在[冻结声明](../../packaging/linux/l6-release-pair.json) | S2 prior-terminal 的精确已安装源；只支持原历史链。本轮未访问原包、磁盘或外部 evidence |
-| 历史 L6 target/case | 声明 target 为 `26.7.1+38-2`；[第三 crash case](../../packaging/linux/l6-upgrade-quiesced-case.json)绑定 `d75818f` 历史 handoff | 旧 case 仅作历史证据；partial/S2 及相关载体已退役，不能沿 Move 续跑、重建或混入新 pair；该恢复边界须在新 pair 取证 |
-| 当前 Linux source 与 target | S `c038602` 为 `26.7.1+40-2`。T `fa3b2c5` 的 [product.json](../../packaging/linux/product.json)为 `26.7.1+40-3`，两者均为 Debian13 ARM64、ABI9、schema9、XDG v1、settings/privacy v1 | S 已在通用机安装并封存，T 的实物包已独立核验，尚未安装 |
-| 新的同合同 pair | R `65a4147` 固定受审 baseline 与正式 seed，D 绑定 S/R/T 及精确 source 字节 | 以[回读记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)进入实机验收前门。合同实质变化时重新审阅适用域 |
+| 历史 L6 target/case | 声明 target 为 `26.7.1+38-2`，[第三 crash case](../../packaging/linux/l6-upgrade-quiesced-case.json)绑定 `d75818f` 历史 handoff | partial/S2 及相关载体已退役，保留历史未完成记录。新包对的恢复结果见 B3 |
+| 当前 Linux source 与 target | S `c038602` 为 `26.7.1+40-2`。T `fa3b2c5` 的 [product.json](../../packaging/linux/product.json)为 `26.7.1+40-3`，两者均为 Debian13 ARM64、ABI9、schema9、XDG v1、settings/privacy v1 | S 的通用机源安装已封存，T 实物已用于连续 L6 与独立恢复验收 |
+| 当前同合同 pair | R `65a4147` 固定受审 baseline 与正式 seed，D 绑定 S/R/T 及精确 source 字节 | 后续前门使用同一批[已回读材料](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。合同实质变化时重新审阅适用域 |
 
 新 pair 选相邻 Debian revision，目的是复验当前受支持的同合同安装维护主路径，不新增 `38 → 40` 跨合同迁移支持。生产 [artifact relationship](../../platforms/linux-product/src/debian/relationship/version.rs)及[事务身份](../../platforms/linux-product/src/model.rs)均要求相同 data contract；其中包含 Rime 锁。即使 schema9、ABI9 相同，Rime 锁改变也不能豁免。
 
@@ -31,7 +31,7 @@
 
 当前 Rime 锁实物 SHA-256 与当前 metadata 相等；schema 的 `enable_user_dict: false`、runtime 隐私修复及锁定 SQLite 升级的仓库结果见 [REV-01/REV-02](product-review-2026-09.md)。当前 Linux 包仍须实测配置、双 FFI 实际链接 SQLite 身份和隐私路由，不从 macOS 产物或 Cargo.lock 推导 Linux 产物通过。
 
-## 本轮有界只读核验
+## 11 月 1 日有界只读核验
 
 以下每项执行一次，不是完整 L6 或全仓门禁；均未构建、开 SQLite、创建 evidence 根或访问 VM。Python 禁止写入 bytecode 缓存。
 
@@ -47,31 +47,31 @@
 
 ## 阻塞清单与关闭证据
 
-| 编号 | 阻塞 | 关闭所需证据 |
+| 编号 | 11 月 22 日证据 | 后续要求 |
 | --- | --- | --- |
 | B1 新交付链 | 受审 S/R 与后继 T 已固定，`40-2` 安装终态为 `completed`/chain1 | 保持精确 source、receipt、seed、review 与 Git 关系，实机前门重新核对 |
 | B2 实际载体与后继构建 | D 的两份 ARM64 `.deb`、两端 FFI、实际 SQLite、执行器及交接清单已核验 | 后续 case 绑定 D 的闭合清单与实物，同一 T 无需为该前门重建 |
-| B3 guest 资源与第三 crash | 旧 partial/S2 和 P04 专机均已退役。旧 upgrade_quiesced 保留历史未完成状态 | 优先通用 Debian 只读前门。新 pair 取得 upgrade_quiesced 实际恢复证据，旧两个 crash 分别审适用域。连续 L6/P05C 串行满足独立性与配额 |
-| B4 连续 L6 | 六类 operation 现有分散证据不能拼成连续 session；两项已闭合 crash 也不覆盖新 pair | 同一新 guest、同一获准 pair 的 install→upgrade→repair→rollback→remove→reinstall；包含实际载体、receipt/dpkg/process、双端startup正负、dependency/font、XDG保留、断网与reboot。必须明确旧 crash 证据适用域及新 pair 的代表 crash 覆盖，不自动平移 |
+| B3 guest 资源与第三 crash | 当前包对的独立 S2 副本已闭合 `upgrade_quiesced`、单次生产 resume 和正常停机。前两个历史 crash 的适用性限于共同安装恢复合同。[恢复记录](../devlogs/2026-W47.md#2026-11-22-upgrade_quiesced-恢复与停机) · [适用性审阅](../devlogs/2026-W47.md#2026-11-22-两个历史-crash-的适用性) | 保留恢复机与证据，独立 P05C 优先复用通用 Debian。更换专机须符合配额并逐项授权 |
+| B4 连续 L6 | 同一候选与当前包对完成 install→upgrade→repair→rollback→remove→reinstall，包含实际 dpkg、双端门禁、依赖和字体、断网、XDG 与重装后冷启动。[六步实测](../devlogs/2026-W47.md#2026-11-22-连续-l6-六步实测) · [冷启动](../devlogs/2026-W47.md#2026-11-22-连续-l6-冷启动对照与留存) | 保留终态与资料，向 M5 出口评审提交同一连续证据链 |
 | B5 当前 Linux 产品行为 | P04历史实测早于REV修复，当前候选真实隐私/学习/质量复验不足 | 对实际新产品覆盖Wayland主路径、X11适用回归、跨上下文隐私与普通恢复、多session、候选/commit、本地学习/删除/tombstone、Manager同库/重启；只用合成数据，不把安装维护的XDG零写入场景混作学习场景 |
-| B6 P05C与退出 | P05B未收口，独立实机验收未完成 | 另一独立guest授权验收、必要常规和全部适用专项、残余限制与M5退出审阅；不扩张为八个真实crash全跑或公开发布 |
+| B6 P05C与退出 | 独立实机方案已形成，通用 Debian 离线启动前门待批准。[P05C 方案](../runbooks/linux-p05c-acceptance.md) | 独立 guest 授权验收、适用的常规与专项验证、残余限制与 M5 退出审阅 |
 
 REV-06 的根 Rust 1.80 声明与近期依赖 MSRV 不一致仍开放。新 builder 应固定实际可用工具链及复现条件，不能自报1.80通过；若需要工具链/依赖变更再单独确定范围。当前只确认源码约束，没有测旧工具链或修改支持声明。
 
 ## 执行顺序
 
-继续[已批准合同](linux-m5-source-first-contract.md)。source 构建、seed、R 和 target pair 的既有完成记录见[装配 runbook](../runbooks/linux-source-first-assembly.md)及[日终周志](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。后续实际顺位以[当前状态](../status/current.md)为准。
+以下为既定证据依赖。source 构建、seed、R 和 target pair 的记录见[装配 runbook](../runbooks/linux-source-first-assembly.md)及[日终周志](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。各步已取得的证据见上表，实际接续顺位见[当前状态](../status/current.md#下一阶段linux-m5-交付收口)。
 
 1. 固定新 pair、包和执行器的精确身份，准备只读实机前门。先区分通用 Debian 的已安装 `40-2` 状态与连续 L6 所需的 fresh 起点，确定可使用的环境和操作边界。
 2. 前门与新 case 的身份绑定可审阅后，另行申请实际 VM 与首项操作授权。
 3. 按固定新 pair 审定三类代表 crash 的覆盖与旧证据适用域；旧 upgrade_quiesced 现场不可续跑，该边界在新 pair 实测。完成同一 guest 连续六类 operation 的 L6，不以旧分散结果拼接。
-4. 在当前候选完成 Wayland/X11 适用输入、多 session、隐私与普通恢复、学习/删除/tombstone、Manager 同库与重启。安装维护零写入与学习写入分别取证。
-5. 在专机配额内串行安排独立 P05C，保留前轮证据并按原授权处理资源；必要常规/适用专项与严重缺陷关闭后评审 M5 退出。无法取得独立环境时明确阻塞，不降低独立性要求。
+4. 在配额内安排独立 P05C，逐批授权并保留前轮证据。实测当前候选的 Wayland/X11 输入、多 session、隐私与普通恢复、学习/删除/tombstone、Manager 同库与重启。安装维护零写入与学习写入分别取证。无法取得独立环境时记录具体阻塞。
+5. 汇总独立 P05C、适用门禁与残余限制，关闭阻塞退出的严重缺陷后评审 M5 退出。
 
 当前交付范围止于固定 Debian13 ARM64 本地 `.deb`。macOS 支线、其余五个真实 crash、额外平台/同步/公开发布及无新热点的性能优化后置；不扩建 VM 或通用验收框架。只有新候选真实失败直接阻塞出口，才新增修复及相关回归，不重设计已通过合同。旧 evidence、pair、JSON 和失败材料不改写，本次规划维护没有重新执行以上任何步骤。
 
 ## 验证与停止线
 
-本轮只做上述静态/只读检查、文档/文本/diff检查；未启动全仓、完整Linux专项、容器/VM、GUI、产品构建、签名或系统安装。干净`90e7717`的完整自动通过保留为仓库历史结果，不升级为本轮Linux交付证据。
+11 月 1 日只读审计的范围限于上述检查及文档、文本和 diff 检查。`90e7717` 的完整自动通过作为仓库历史结果；当前 T 的常规与可靠性专项见[11 月 14 日周志](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)，实机结果见 B3/B4。
 
 后续实施先执行与实际变更匹配的格式/静态/定向检查；新pair的actual包与ARM64 ELF需真实目标环境。每次完整门禁、完整L6与P05C分别给出命令、预算、资源影响并取得新授权，失败先诊断、不自动重跑。保留所有既存失败和冻结材料，不触碰真实用户XDG/DB或macOS 39/40现场；不推送或发布。

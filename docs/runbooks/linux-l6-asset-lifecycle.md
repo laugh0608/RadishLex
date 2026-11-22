@@ -1,6 +1,6 @@
 # Linux L6 收敛与本地资产生命周期
 
-本文固定 M5-P05B 的收敛退出口径、当前 UTM 资产账本、保留/归档/删除建议和未来安全清理控制器边界。读者是准备收口 Linux L6 或维护本地 UTM 资产的维护者。本文不授权启动、克隆、注销、删除或清理任何 VM、快照、guest 数据、host evidence，也不把账面磁盘占用表述为实际可回收空间。
+本文固定 M5-P05B 的收敛退出口径、UTM 历史资产账本、保留与退役规则和未来清理控制器边界。读者是准备收口 Linux L6 或维护本地 UTM 资产的维护者。本文不授权启动、克隆、注销、删除或清理任何 VM、快照、guest 数据、host evidence，也不把账面磁盘占用表述为实际可回收空间。
 
 2026-11-01：[交付基线审计](../remediation/linux-m5-delivery-baseline-audit.md)确认当前build40/Rime合同不属于旧38 pair，maintenance refresh也不能替代新包。本文原Move/物化与配额顺序继续约束旧partial，历史账本不代表本轮live观察；新source/pair与当前候选验收另行建立，不能套用旧记录。当前仓库任务先设计新基线，系统动作仍逐步授权，不默认增加guest或清理partial。
 
@@ -14,16 +14,11 @@ P05B 不再把八个 crash checkpoint 全部执行为真实系统阻塞项。八
 
 1. `install_prepared`：已闭合，覆盖首次安装 prepared、完整 process group crash、合法 guard 与 exact resume。
 2. `install_artifacts_staged`：已闭合，覆盖 target-only staging、fresh boot、延迟结果消歧、`completed` 与正常停止。
-3. `upgrade_quiesced`：尚未执行，覆盖已有 source、运行程序静止、upgrade quiesced 与 exact resume。
+3. `upgrade_quiesced`：覆盖已有 source、运行程序静止、upgrade quiesced 与 exact resume。当前包对已从独立 S2 副本取得实机恢复和正常停机证据。[恢复记录](../devlogs/2026-W47.md#2026-11-22-upgrade_quiesced-恢复与停机)
 
 `upgrade_before_dpkg`、`upgrade_after_dpkg`、`upgrade_rollback_required`、`upgrade_before_source_restore` 和 `upgrade_after_source_restore` 的真实系统执行转为后续 hardening，不再阻塞 P05B 或 M5 退出。它们不得从 matrix、测试、validator 或文档合同中删除，也不能把未执行的真实系统结果写成通过。
 
-P05B 剩余阻塞项为：
-
-- 在资产收敛后完成一次真实 `upgrade_quiesced`；
-- 在一台新的 disposable guest、同一 release pair 和同一连续 session 中依次闭合 `install_source`、`upgrade_target`、`repair_target`、`rollback_source`、`remove_source`、`reinstall_target`；
-- 同一连续 session 复验 dependency/font、startup 正负向、XDG 零写入/保留、process/package-manager lifecycle、断网与 guest reboot 对照；
-- P05C 仍使用另一台独立 guest，并重新取得系统授权。
+11-22，现包对已完成连续六步及冷启动对照，原连续 L6 专机冻结终态后已退役。旧 `install_prepared` 和 `install_artifacts_staged` 按共同恢复合同引用。现有 `upgrade_quiesced` 验收机占用唯一专机名额，停机保留。P05C 优先使用独立的通用 Debian，真实启停与更换专机均需逐批授权。[当前停止线](../status/current.md#linux-m5-系统操作停止线) · [适用性审阅](../devlogs/2026-W47.md#2026-11-22-两个历史-crash-的适用性)
 
 历史预算允许 5 台常驻注册锚点与 1 台 P05B disposable target。五批删除将 managed 注册项由 22 台降至 5 台，随后 `upgrade_quiesced` clone v2 增加 1 台停机 partial，达到当时的 6 台上限。另有 2 台当时的 foreign overlay。
 

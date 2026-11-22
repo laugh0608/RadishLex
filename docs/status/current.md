@@ -74,17 +74,17 @@
 
 ## 下一阶段：Linux M5 交付收口
 
-连续 L6 与 `upgrade_quiesced` 恢复已归档。独立 P05C 优先复用通用 `Debian13-ARM64`，先验收离线前门，再准备当前 `40-3` 产品会话。M5 候选与 B1–B6 见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)。
+下次从 P05C A 批接续，当前待确认。优先复用通用 `Debian13-ARM64`，现有恢复专机保留停机。通用机若不合格，先记明缺口，再决定是否单独报批换机。[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | 独立 P05C 只读前门 | 先报通用 Debian 的一次离线启动。运行态复核 boot、包与 receipt、依赖、桌面前端、合成账号初态及 R 封存材料。前门不合格时保留现场并记录缺口 |
+| 1 | A 批，独立 P05C 只读前门（8–12 分钟） | 获准后复核全停、身份与隔离，只启动通用 Debian 一次。检查离线 boot、`40-2` receipt、依赖、桌面前端、合成账号初态和 R 封存材料 |
 | 2 | 固定 `40-3` 的独立实机验收 | 按批批准候选升级、合成账号和桌面测试。覆盖 Wayland/X11、多应用、多 session、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库与重启。维护零写入与产品行为分别归档 |
 | 3 | M5 退出评审 | 核对独立 P05C、代表 crash 适用域和常规及专项验证，关闭阻塞退出的缺陷，登记残余限制 |
 
 V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair 见[日终记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。[合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用；guest 已安装，不清理后冒充 fresh。
 
-独立载体、测试矩阵和逐批命令见 [P05C 验收方案](../runbooks/linux-p05c-acceptance.md)。
+启动命令、影响和测试矩阵见 [P05C 验收方案](../runbooks/linux-p05c-acceptance.md)。
 
 出口沿[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)：固定 Debian13 ARM64 本地 `.deb`，当前输入/个人化/隐私/持久化通过，连续 L6、八个 crash 自动合同、三个代表实际恢复边界和独立 P05C 闭合。不增加全部 Linux 平台、macOS 遗留清零或公开发布为 M5 条件。
 

@@ -15,7 +15,9 @@
 
 ## 当前执行状态
 
-2026-11-08 已退休旧 PairBuilder、registration shell、partial、`DependencyFrozen` 和 S2/S3 磁盘。下文保留当时的现场身份与证据关系。当前停止线与后续资格见[当前状态](../status/current.md#linux-m5-系统操作停止线)。
+当前 `40-2 → 40-3` 包对的执行记录见[连续 L6 与冷启动](../devlogs/2026-W47.md#2026-11-22-连续-l6-六步实测)、[`upgrade_quiesced` 恢复与停机](../devlogs/2026-W47.md#2026-11-22-upgrade_quiesced-恢复与停机)及[旧两项 crash 适用性审阅](../devlogs/2026-W47.md#2026-11-22-两个历史-crash-的适用性)。P05C 使用[独立验收方案](linux-p05c-acceptance.md)，授权与停止线见[当前状态](../status/current.md#linux-m5-系统操作停止线)。
+
+以下为旧包对历史。2026-11-08 已退休旧 PairBuilder、registration shell、partial、`DependencyFrozen` 和旧 S2/S3 磁盘，保留当时的现场身份与证据关系供审阅。
 
 截至 2026-08-23：
 
