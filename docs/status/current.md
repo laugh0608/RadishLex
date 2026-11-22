@@ -5,10 +5,9 @@
 ## 当前判断
 
 - 11-14 收尾：R `65a4147` 固定受审 `40-2` seed。T `fa3b2c5` 通过完整仓库验证，ARM64 `40-3` 新 pair 已完成独立实物核验及宿主回读。macOS仍为09-09 source39恢复，`rolled_back`/`aborted_preserved`，材料保留、双组件停止。常态分支`dev`，主线`master`。
-- 11-22，固定 Debian 13 ARM64 专用候选已依次完成六步维护事务，终态为 `40-3 / completed / install / chain=6`，六步脱敏证据已持久归档。依赖、字体和重装终态跨 boot 对照仍待验收。[实机周志](../devlogs/2026-W47.md#2026-11-22-连续-l6-六步实测)
-- 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate，本批完整自动通过，V3–V5另批。
+- M5 Linux Fcitx5 离线产品已完成当前包对的连续 L6 与 `upgrade_quiesced` 恢复。P05C 独立实机需逐步授权。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
+- T 基线已通过八个自动合同。三个代表 crash 实机证据见下文，其余五个真实 crash 留作后续强化。
 
 ## 能力与开放状态
 
@@ -18,7 +17,7 @@
 | --- | --- | --- | --- |
 | macOS 离线输入与本地管理 | runtime、FFI、Manager、产品 bundle 与合同测试 | build 38 历史验收；build 39 安装、双端启动及普通选词/学习通过，其余复验待执行 | 已验收范围可供受控本地使用；尚未公开发布 |
 | Linux 输入与本地管理 | Fcitx5 addon、共享 XDG/FFI、Manager | P04 Wayland/X11 与同库验收 | 受控本地验收；尚未公开发布 |
-| Linux 安装维护 | `.deb`、事务、startup gate、八个 crash 自动合同 | 当前候选六步连续实机证据及两个历史代表 crash 终态 | L6 待依赖、字体、重装后冷启动对照和第三个代表 crash，P05C 待验收 |
+| Linux 安装维护 | `.deb`、事务、startup gate、八个 crash 自动合同 | 当前包对的连续六步、依赖、字体、冷启动和 `upgrade_quiesced` 恢复。两个历史 crash 按共同合同引用 | P05C 待验收，尚未公开发布 |
 | 加密同步 | 协议、服务、客户端及受控合成资格链 | macOS key backend 与本地 HTTPS 资格记录 | 真实用户同步关闭；目标生产部署未验收 |
 | Android / Windows / iOS | Android 仅有 Keystore 能力桥；其他平台壳未落地 | 不构成完整 IME 验收 | 后续串行计划 |
 
@@ -42,16 +41,17 @@
 
 ## 当前证据摘要
 
-- 当前 `40-2 → 40-3` 包对已在同一候选上完成六步维护。S2 冷启动后的升级、repair、回退、移除和重装均在同一离线 boot 完成，七节点 XDG 指纹逐项一致。移除返回双端 `RemovedProgram`，重装恢复双端 `AllowedProduct`。持久归档清单 `bd7c8d3a…df5d` 含 13 项已核验材料。[事务与证据摘要](../devlogs/2026-W47.md#2026-11-22-连续-l6-六步实测)
-- Linux 输入与 Manager 已有 P04 历史实机记录。当前交付物的真实离线输入、隐私、个人化及独立 P05C 仍待验收。
-- `install_prepared` 与 `install_artifacts_staged` 已取得代表 crash 恢复终态；第二场景 transaction 权威为 `7fcef38e…0e3d/completed`，停止权威为 `096fe01f…e133/stopped-verified`。
-- `upgrade_quiesced` 的旧 `move-ready` 和 `fa6e7335…33ea5` 作为历史证据冻结。旧 registration shell、partial 与 S2 磁盘已退役，旧场景无法原样续跑，第三个代表 crash 仍未闭合。
+- 固定包对在同一候选完成六步维护。S2 冷启动后的五步均在同一离线 boot 完成，七节点 XDG 指纹一致。移除与重装分别返回双端 `RemovedProgram`、`AllowedProduct`。13 项归档清单 `bd7c8d3a…df5d` 已复验。[六步实测](../devlogs/2026-W47.md#2026-11-22-连续-l6-六步实测)
+- 一次正常关机和一次冷启动后，离线 boot `0b73f8fd…2105d` 保持 `40-3 / completed / install / chain=6`。28 项文件、双端 `AllowedProduct`、20 项依赖、两种发行版字体和七节点 XDG 通过。归档 `58b41cae…dde2`。[冷启动对照](../devlogs/2026-W47.md#2026-11-22-连续-l6-冷启动对照与留存)
+- 独立 S2 副本在离线 boot `af171935…5296` 完成 `upgrade_quiesced / chain=2` 和单次生产 resume。仅一次 dpkg 升级，终态 `40-3 / completed / upgrade / chain=2`、28 项文件、双端 `AllowedProduct` 与 XDG 均通过。恢复归档 `9a7dc6e4…f530`，正常停机归档 `6a8280fc…19e4`。[恢复与停机](../devlogs/2026-W47.md#2026-11-22-upgrade_quiesced-恢复与停机)
+- `install_prepared` 的历史终态 `679b7e04…c544` 和 `install_artifacts_staged` 的历史终态 `7fcef38e…0e3d` 经审阅可引用于 `Prepared` 与 `ArtifactsStaged` 的共同安装恢复合同。实测来自旧 `38-1 → 38-2` 包对，新 `40-2 → 40-3` 的两项 install crash 未重放，旧原始归档本轮未逐件复算。[适用性审阅](../devlogs/2026-W47.md#2026-11-22-两个历史-crash-的适用性)
+- Linux 输入与 Manager 已有 P04 历史实机记录。当前交付物的真实离线输入、隐私、个人化和持久化仍待独立 P05C 验收。
 - 前五批已退休 17 个 raw bundle。11 月 8 日另退休 4 份旧载体及 S2/S3 磁盘，保留快照配置、EFI、handoff、清单和失败证据。
 - 原入口中的精确证据流水已原样移入[本周周志的入口归档](../devlogs/2026-W36.md#2026-09-05入口历史证据归档)。这是文档迁移，不是现场复验；操作前仍需按 runbook 重新满足资格与授权。
 
 ## 停止线
 
-- [R 记录](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)固定 S `c038602` 和源材料。通用 Debian 保持源包 `40-2` 已停机。专用候选的最后 guest 终态为重装后的 `40-3 / chain=6`。保留 S0/S1/S2、固定包对、事务暂存和持久归档，下一真实操作另行授权。
+- [R 记录](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)固定 S `c038602` 和源材料。通用 Debian 已停机，最近记录的产品版本为 `40-2`，下次启动只读复核。原连续 L6 专机已退役，终态副本与 S0/S1/S2、固定包对和持久证据保留。`upgrade_quiesced` 专机 `17BCA414…DD0F` 已停机并保留，继续占用唯一专机名额。
 - macOS `aad9cf8ac2dae71b2b659e96a91ea706` 已为外层 `rolled_back` / 数据 `aborted_preserved`。源 39 双程序已恢复，target 40 保留在同 operation 的两个 `staged.app`；原 DB/WAL/SHM、snapshot/candidate/settings backup、独立恢复证据、原 39/40 与恢复 Installer 全部保留。输入源未选中、Manager/InputMethod 停止、privacy false，恢复 Installer 保持终态窗口。实际恢复授权已完成，不点“重新执行”/移除，不手动 checkpoint/删除 sidecar，不清理或启动双组件/输入测试；后续 WAL 新升级合同及系统动作另行确定范围。
 - 五批均闭合`deleted`，第五批manifest为`a65abab2…1b106`；授权均已消费，不得复跑。
 - 第五批证据、projection 与 S2 的留存证据冻结，三台 bundle 已 absent；不得恢复、重建、注册或复用。
@@ -74,17 +74,17 @@
 
 ## 下一阶段：Linux M5 交付收口
 
-六步维护事务实测已归档。下一段先补当前候选的依赖、字体与重装终态冷启动对照，再推进代表恢复边界和当前产品行为，最终进入独立 P05C。M5 候选与 B1–B6 见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)。
+连续 L6 与 `upgrade_quiesced` 恢复已归档。独立 P05C 优先复用通用 `Debian13-ARM64`，先验收离线前门，再准备当前 `40-3` 产品会话。M5 候选与 B1–B6 见[基线审计](../remediation/linux-m5-delivery-baseline-audit.md)。
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | 补当前候选的依赖、字体和冷启动对照 | 先恢复专用候选唯一运行。复核固定 `40-3` 的 20 项依赖及字体 family、glyph、包归属，以 `chain=6`、28 项文件、双端门禁和 S2 指纹作为冷启动前基准。正常关机及冷启动另行授权，新 boot 复验同一终态、XDG 和断网 |
-| 2 | 验证代表恢复边界并准备当前产品行为验收 | 绑定当前包对和合格前态，设计 `upgrade_quiesced` 的真实中断及恢复，单独审阅前两个代表样本的适用性。准备离线输入、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库及重启的合成场景，分开记录维护零写入与产品学习证据 |
-| 3 | 独立 P05C 与 M5 退出评审 | 在资源上限内串行安排独立 guest，实测当前产品路径，关闭严重数据、隐私和安装缺陷，登记残余限制，并完成退出评审 |
+| 1 | 独立 P05C 只读前门 | 先报通用 Debian 的一次离线启动。运行态复核 boot、包与 receipt、依赖、桌面前端、合成账号初态及 R 封存材料。前门不合格时保留现场并记录缺口 |
+| 2 | 固定 `40-3` 的独立实机验收 | 按批批准候选升级、合成账号和桌面测试。覆盖 Wayland/X11、多应用、多 session、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库与重启。维护零写入与产品行为分别归档 |
+| 3 | M5 退出评审 | 核对独立 P05C、代表 crash 适用域和常规及专项验证，关闭阻塞退出的缺陷，登记残余限制 |
 
 V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair 见[日终记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。[合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用；guest 已安装，不清理后冒充 fresh。
 
-旧 `upgrade_quiesced` 现场及相关载体已退役，保留“历史未完成”，不安排原现场续跑。该恢复边界在新 pair 取得实际证据；旧两项 crash 只在明确审阅适用性后引用，不自动平移。连续 L6 和 P05C 的独立性要求与专机配额继续适用。
+独立载体、测试矩阵和逐批命令见 [P05C 验收方案](../runbooks/linux-p05c-acceptance.md)。
 
 出口沿[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)：固定 Debian13 ARM64 本地 `.deb`，当前输入/个人化/隐私/持久化通过，连续 L6、八个 crash 自动合同、三个代表实际恢复边界和独立 P05C 闭合。不增加全部 Linux 平台、macOS 遗留清零或公开发布为 M5 条件。
 
@@ -94,7 +94,7 @@ V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair �
 
 ## Linux M5 系统操作停止线
 
-日常复用 `Debian13-ARM64` / `Windows11-ARM64`，干净基线只作备份。11-22 重装终态时，专用 `RadishLex-Debian13-ARM64-L6-40-3` 唯一运行、配置无网卡，guest 只有 loopback。随后只读前门发现 `Windows11-ARM64` 也在运行，未进入 guest。恢复条件为 `Windows11-ARM64` 正常停机，专用候选唯一运行并通过新的只读资格核验。P04 专机已退役。[当前候选记录](../devlogs/2026-W47.md#2026-11-22-连续-l6-六步实测)
+日常复用 `Debian13-ARM64` / `Windows11-ARM64`，干净基线只作备份。11-22 停机后的只读复核显示五台登记 VM 全停，`upgrade_quiesced` 专机配置、EFI、磁盘零句柄。P04 专机和原连续 L6 专机已退役。通用 Debian 与现有专机分别有独立 UUID、载体和磁盘，符合当前宿主选机条件。[P05C 验收方案](../runbooks/linux-p05c-acceptance.md)
 
 1. 留存的旧证据只用于历史审阅。迁移映射见 `datas/_organization/2026-11-01/`。旧 Move、adopt 和物化控制仅用于审阅历史，后续实机前门按新 source/pair 和实际载体重新建立。
 2. 通用测试机之外最多保留一台 RadishLex 专用 VM，按根协作约定计数。现有专用载体超额时暂停新增，按精确清单取得退役授权并核验后再安排专用 guest。
@@ -124,7 +124,7 @@ V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair �
 git diff --check
 ```
 
-上述入口覆盖八个crash合同和现有L6控制，但不替代实机。release-pair 门禁验证冻结声明及合成合同，不表示当前 build 40 满足旧 pair 的 target 资格；实际构建仍需通过独立资格检查。`upgrade_quiesced`、连续L6与发布未闭合；其余五个真实crash转为hardening。
+上述入口覆盖八个 crash 合同和现有 L6 控制。当前包对的实际构建资格、连续 L6 与真实恢复证据见本页证据摘要。独立 P05C 和 M5 退出评审仍开放。
 
 ## 阅读索引
 
@@ -135,4 +135,5 @@ git diff --check
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
 - [Linux L6 Debian package matrix runbook](../runbooks/linux-l6-package-matrix.md)
 - [Linux L6 收敛与本地资产生命周期](../runbooks/linux-l6-asset-lifecycle.md)
+- [Linux P05C 独立实机验收方案](../runbooks/linux-p05c-acceptance.md)
 - [本周周志](../devlogs/2026-W47.md)
