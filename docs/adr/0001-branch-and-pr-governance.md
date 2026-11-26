@@ -85,3 +85,9 @@ git rev-list --left-right --count origin/master...dev
 - 合并完成不能视为本轮 Git 收尾；必须继续完成 dev 推送和祖先关系复核。
 - 如果未来启用 dev 保护，回同步需要额外的同步 PR 与 required checks。
 - `dev` 直接 push 不获得远端检查反馈，因此直接提交者必须承担本地验证责任；如希望强制所有开发者通过检查，需要另行启用 `dev` 保护。
+
+## 二进制资产门禁
+
+本仓采用 [Radish 系列资产规则 v1](https://github.com/RadishIntelligence/.github/tree/main/asset-policy/v1)。单个二进制超过 5 MiB 时须登记例外，新增二进制合计超过 10 MiB 时提示复核。本仓的输出路径和例外以 [policy.tsv](../../.radish-assets/policy.tsv) 为准。
+
+新克隆在仓库根目录运行 `git config --local core.hooksPath .githooks` 启用本地钩子。PR 检查会核对新增提交中的资产。可用 `bash .radish-assets/check.sh --staged` 检查暂存区。
