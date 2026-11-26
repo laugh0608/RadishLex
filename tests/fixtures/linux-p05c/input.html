@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>P05C · Electron 输入验收</title>
+  <style>
+    body { max-width: 38rem; margin: 2rem auto; padding: 0 1rem; font: 1rem/1.5 system-ui, sans-serif; }
+    h1 { font-size: 1.5rem; }
+    label, #editable-label { display: block; margin-top: 1rem; }
+    input, textarea, [contenteditable] { box-sizing: border-box; width: 100%; padding: .4rem; font: inherit; }
+    [contenteditable] { min-height: 3rem; border: 1px solid currentColor; }
+  </style>
+</head>
+<body spellcheck="false">
+  <main>
+    <h1>Electron 输入验收</h1>
+    <p>仅输入合成文本。用 Tab 切换字段，用 Shift+Tab 返回。</p>
+    <label for="ordinary">普通文本</label>
+    <input id="ordinary" type="text" autocomplete="off" autofocus>
+    <label for="password">密码（仅用合成文本）</label>
+    <input id="password" type="password" autocomplete="off">
+    <label for="multiline">多行文本</label>
+    <textarea id="multiline" rows="2" autocomplete="off"></textarea>
+    <span id="editable-label">可编辑区域</span>
+    <div contenteditable="plaintext-only" role="textbox" aria-multiline="true" aria-labelledby="editable-label"></div>
+  </main>
+</body>
+</html>
