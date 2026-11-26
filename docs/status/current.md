@@ -5,7 +5,7 @@
 ## 当前判断
 
 - 11-14 收尾：R `65a4147` 固定受审 `40-2` seed。T `fa3b2c5` 通过完整仓库验证，ARM64 `40-3` 新 pair 已完成独立实物核验及宿主回读。macOS仍为09-09 source39恢复，`rolled_back`/`aborted_preserved`，材料保留、双组件停止。常态分支`dev`，主线`master`。
-- M5 已完成当前包对的连续 L6 与 `upgrade_quiesced` 恢复。P05C 的离线 `40-2` 桌面材料已部署，A 批资格待复核。
+- M5 已完成当前包对的连续 L6 与 `upgrade_quiesced` 恢复。P05C A 批只读资格通过，B 批升级待批。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - T 基线已通过八个自动合同。三个代表 crash 实机证据见下文，其余五个真实 crash 留作后续强化。
 
@@ -74,12 +74,12 @@
 
 ## 下一阶段：Linux M5 交付收口
 
-11-26 21:41 通用 Debian 仍在同一离线 boot。35 个桌面依赖已安装，三份测试文件与 Electron 的 74 个文件已核验，产品为 `40-2`。[部署记录](../devlogs/2026-W48.md#2026-11-26-桌面测试文件与-electron-离线部署) · [基线审计](../remediation/linux-m5-delivery-baseline-audit.md)
+11-26 21:48 通用 Debian 的 A 批 37 项只读复核通过，仍为离线 `40-2 / completed / install / chain=1`。[资格与 B 批申请](../devlogs/2026-W48.md#2026-11-26-p05c-a-批只读资格复核) · [基线审计](../remediation/linux-m5-delivery-baseline-audit.md)
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | 只读复核 P05C A 批资格，待批 | 核对前端与应用、会话入口、账号与进程静止、安装基线及隔离条件，再报 B 批升级 |
-| 2 | 固定 `40-3` 的独立实机验收 | 按批批准候选升级、合成账号和桌面测试。覆盖 Wayland/X11、多应用、多 session、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库与重启。维护零写入与产品行为分别归档 |
+| 1 | B 批 `40-2 → 40-3` 单次升级，待批 | 复验同一 boot 与 5 件锁定输入，核对实际 dpkg、升级 receipt、28 项文件、双端门禁与合成账号 XDG |
+| 2 | 固定 `40-3` 的独立实机验收 | 合成账号和桌面测试另批。覆盖 Wayland/X11、多应用、多 session、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库与重启。维护零写入与产品行为分别归档 |
 | 3 | M5 退出评审 | 核对独立 P05C、代表 crash 适用域和常规及专项验证，关闭阻塞退出的缺陷，登记残余限制 |
 
 V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair 见[日终记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。[合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用；guest 已安装，不清理后冒充 fresh。
