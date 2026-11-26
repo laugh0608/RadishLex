@@ -43,8 +43,8 @@ test ! -e /home/radishlex-p05c && test ! -L /home/radishlex-p05c
 预计 15–25 分钟。先独立确认 A 的 boot、仅 loopback、R 的封存材料、actual pair、source completed receipt、staging 和进程静止。用经逐字节回读的私有输入，为这一批生成一个 guest 内 operation ID，执行一次下列命令。实际 guest 绝对路径、输入文件 mode/owner、执行器和证据摘要在本批审批时锁定。
 
 ```bash
-"$verified_maintenance" --authorized-system-mutation --preserve-user-data \
-  start --operation-id "$operation_id" --kind upgrade \
+"$verified_maintenance" start --authorized-system-mutation --preserve-user-data \
+  --operation-id "$operation_id" --kind upgrade \
   --source-deb "$source_deb" --source-evidence "$source_evidence" \
   --target-deb "$target_deb" --target-evidence "$target_evidence"
 ```

@@ -5,7 +5,7 @@
 ## 当前判断
 
 - 11-14 收尾：R `65a4147` 固定受审 `40-2` seed。T `fa3b2c5` 通过完整仓库验证，ARM64 `40-3` 新 pair 已完成独立实物核验及宿主回读。macOS仍为09-09 source39恢复，`rolled_back`/`aborted_preserved`，材料保留、双组件停止。常态分支`dev`，主线`master`。
-- M5 已完成当前包对的连续 L6 与 `upgrade_quiesced` 恢复。P05C A 批只读资格通过，B 批升级待批。
+- M5 已完成当前包对的连续 L6 与 `upgrade_quiesced` 恢复。P05C B 批已升级至 `40-3`，C 批桌面验收待批。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - T 基线已通过八个自动合同。三个代表 crash 实机证据见下文，其余五个真实 crash 留作后续强化。
 
@@ -51,7 +51,7 @@
 
 ## 停止线
 
-- [R 记录](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)固定 S `c038602` 和源材料。通用 Debian 已在本次 boot 核实 `40-2`。A 批启动及已有报告回读均已执行，现保留现场。原连续 L6 专机已退役，终态副本与 S0/S1/S2、固定包对和持久证据保留。`upgrade_quiesced` 专机仍占用唯一专机名额。
+- [R 记录](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)固定 S `c038602` 和源材料。通用 Debian 保留 B 批 `40-3` 现场、私有输入与 receipt。原连续 L6 专机已退役，终态副本与 S0/S1/S2、固定包对和持久证据保留。`upgrade_quiesced` 专机仍占用唯一专机名额。
 - macOS `aad9cf8ac2dae71b2b659e96a91ea706` 已为外层 `rolled_back` / 数据 `aborted_preserved`。源 39 双程序已恢复，target 40 保留在同 operation 的两个 `staged.app`；原 DB/WAL/SHM、snapshot/candidate/settings backup、独立恢复证据、原 39/40 与恢复 Installer 全部保留。输入源未选中、Manager/InputMethod 停止、privacy false，恢复 Installer 保持终态窗口。实际恢复授权已完成，不点“重新执行”/移除，不手动 checkpoint/删除 sidecar，不清理或启动双组件/输入测试；后续 WAL 新升级合同及系统动作另行确定范围。
 - 五批均闭合`deleted`，第五批manifest为`a65abab2…1b106`；授权均已消费，不得复跑。
 - 第五批证据、projection 与 S2 的留存证据冻结，三台 bundle 已 absent；不得恢复、重建、注册或复用。
@@ -74,12 +74,12 @@
 
 ## 下一阶段：Linux M5 交付收口
 
-11-26 21:48 通用 Debian 的 A 批 37 项只读复核通过，仍为离线 `40-2 / completed / install / chain=1`。[资格与 B 批申请](../devlogs/2026-W48.md#2026-11-26-p05c-a-批只读资格复核) · [基线审计](../remediation/linux-m5-delivery-baseline-audit.md)
+11-26 22:06 通用 Debian 已在 A 批同一离线 boot 完成一次升级，终态为 `40-3 / completed / upgrade / chain=2`。[B 批实测](../devlogs/2026-W48.md#2026-11-26-p05c-b-批单次升级) · [基线审计](../remediation/linux-m5-delivery-baseline-audit.md)
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | B 批 `40-2 → 40-3` 单次升级，待批 | 复验同一 boot 与 5 件锁定输入，核对实际 dpkg、升级 receipt、28 项文件、双端门禁与合成账号 XDG |
-| 2 | 固定 `40-3` 的独立实机验收 | 合成账号和桌面测试另批。覆盖 Wayland/X11、多应用、多 session、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库与重启。维护零写入与产品行为分别归档 |
+| 1 | C 批合成账号准备，待批 | 复核 `40-3` 和账号初态，创建普通本地账号 `radishlex-p05c`、同名组及私有空 home，核对归属与权限 |
+| 2 | C 批桌面实测与 D 批冷启动 | 分别授权。覆盖 Wayland/X11、多应用与多 session、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库及重启持久化 |
 | 3 | M5 退出评审 | 核对独立 P05C、代表 crash 适用域和常规及专项验证，关闭阻塞退出的缺陷，登记残余限制 |
 
 V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair 见[日终记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。[合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用；guest 已安装，不清理后冒充 fresh。
