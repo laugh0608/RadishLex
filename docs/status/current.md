@@ -5,7 +5,7 @@
 ## 当前判断
 
 - 11-14 收尾：R `65a4147` 固定受审 `40-2` seed。T `fa3b2c5` 通过完整仓库验证，ARM64 `40-3` 新 pair 已完成独立实物核验及宿主回读。macOS仍为09-09 source39恢复，`rolled_back`/`aborted_preserved`，材料保留、双组件停止。常态分支`dev`，主线`master`。
-- M5 已完成当前包对的连续 L6 与 `upgrade_quiesced` 恢复。P05C B 批已升级至 `40-3`，C 批合成账号已在新离线 boot 建立，桌面登录待批。
+- M5 已完成当前包对的连续 L6 与 `upgrade_quiesced` 恢复。P05C B 批已升级至 `40-3`，C 批合成账号已建立，首次 Wayland 登录已获准，等候本地输入。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - T 基线已通过八个自动合同。三个代表 crash 实机证据见下文，其余五个真实 crash 留作后续强化。
 
@@ -78,7 +78,7 @@
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | C 批 Wayland 桌面登录待批 | 仅为 `radishlex-p05c` 准备本地登录并核对实际会话 UID、类型及用户目录归属 |
+| 1 | C 批 Wayland 登录已获准 | [guest 本地密码提示已打开](../devlogs/2026-W48.md#2026-11-27-c-批-wayland-首次登录)。登录后核验会话 UID、类型与目录归属 |
 | 2 | C 批桌面实测与 D 批冷启动 | 分别授权。覆盖 Wayland/X11、多应用与多 session、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库及重启持久化 |
 | 3 | M5 退出评审 | 核对独立 P05C、代表 crash 适用域和常规及专项验证，关闭阻塞退出的缺陷，登记残余限制 |
 
