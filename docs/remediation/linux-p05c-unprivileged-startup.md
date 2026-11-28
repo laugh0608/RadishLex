@@ -1,22 +1,22 @@
 # Linux P05C 普通用户启动检查修复设计
 
-本提案供 Linux 安装维护、Fcitx5 和 Manager 实现者评审。目标是让普通桌面用户能在已验证的 Debian 系统安装上启动产品，同时保留维护端对恢复材料的私有访问。本文定义建议的实现与验收条件。现行合同仍见 [Linux 安装维护边界](../linux-installation-maintenance-boundary.md#数据保留与启动门禁)，实施和实机操作分别授权。
+11 月 28 日已按批准的设计完成仓库实现。维护端核验私有恢复材料，普通桌面用户凭绑定终态的记录核验当前安装。Debian ARM64 容器已覆盖 Manager 和 Fcitx 的 Rust 启动判定，新候选及真实桌面验收待准入。[验证记录](../devlogs/2026-W48.md#2026-11-28-普通用户启动检查仓库实现) · [安装维护合同](../linux-installation-maintenance-boundary.md#数据保留与启动门禁)
 
 ## 阻塞发生在哪里
 
 11 月 27 日，普通用户已在聚焦的 Qt 字段切到 RadishLex，Fcitx5 在创建引擎前报告 `FailedClosed / PermissionDenied`。此前 B 批从 root 调用双端 FFI 得到 `AllowedProduct`。这两次观察的调用身份不同。Manager GUI 尚无本轮普通用户结果，日志也未记录首次拒绝访问的路径。[P05C 实机记录](../devlogs/2026-W48.md#2026-11-27-qt-普通字段无候选)
 
-| 启动时的读取 | 现行实现及权限 | 建议职责 |
+| 启动时的读取 | 冻结的 `40-3` 行为 | 修复后职责 |
 | --- | --- | --- |
 | 安装状态 | 状态根及 `operations/` 为 `root:root 0755`，规范 receipt 为 `root:root 0644`。读取 receipt 时会进一步枚举当前及历史 `0700` 操作目录的内部成员 | 双端继续核验状态根、guard、临时文件、receipt、可见操作目录的名称集合和目录自身身份。目录内部成员由维护端检查。[只读状态检查](../../platforms/linux-product/src/startup/read_only_state.rs) |
 | 包与依赖 | 启动时会重新打开 `0600` 的已暂存包和 evidence，验证实际包，再用展开后的完整 `Depends` 校验 dpkg。安装 manifest 的 `hard_dependencies` 含构建替换项，不能还原全部约束 | 维护端从实际包取得依赖清单。桌面端用该清单独立校验当时的 dpkg 状态。[包关系检查](../../platforms/linux-product/src/startup/system_port.rs) · [manifest 与 control 的关系](../../platforms/linux-product/src/debian/relationship/manifest.rs) |
 | 当前运行组件 | 双端共用 startup FFI，分别验证 Manager bundle 或 Fcitx addon、RimeData 和 metadata，并交叉校验两份 FFI | 继续按实际组件路径、symbol origin、manifest 摘要和组件清单检查，在 Flutter 或输入引擎业务初始化前作决定。[组件校验](../../platforms/linux-product/src/startup/system_port/manifest.rs) · [startup FFI](../../crates/ime-ffi/src/linux_product_startup.rs) |
 
-## 建议采用的权限边界
+## 启动核验记录的权限边界
 
 由维护执行器在终态校验后写一份普通用户只读的**启动核验记录**。安装事务仍以 v1 receipt 为准。每个使用新 gate 的进程都执行同一只读检查，包括从 root 发起的诊断调用。用户输入、XDG、网络和后台特权服务均不参与这个决定。
 
-建议固定文件为 `/var/lib/radishlex/startup-v1.json`。将它放在 `install-v1/` 旁边，保留旧 reader 对状态根成员的严格白名单。复用受信的 `root:root 0755` 父目录。记录使用规范 UTF-8 JSON、固定字段顺序、单行和末尾换行。建议上限 128 KiB，足以容纳现行 64 KiB control 中展开的依赖及 JSON 开销。读写两端校验编码、类型、长度和字段集合，拒绝未知格式、重复字段或重复依赖。
+固定文件为 `/var/lib/radishlex/startup-v1.json`。将它放在 `install-v1/` 旁边，保留旧 reader 对状态根成员的严格白名单。复用受信的 `root:root 0755` 父目录。记录使用规范 UTF-8 JSON、固定字段顺序、单行和末尾换行。上限为 128 KiB，足以容纳现行 64 KiB control 中展开的依赖及 JSON 开销。读写两端校验编码、类型、长度和字段集合，拒绝未知格式、重复字段或重复依赖。
 
 | 字段 | 来源与作用 |
 | --- | --- |
@@ -26,14 +26,14 @@
 
 记录必须是固定路径的 `root:root 0644` 单链接常规文件。通过安全父目录、无链接的固定叶名及打开前后身份比对读取。每个操作目录继续使用 `0700`，暂存包和 evidence 继续使用 `0600`。维护端保留当前所有 slot、私有文件 owner/mode/link/device/inode/size/hash 与实际包关系校验。历史操作只校验 v1 实际记录的结构和文件元数据。[维护存储](../../platforms/linux-product/src/store.rs) · [现有包和依赖类型](../../platforms/linux-product/src/debian/relationship/mod.rs)
 
-**待评审的取舍。** 每次启动实时验证依赖、当前组件及其安装证据。若只有私有暂存字节在终态后变化，检测时点是下次特权复核。维护端必须在再次出具记录、mutation、retry 或恢复前拒绝漂移。给桌面用户开放暂存会扩大恢复材料的读权限。把依赖清单放进新版 receipt 可以减少一个文件，却要求旧 reader 和恢复工具识别新的事务格式。建议保留 v1 receipt，通过以下写入顺序维持一致性。
+每次启动实时验证依赖、当前组件及其安装证据。若只有私有暂存字节在终态后变化，检测时点是下次特权复核。维护端必须在再次出具记录、mutation、retry 或恢复前拒绝漂移。给桌面用户开放暂存会扩大恢复材料的读权限。把依赖清单放进新版 receipt 可以减少一个文件，却要求旧 reader 和恢复工具识别新的事务格式。v1 receipt 与核验记录按以下顺序持久化。
 
 ## 维护端何时撤销和出具记录
 
 1. **开始新操作。** 在现有独占 guard 下验证原 receipt 和既有记录的路径、身份及绑定。若有合法的旧记录，先撤下它并同步父目录，再复核私有材料、写入新 `prepared` 或进入任何包变更。记录缺失的旧安装按下文的源资格处理。未知文件、绑定错误或不明临时文件保留现场并拒绝操作。即使新操作尚未写入 receipt 就中断，旧记录也不能继续放行。guard 存在期间双端始终阻断。
 2. **完成事务。** 保留现有 receipt 状态机及 `fsync → rename → 父目录 fsync` 顺序。在 guard 内回读已持久化的终态，按 `installed_artifact()` 取目标或保留/恢复的源。逐项复核当前操作的暂存关系、历史目录结构、实际包/evidence、当前 dpkg 及其依赖、完整已安装产品。repair 的 source/target 身份相等时可使用本操作已记录且完全匹配的 target slot。只有原身份、实物与当前系统全都一致，才可出具记录。这也要求独立核验 `aborted_preserved` 的源。有程序但证明不足时保留事务原终态，维护调用返回启动资格未就绪。
 3. **持久化。** 在同一父目录独占创建 `startup-v1.json.tmp`，以私有模式完整写入，同步内容，设为 `0644` 并再次同步。校验身份后原子 rename，随后同步父目录，并从最终路径回读内容与 receipt。完成这一步才释放 guard 并报告产品可启动。已移除或无源可恢复的首次安装终态保留“无记录”。出现意外记录或临时对象时停止并保留现场。
-4. **中断和重入。** `start`、`resume` 及提前结束的终态分支共用上述收尾。receipt 已终态而记录缺失时，桌面端拒绝启动。另行授权的维护端持 guard，以精确 operation 和制品复核私有材料与实际系统。正确记录可幂等确认，缺失时只补同一终态记录。若发现私有材料漂移，须在 guard 下撤销仍与本终态绑定的合法记录并同步父目录，保留私有现场并报错。恢复仅在临时文件身份安全且字节与重新推导结果完全一致时续完发布。部分字节、来源不明或绑定错误保留待处置。终态收尾不再执行 dpkg 或追加 operation。现行代码直接返回终态，需要覆盖该分支。[维护入口](../../platforms/linux-product/src/system/host.rs) · [事务终态分支](../../platforms/linux-product/src/coordinator.rs)
+4. **中断和重入。** `start`、`resume` 及提前结束的终态分支共用上述收尾。receipt 已终态而记录缺失时，桌面端拒绝启动。另行授权的维护端持 guard，以精确 operation 和制品复核私有材料与实际系统。正确记录可幂等确认，缺失时只补同一终态记录。若发现私有材料漂移，须在 guard 下撤销仍与本终态绑定的合法记录并同步父目录，保留私有现场并报错。恢复仅在临时文件身份安全且字节与重新推导结果完全一致时续完发布。部分字节、来源不明或绑定错误保留待处置。终态收尾不再执行 dpkg 或追加 operation。维护入口对新事务、恢复及已终态的重入执行相同的终态复核。[维护入口](../../platforms/linux-product/src/system/host.rs) · [事务终态分支](../../platforms/linux-product/src/coordinator.rs)
 
 ## 普通用户如何判定
 
@@ -64,7 +64,7 @@
 
 ## 实施与回归的验收条件
 
-先在 `platforms/linux-product` 实现维护端出具与恢复、桌面端只读判定及共用的 Debian 校验。随后通过现有 startup FFI 和两个生产入口验证调用顺序。各层验收记录候选身份、有效 UID、预期与实际决定、可观察的后置条件。所有条目都是待执行项。
+下表定义整体验收范围。本轮已覆盖普通用户权限故障、终态补发与撤销、桌面读取中出现维护或文件替换的定向用例。实际通过项见[本周记录](../devlogs/2026-W48.md#2026-11-28-普通用户启动检查仓库实现)。逐操作中断与连续恢复、候选原生组件加载及真实桌面结果须分别取证。
 
 | 层次 | 必须取得的证据 |
 | --- | --- |
@@ -73,4 +73,4 @@
 | 读写并发与开发隔离 | 用可控屏障让 guard 或新 receipt 在桌面读取中途出现，亦覆盖一次完整变更穿过读取窗口。再测试桌面已通过而维护端申请静止许可的顺序。分别证明旧决定不能放行新安装、已映射的运行组件能阻止 mutation。覆盖仅残留记录的 development build 和缺 receipt 的 product build |
 | 真实 P05C | 独立授权后，先在离线 Wayland 的 Qt 普通字段确认焦点及当前输入法，人工输入合成 `nihao`，同时观察预编辑与中文候选，按 Esc 后预编辑和候选消失、字段为空。以同一普通用户独立启动 Manager 并确认进入产品模式。两条通过后继续 C 批多应用、多 session、隐私/普通恢复、学习和删除/tombstone、Manager 同库，再单独执行 D 批冷启动持久化 |
 
-仓库实现时以现有 [startup gate 检查](../../scripts/check-linux-startup-gate.sh) 和[事务检查](../../scripts/check-linux-package-transaction.sh)承载定向回归，补足现有 fixture 用当前目录 owner 模拟身份的缺口。涉及包对、连续维护及 crash 的正式验证范围随新候选评审，完整门禁逐轮授权。合成 EUID 检查与真实 Qt/Manager 桌面证据分别留存。
+使用已有 Debian ARM64 镜像和对应 Linux libtest 可执行文件，运行 `./scripts/check-linux-startup-unprivileged.sh LOCAL_IMAGE LINUX_TEST_EXECUTABLE` 可重放本轮权限回归。脚本断网、禁止拉取镜像，仅在独立 tmpfs 布置合成系统安装，子进程以无附加组和有效 capabilities 的 UID/GID 65534 分别核验两个组件。正式 [startup gate 检查](../../scripts/check-linux-startup-gate.sh)、[事务检查](../../scripts/check-linux-package-transaction.sh)及新候选的连续维护与 crash 验证按适用范围另行授权。

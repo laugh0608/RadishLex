@@ -291,20 +291,20 @@ Manager 与 addon 的 product build 必须在 Flutter engine/settings/userdb 或
 
 | 现场 | 结果 |
 | --- | --- |
-| terminal install/upgrade/repair/rollback 且 running component/manifest 匹配 | 允许继续 |
-| 无 system receipt 的明确 development build | 仅允许既有显式开发模式 |
-| nonterminal、guard active、tmp receipt、dpkg 非 Installed | `maintenance_required` |
+| 有已安装制品的合法终态、绑定核验记录、dpkg、依赖与当前组件全部匹配 | 允许继续 |
+| 系统状态及记录均缺失且 dpkg 为 NotInstalled 的 development build | 仅允许既有显式开发模式 |
+| nonterminal、活动 guard、合法临时文件、已安装终态缺核验记录、dpkg 半配置 | `maintenance_required` |
 | completed remove、未知 receipt/identity、manifest/hash/owner/link/ABI 漂移 | 失败关闭 |
-| 字体或系统 dependency 不满足 | startup 已从 terminal actual package/evidence 重建 relationship并拒绝；真实 family/glyph/owner 留 L6 |
+| 字体或系统 dependency 不满足 | 按记录内完整 Depends 核对当前 dpkg 并拒绝启动。真实字体 family/glyph/owner 另由 L6 取证 |
 
 production build 不得把“receipt 缺失”解释为首次启动成功，也不得回退 fixture、仓库 `.so`、`LD_LIBRARY_PATH`、用户级 staging 或在线下载。开发 build 与 product build 的 gate 必须在编译身份上分离。
 
-当前只读实现固定为：
+维护端在独占 guard 内复核私有暂存、实际包及 evidence、dpkg 和完整安装。对有已安装制品的终态，在状态根旁原子发布 `root:root 0644` 的 `/var/lib/radishlex/startup-v1.json`，绑定规范 receipt 的 SHA-256 和实际包中展开的 Depends。新操作先撤销合法旧记录，同一终态可持 guard 复核并补发。发现私有材料漂移时撤销已有资格并保留现场。[写入与恢复协议](remediation/linux-p05c-unprivileged-startup.md#维护端何时撤销和出具记录)
 
 - `LinuxSystemStartupPort` 直接读取并严格解析 `/var/lib/dpkg/status`，不执行 `dpkg-query`、`dpkg`、shell 或其他 package mutation 命令；状态文件不可读、重复 package paragraph、未知 tuple 或不完整 identity 都失败关闭。
-- 检查顺序先于业务初始化：root/state、active/异常 guard、`receipt.json.tmp`、receipt 与 operation state，再检查 package state、terminal installed artifact、canonical product manifest 与当前 component scope。terminal receipt 引用的 source/target staging 必须按 receipt proof 重新验证固定 slot、file identity、owner/mode/link/size/hash，不能只信 receipt 文本或遗留路径。observer 不创建 state root、不清理 stale guard/tmp/receipt、不打开 XDG/userdb/settings/privacy/Rime。
-- `development-staged` 只在 system receipt/state 均不存在且 package 严格为 `NotInstalled` 时得到 `AllowedDevelopment`；`debian-system-product` 缺 receipt 失败关闭。开发 build 遇到任何 system receipt 也按身份隔离拒绝，不能借 development profile 绕过维护现场。
-- terminal install/upgrade/repair/rollback 的目标，或失败恢复后的 source，只有 actual staged `.deb`/evidence、package/version/architecture、完整 dependency relationship 与 component 身份完全一致才得到 `AllowedProduct`；nonterminal、active guard、Config-Files/半配置、unmanaged package、completed remove、首次安装失败无 source 和任何身份漂移均要求维护或失败关闭。Manager scope 复验完整 bundle tree；Fcitx scope 复验 addon、同目录 FFI、固定 RimeData、两份 metadata，并交叉验证 Manager/Fcitx 两份 FFI equivalence。该运行时 scope 不执行 fontconfig family/glyph probe，也不冒充 L6 的全系统验证。
+- 桌面端检查 root/state、guard、receipt 与记录的临时文件、规范 receipt、可见操作目录及核验记录。读取一份 dpkg 快照验证安装身份和依赖，再验证 manifest、当前组件及双 FFI。放行前再次核对可见状态及文件身份。操作目录为 `0700`，包及 evidence 为 `0600`，内部材料只由维护端访问。桌面检查只读，并先于 XDG、userdb、settings、privacy 和 Rime 初始化。
+- `development-staged` 只在 system receipt/state、启动核验记录和临时对象均不存在且 package 严格为 `NotInstalled` 时得到 `AllowedDevelopment`；`debian-system-product` 缺 receipt 失败关闭。开发 build 遇到任何 system receipt 也按身份隔离拒绝，不能借 development profile 绕过维护现场。
+- terminal install/upgrade/repair/rollback 的目标，或失败恢复后的 source，只有终态记录与 receipt 绑定，且当前 package/version/architecture、完整依赖与组件身份全部匹配才得到 `AllowedProduct`；nonterminal、active guard、Config-Files/半配置、unmanaged package、completed remove、首次安装失败无 source 和任何身份漂移均要求维护或失败关闭。Manager scope 复验完整 bundle tree；Fcitx scope 复验 addon、同目录 FFI、固定 RimeData、两份 metadata，并交叉验证 Manager/Fcitx 两份 FFI equivalence。该运行时 scope 不执行 fontconfig family/glyph probe，也不冒充 L6 的全系统验证。
 - Manager runner 在设置 `umask(0077)` 后、创建 Flutter application/engine 前调用；Fcitx factory 在构造 `Engine` 前取得 move-only startup permit，因此 Engine constructor 内的 input FFI、XDG、privacy 与 Rime 初始化均晚于 gate。共用 C++ binding 在调用 startup ABI 前用 `dladdr` 与 canonical path 验证 startup/error symbols 确实来自当前 component 的精确 sibling FFI；Fcitx 还验证全部输入热路径 FFI symbol origin，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。
 - `radishlex_linux_product_startup_gate` 使用独立 request/result v1，携带编译 build identity、component 与由 host 从已加载 executable/shared object 取得的 canonical component path；它是 additive Linux startup ABI，输入 session/key ABI contract 仍为 v9。
 
@@ -356,7 +356,7 @@ privileged host 只暴露不可直接构造的 `LinuxMaintenanceCommand`。CLI �
 
 已由稳定双结果与completed phase闭合的现场，只能经独立授权的terminal stop控制结束host runtime。控制先递归绑定completed manifest、source/target与旧baseline，再以一次preflight inventory要求仅target started或全部stopped；started分支必须把当前PID和EFI/qcow2双句柄连续绑定后，至多发送一次`utmctl stop UUID --request`，stopped分支不得重复stop。随后只允许有界host process/lsof静止观察、一次terminal inventory、无UTM backend/target句柄与target固定身份复核。清单、命令返回、句柄、backend或后置身份任一不一致都保持`state-indeterminate`；不得使用status/start、guest/file transport、resume/dpkg、retry/repair/cleanup、force/kill或quit补救。
 
-L5 当前由 `./scripts/check-linux-startup-gate.sh` 闭合仓库内只读 decision 与初始化顺序合同：Rust fake/system-port 测试覆盖状态矩阵、staging proof、真实格式的 synthetic Manager bundle/Fcitx component scope、双 FFI equivalence 与目录零写入；C++ contract 分别编译 `development-staged`、`debian-system-product` 两种身份并拒绝交叉 allow，另以编译和源码合同固定 sibling symbol-origin 校验先于 gate 调用；源码顺序门禁固定 Manager 的 `umask -> gate -> Flutter` 与 Fcitx 的 `gate -> Engine/input FFI/XDG/Rime`。动态 preload/错误 sibling 拒绝仍须在新的 Linux payload 中复验；该 L5 不等于全 package runtime inventory、ARM64 product payload、Debian package lifecycle 或真实桌面启动证据。
+L5 当前由 `./scripts/check-linux-startup-gate.sh` 闭合仓库内只读 decision 与初始化顺序合同：Rust fake/system-port 测试覆盖状态矩阵、终态记录绑定、真实格式的 synthetic Manager bundle/Fcitx component scope、双 FFI equivalence 与目录零写入；C++ contract 分别编译 `development-staged`、`debian-system-product` 两种身份并拒绝交叉 allow，另以编译和源码合同固定 sibling symbol-origin 校验先于 gate 调用；源码顺序门禁固定 Manager 的 `umask -> gate -> Flutter` 与 Fcitx 的 `gate -> Engine/input FFI/XDG/Rime`。动态 preload/错误 sibling 拒绝仍须在新的 Linux payload 中复验；该 L5 不等于全 package runtime inventory、ARM64 product payload、Debian package lifecycle 或真实桌面启动证据。
 
 L6 输入合同由 `packaging/linux/l6-matrix.json`、`scripts/linux-product/l6_contract.py` 与 `./scripts/check-linux-l6-contract.sh` 固定：profile 为 `debian13-arm64-ephemeral-v1`，专用用户为 `radishlex-l6`；source/target 必须来自不同 commit 的相邻 Debian revision并保持 product/build/data contract相同；主序列固定 install→upgrade→repair→rollback→remove→reinstall，另有八个完成/回退 crash checkpoint。probe 同时覆盖 actual dependency、字体 family/glyph/owner、Manager/Fcitx startup 正负向、XDG fingerprint、dpkg/procfs 与完整 inventory。该门禁只验证 matrix、不运行 controller或连接 guest，也不证明 L6 已执行；详细步骤见 [Linux L6 Debian package matrix runbook](runbooks/linux-l6-package-matrix.md)。
 

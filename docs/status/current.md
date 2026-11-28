@@ -78,7 +78,7 @@
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | C 批普通用户启动受阻 | 11-28 [修复提案](../remediation/linux-p05c-unprivileged-startup.md)待批。实施后以普通用户复验 Qt 候选、Esc 取消和 Manager 启动。[实机诊断](../devlogs/2026-W48.md#2026-11-27-qt-普通字段无候选) |
+| 1 | C 批普通用户启动受阻 | [仓库修复与非特权回归](../remediation/linux-p05c-unprivileged-startup.md)已通过。新候选待准入，再验 Qt 候选、Esc 与 Manager。[实机诊断](../devlogs/2026-W48.md#2026-11-27-qt-普通字段无候选) |
 | 2 | C 批桌面实测与 D 批冷启动 | 分别授权。覆盖 Wayland/X11、多应用与多 session、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库及重启持久化 |
 | 3 | M5 退出评审 | 核对独立 P05C、代表 crash 适用域和常规及专项验证，关闭阻塞退出的缺陷，登记残余限制 |
 
@@ -90,7 +90,7 @@ V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair �
 
 后置：macOS WAL 新升级及 Q2/F0/W0/最终取消、其余五个真实 crash hardening、新 VM 管理/clone/迁移框架、Android/Windows/iOS、真实用户同步，以及无新热点的性能/CI 极限优化。macOS action `10–13` 与已有自动证据保留，冻结现场不重试真实 40；完整发布顺序不变。
 
-继续使用固定 `40-2 → 40-3` 包对。先推进表中的现成验收路径，只有当前候选出现直接阻塞退出的实际缺陷时，才增加针对根因的修复和回归。环境受阻时记录具体 guest、起点与恢复条件。真实维护操作、VM 和完整门禁分项授权。
+冻结 `40-2 → 40-3` 包对及其证据。新目标须使用新 Debian revision，先评审 source seed 和原证据适用域。制品装配、实机维护、VM 和完整门禁分项授权。
 
 ## Linux M5 系统操作停止线
 
