@@ -56,7 +56,7 @@
 
 冻结的 `40-2 → 40-3`、原执行器和既有证据保留原身份。新记录无法改变旧二进制中的读目录行为，单独刷新维护执行器也不能修复 Fcitx5 或 Manager。
 
-评审选定 `40-3 → 40-4`。已复核原包、evidence 与交接清单，仓库准入只接受这份冻结的 `40-3` 作源。通用 Debian 的 `completed / upgrade / chain=2` 是后续 P05C 升级起点，L6 留存的重装为 `completed / install / chain=6`。两者均不满足 source-first 要求的首次安装 `not_installed → completed / install / chain=1`。专机已取得首次安装 seed `4f3ccb17…eaec`，待独立审阅及所有者确认后建立 R。[首装证据](../devlogs/2026-W48.md#2026-11-28-40-3-首次安装与-seed-归集) · [候选准入与命令](../runbooks/linux-source-first-assembly.md#从冻结的-40-3-建立-40-4-候选) · [seed 判定](../../platforms/linux-product/src/model/source_seed.rs)
+评审选定 `40-3 → 40-4`。已复核原包、evidence 与交接清单，仓库准入只接受这份冻结的 `40-3` 作源。通用 Debian 的 `completed / upgrade / chain=2` 是后续 P05C 升级起点，L6 留存的重装为 `completed / install / chain=6`。两者均不满足 source-first 要求的首次安装 `not_installed → completed / install / chain=1`。专机取得首次安装 seed `4f3ccb17…eaec`，独立审阅确认真实首装，三项证据不完整，R 仍阻塞。[审阅结论](../devlogs/2026-W48.md#2026-11-28-40-3-首装-seed-独立审阅) · [候选准入与命令](../runbooks/linux-source-first-assembly.md#从冻结的-40-3-建立-40-4-候选) · [seed 判定](../../platforms/linux-product/src/model/source_seed.rs)
 
 新包对准入通过后分别审批制品装配与实机升级。新维护端取得 guard，以旧 receipt、实际旧 source 包/evidence、私有 staging 和安装实物重新验证起点，沿正常升级追加新 operation。若从原 P05C 的 chain=2 接续，预期为同链追加至 `completed / upgrade / chain=3`。修复版本的双端与目标终态逐件取证后才进入 P05C。旧 receipt 继续使用原格式，桌面进程只读，放行依据始终来自受控系统安装。
 

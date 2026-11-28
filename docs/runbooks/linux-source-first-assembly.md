@@ -15,6 +15,16 @@ python3 -B scripts/linux-product/source_first.py --case 40-3-to-40-4 inspect-fro
 2. 单独批准实际载体和首次安装后，在符合离线、dpkg 严格未安装、状态根及指定合成 XDG 均为空等前提的 Debian 13 ARM64 环境，取得原包 `completed / install / chain=1`。用 `source_first_capture.py --case 40-3-to-40-4` 和下文既有 capture 参数归集，再用 `source_first.py --case 40-3-to-40-4 verify-seed --seed-root "$SEED"` 复核 12 类附件。对旧版启动结果记录调用身份，普通用户双端启动由新目标另验。当前 P05C 的 chain=2 现场保留供将来的升级复验。
 3. 原始材料独立审阅及所有者确认后，才能在 R 提交 `packaging/linux/source-first-40-4-baseline.json`。R 保持 `40-3` 产品元数据。T 须为 R 和修复 `d0fc8ac` 的后继，元数据及制品文件名升为 `40-4`。以新 case 调用下文的 `preflight-pair` 和 `target`，传入新 R、seed、review 及原始 `40-3` 包和 evidence。准入通过且单独批准装配后，构建目标及配套执行器。旧 baseline 和旧 review 各自固定在原包对。
 
+### 首装采集的三项复核
+
+下一次真实首装须使用新 attempt 和单独授权的严格未安装现场。上一轮的回执、载荷和停机证据继续按原 attempt 保留。下列复核供准备 guest 观察器与宿主收证程序时使用，结果与原始材料一同保存在新 attempt 独占的私有目录。[首装准入合同](../remediation/linux-m5-source-first-contract.md#2-单包首次安装不依赖完整-pair) · [11-28 审阅记录](../devlogs/2026-W48.md#2026-11-28-40-3-首装-seed-独立审阅)
+
+| 角色 | 现场采集与交叉核验 | 定向验证的失败情形 |
+| --- | --- | --- |
+| `dependencies` | 从矩阵的 `probes.font_roles` 读取字体包、family 和完整样例。安装前后分别保存实际匹配的 family、文件及 dpkg 归属，保留 fontconfig 字集或逐码点结果。以矩阵样例的每个码点核验覆盖。[矩阵](../../packaging/linux/l6-matrix.json) | 样例被缩短、任一码点缺失、family 或包归属不符。 |
+| `host-readback` | 首装前用只读探针验证所选 guest-agent 接口能返回本次调用的非空结构化输出。实际安装时，宿主保留该次调用的独立结果及退出状态，再分别拉回固定终态文件和清单。交叉核对操作摘要、终态、清单摘要及成员数。历史 `40-2` 通过 UTM 的 `get result` 取得子进程输出，可据此准备新采集器。[历史收证实现](/Users/luobo/VirtualMachines/datas/RadishLex/source-first/seed-20261113-01/control/host_stage.py) | 返回为空、截断、摘要不符，或仅有同一文件的两份副本。若发生在安装之后，保留回执与现有材料，标记收证不完整。 |
+| `input-stability` | 安装前后分别对固定输入根取 `lstat`，以 `O_DIRECTORY | O_NOFOLLOW` 打开并用 `fstat` 核对。保留目录类型、设备号、inode、UID/GID、mode 和链接数，核对两次均为同一 `root:root 0700` 真实目录。同时逐件复验四个输入的元数据与摘要。 | 后置目录记录缺失、路径被替换或变为链接、属主或权限漂移，即使四个文件的摘要都匹配。 |
+
 ## 单 artifact 与 target
 
 入口为`scripts/linux-product/source_first_build.py`：

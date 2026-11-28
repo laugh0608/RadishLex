@@ -5,7 +5,7 @@
 ## 载体与固定输入
 
 - 首选通用 `Debian13-ARM64`，UUID `755199B1-1C18-4441-8A1E-D423C8DE0022`，实际载体 `/Users/luobo/VirtualMachines/utms/Debian13-ARM64.utm`。原 A 批前检确认当时五台 VM 全停，候选 `Network=[]`、无共享目录且共享剪贴板关闭，配置、EFI、qcow2 均为独立文件且零句柄。其 qcow2 无 backing file，与当时恢复专机磁盘的文件身份不同。A 批前的系统包为 `40-2`，B 批升级到 `40-3`。[通用 Debian 原始 seed 停机记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)
-- `upgrade_quiesced` 专机已退役，配置、EFI 和终态磁盘已封存。通用 Debian 保留升级现场。从已验 S0 创建的 `40-3` 首装专机 UUID 为 `435CE261-36B6-4EC2-AB1C-7B5B1F198DFE`，磁盘独立，网卡和共享关闭。首次启动已核实离线、严格未安装及合成账号初态。同一 boot 上已用四件固定材料完成 `40-3` 首装并正常停机。宿主核验 28 个载荷和 12 类 seed 附件。旧版两端启动门的调用身份为 root，普通用户验收留给 `40-4`。[首装与归集](../devlogs/2026-W48.md#2026-11-28-40-3-首次安装与-seed-归集) 原连续 L6 和旧 P04 专机均已退役，冻结 S2 继续保留。[退役记录](../devlogs/2026-W48.md#2026-11-28-恢复专机退役)
+- `upgrade_quiesced` 专机已退役，配置、EFI 和终态磁盘已封存。通用 Debian 保留升级现场。从已验 S0 创建的 `40-3` 首装专机 UUID 为 `435CE261-36B6-4EC2-AB1C-7B5B1F198DFE`，磁盘独立，网卡和共享关闭。首次启动已核实离线、严格未安装及合成账号初态。同一 boot 上已用四件固定材料完成 `40-3` 首装并正常停机。宿主核验 28 个载荷。12 类 seed 附件的原始材料经独立审阅，三项证据不完整。[审阅结论](../devlogs/2026-W48.md#2026-11-28-40-3-首装-seed-独立审阅) 旧版两端启动门的调用身份为 root，普通用户验收留给 `40-4`。[首装与归集](../devlogs/2026-W48.md#2026-11-28-40-3-首次安装与-seed-归集) 原连续 L6 和旧 P04 专机均已退役，冻结 S2 继续保留。[退役记录](../devlogs/2026-W48.md#2026-11-28-恢复专机退役)
 - 使用 S `c038602`、R `65a4147` 和 T `fa3b2c5`。固定 pair SHA-256 `671c9633848a1a27176f978bbf28d8ecccb4ed5b8b5bdd44a85794509482507c`，生产维护执行器 `5d6c220ee7e9e0a174bd5a038c42c5bd39ce6aa0fdba002983646bf519b6ae82`。宿主已复算 pair、执行器、双侧 `.deb` 和 evidence。批次开始时逐项按 pair 再验来源、实际字节与 mode/link，保留 R 封存材料。S2 合成词库和既有账号的 XDG 不作为本轮测试输入。[固定输入归档](/Users/luobo/VirtualMachines/datas/RadishLex/source-first/target-02-d-rebuild-01/readback/pair.evidence.json)
 
 ## 分批审批与命令
