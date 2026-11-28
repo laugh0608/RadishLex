@@ -13,7 +13,9 @@
 
 ## 交付基线与验收出口
 
-本合同继续作为唯一 source-first 交付路径。S `c038602` 的真实安装为 `completed`/chain1，seed `d0bd5b7c…c820b` 已由独立审阅及所有者认可。11-14 的 [baseline](../../packaging/linux/source-first-baseline.json)固定正式 review 和 portable 附件摘要。实物核验与 S/R/T 建立过程见[周志](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)，实机维护取证与接续授权见[当前顺位](../status/current.md#下一阶段linux-m5-交付收口)。
+下文的 S/R/T 和版本表对应首个包对 `40-2 → 40-3`。S `c038602` 的真实安装为 `completed`/chain1，seed `d0bd5b7c…c820b` 已由独立审阅及所有者认可。11-14 的基线固定正式 review 和 portable 附件摘要。[首个包对基线](../../packaging/linux/source-first-baseline.json) · [实物核验](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)
+
+后继 `40-3 → 40-4` 复用上述交付顺序。其 S 取自上一包对已核验的 target 交接原件，R 另行绑定该原包的首次安装 seed 和独立 review，T 还须包含普通用户启动修复。旧包对的清单与新 R 各自绑定自己的材料。[后继候选声明](../../packaging/linux/source-first-40-4-candidate.json) · [装配手册](../runbooks/linux-source-first-assembly.md#从冻结的-40-3-建立-40-4-候选)
 
 `upgrade_quiesced` 在新包对取得独立实机证据，旧载体保留退役和历史未完成记录。前两项历史 crash 只在[已审阅的适用域](../devlogs/2026-W47.md#2026-11-22-两个历史-crash-的适用性)引用。安装维护 XDG 零写入在 L6 取证，产品学习和删除写入在独立 P05C 取证。[恢复记录](../devlogs/2026-W47.md#2026-11-22-upgrade_quiesced-恢复与停机)
 

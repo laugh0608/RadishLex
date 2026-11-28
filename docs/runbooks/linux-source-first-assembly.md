@@ -17,7 +17,7 @@ python3 -B scripts/linux-product/source_first.py --case 40-3-to-40-4 inspect-fro
 
 ### 首装采集的三项复核
 
-下一次真实首装须使用新 attempt 和单独授权的严格未安装现场。上一轮的回执、载荷和停机证据继续按原 attempt 保留。下列复核供准备 guest 观察器与宿主收证程序时使用，结果与原始材料一同保存在新 attempt 独占的私有目录。[首装准入合同](../remediation/linux-m5-source-first-contract.md#2-单包首次安装不依赖完整-pair) · [11-28 审阅记录](../devlogs/2026-W48.md#2026-11-28-40-3-首装-seed-独立审阅)
+每轮首装使用单独授权的严格未安装现场，按 attempt 独立保留回执、载荷与停机证据。下列三项源自首轮审阅缺口，第二轮已逐项取得原始材料。准备 guest 观察器与宿主收证程序时，将复核结果与原件保存在本轮独占的私有目录。[首装准入合同](../remediation/linux-m5-source-first-contract.md#2-单包首次安装不依赖完整-pair) · [第二轮审阅](../devlogs/2026-W48.md#2026-11-28-第二轮首装-seed-独立审阅)
 
 | 角色 | 现场采集与交叉核验 | 定向验证的失败情形 |
 | --- | --- | --- |
@@ -31,7 +31,8 @@ python3 -B scripts/linux-product/source_first.py --case 40-3-to-40-4 inspect-fro
 
 - `inspect-environment --output /ABS/environment.json`：只在预先配置好的Debian13 ARM64、loopback-only网络中探测现有工具/Flutter ARM64 release engine/pub配置，输出0600文件供审阅。每个工具版本探测最多15秒，总预算90秒，不配置网络、不下载依赖、不修改全局工具链。
 - `source --work /ABS/absent-work --output /ABS/absent-handoff --environment-file /ABS/environment.json --budget-seconds N --allow-build-process-timeout-cleanup`：S必须干净、40-2，work/output必须absent、checkout之外、同卷、不互相嵌套；环境与冻结文件严格一致。预算为显式1–7200秒，旧20/45分钟授权不适用。该flag必须由本轮执行申请明确覆盖，仅可收尾该入口新建的构建进程组；不得据此结束已有会话/程序。
-- `target`使用相同参数，另需`--review-commit R --seed-root /ABS/seed --review /ABS/review.json --source-package /ABS/source.deb --source-artifact-evidence /ABS/source.deb.evidence.json`。这些basename须实际为合同的40-2文件名，示意路径不构成合法身份。先完成committed R/S/T及私有seed准入，再拷贝source、仅构建T的40-3。缺baseline时零构建命令、零输出。
+- `target` 使用相同的工作目录、环境与预算参数，另传 `--review-commit`、`--seed-root`、`--review`、`--source-package` 和 `--source-artifact-evidence`。包和 evidence 的实际文件名必须匹配所选 case。在旧包对的历史检出，源为 `40-2`，目标为 `40-3`。
+- 含新候选声明的检出须显式使用 `source_first_build.py target --case 40-3-to-40-4`。源文件为冻结的 `radishlex_26.7.1+40-3_arm64.deb` 及其 `.evidence.json` 随附文件。入口在启动构建前核对 R、seed、review 和两件原物，然后复制源件并装配 `40-4`。该 case 拒绝重建 source，历史 case 在含新声明的检出也会拒绝构建。[装配入口](../../scripts/linux-product/source_first_build.py)
 
 依次调用既有metadata、Manager system-product、addon stage、rootfs assemble/verify、真实payload layout、Debian artifact步骤，再构建production maintenance/verifier；target另构建编译隔离的acceptance。Rust locked/offline、Flutter no-pub、并发1、清除注入编译变量，预先准备的pub配置作为有界输入固定前后身份。`target`/Manager build/Flutter ephemeral仍须初始absent；`.dart_tool`不能当作旧产品构建输出整目录拒绝，也不自动生成或联网填充。
 

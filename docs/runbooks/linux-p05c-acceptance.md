@@ -1,12 +1,12 @@
 # Linux P05C 独立实机验收方案
 
-本轮在 Debian 13 ARM64 的独立 guest 验收固定 `40-3` 本地 `.deb` 的输入、隐私、个人化和持久化。连续 L6 和 `upgrade_quiesced` 的维护证据另行留存。测试范围沿用 M5 的 [B5/B6](../remediation/linux-m5-delivery-baseline-audit.md)、[Fcitx5 平台边界](../linux-fcitx5-boundary.md)和 [Manager 同库验收](../linux-manager-local-acceptance.md)。
+本方案在 Debian 13 ARM64 的独立 guest 验收本地 `.deb` 的输入、隐私、个人化和持久化。原 A/B 批把通用 Debian 升至 `40-3`，C 批在普通用户启动时遇到权限错误。后继 `40-4` 的实物核验与升级完成后再接续 C/D 批。连续 L6 与代表 crash 的维护证据另行留存。[B5/B6](../remediation/linux-m5-delivery-baseline-audit.md) · [Fcitx5 平台边界](../linux-fcitx5-boundary.md) · [Manager 同库验收](../linux-manager-local-acceptance.md)
 
 ## 载体与固定输入
 
 - 首选通用 `Debian13-ARM64`，UUID `755199B1-1C18-4441-8A1E-D423C8DE0022`，实际载体 `/Users/luobo/VirtualMachines/utms/Debian13-ARM64.utm`。原 A 批前检确认当时五台 VM 全停，候选 `Network=[]`、无共享目录且共享剪贴板关闭，配置、EFI、qcow2 均为独立文件且零句柄。其 qcow2 无 backing file，与当时恢复专机磁盘的文件身份不同。A 批前的系统包为 `40-2`，B 批升级到 `40-3`。[通用 Debian 原始 seed 停机记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)
-- `upgrade_quiesced` 专机已退役，配置、EFI 和终态磁盘已封存。通用 Debian 保留升级现场。从已验 S0 创建的 `40-3` 首装专机 UUID 为 `435CE261-36B6-4EC2-AB1C-7B5B1F198DFE`，磁盘独立，网卡和共享关闭。首次启动已核实离线、严格未安装及合成账号初态。同一 boot 上已用四件固定材料完成 `40-3` 首装并正常停机。宿主核验 28 个载荷。12 类 seed 附件的原始材料经独立审阅，三项证据不完整。[审阅结论](../devlogs/2026-W48.md#2026-11-28-40-3-首装-seed-独立审阅) 旧版两端启动门的调用身份为 root，普通用户验收留给 `40-4`。[首装与归集](../devlogs/2026-W48.md#2026-11-28-40-3-首次安装与-seed-归集) 原连续 L6 和旧 P04 专机均已退役，冻结 S2 继续保留。[退役记录](../devlogs/2026-W48.md#2026-11-28-恢复专机退役)
-- 使用 S `c038602`、R `65a4147` 和 T `fa3b2c5`。固定 pair SHA-256 `671c9633848a1a27176f978bbf28d8ecccb4ed5b8b5bdd44a85794509482507c`，生产维护执行器 `5d6c220ee7e9e0a174bd5a038c42c5bd39ce6aa0fdba002983646bf519b6ae82`。宿主已复算 pair、执行器、双侧 `.deb` 和 evidence。批次开始时逐项按 pair 再验来源、实际字节与 mode/link，保留 R 封存材料。S2 合成词库和既有账号的 XDG 不作为本轮测试输入。[固定输入归档](/Users/luobo/VirtualMachines/datas/RadishLex/source-first/target-02-d-rebuild-01/readback/pair.evidence.json)
+- 两轮首装专机只提供 source seed。首轮 `435CE261…8DFE` 已封存退役，第二轮 `2FA2135A…3093` 已正常停机，12 类材料全部通过独立审阅。两轮旧版启动门均由 root 调用。普通用户的桌面复验使用保留 B 批升级链的通用 Debian。[首轮审阅](../devlogs/2026-W48.md#2026-11-28-40-3-首装-seed-独立审阅) · [第二轮审阅](../devlogs/2026-W48.md#2026-11-28-第二轮首装-seed-独立审阅)
+- 原 A/B 批使用 S `c038602`、R `65a4147` 和 T `fa3b2c5`。固定 pair SHA-256 `671c9633848a1a27176f978bbf28d8ecccb4ed5b8b5bdd44a85794509482507c`，生产维护执行器 `5d6c220ee7e9e0a174bd5a038c42c5bd39ce6aa0fdba002983646bf519b6ae82`。宿主已复算 pair、执行器、双侧 `.deb` 和 evidence。下列 A/B 命令保留原批次参数。接续升级须以新包对实物及配套执行器重新核对来源、实际字节与 mode/link，并单独报批。S2 合成词库和既有账号的 XDG 不作为本轮测试输入。[原批次输入归档](/Users/luobo/VirtualMachines/datas/RadishLex/source-first/target-02-d-rebuild-01/readback/pair.evidence.json)
 
 ## 分批审批与命令
 
@@ -53,7 +53,9 @@ test ! -e /home/radishlex-p05c && test ! -L /home/radishlex-p05c
 
 ### C　真实桌面与合成账号
 
-预计 60–90 分钟，含人工输入。单独审批创建空 home 的 `radishlex-p05c`、该账号内的桌面登录和 Fcitx profile 准备。仅在这个账号打开 product Manager、输入法和离线夹具，保留正常桌面进程启动和实际 FFI 映射的证据。经本批批准才允许该账号的 Fcitx profile、设置和 XDG 发生测试写入，记录预期写入及 owner/mode。用本地空文档、合成词与离线 HTML 表单，由操作者实际输入。应用缺失或身份不符时标记对应测试阻塞。
+在通用 Debian 上接续 C 批前，核对已核验的 `40-4` 制品与实际安装、同链终态 receipt 及其绑定的启动核验记录。沿用原合成账号，先以该普通用户在 Wayland 的 Qt 普通字段输入 `nihao`，观察预编辑和中文候选，按 Esc 后两者消失且字段为空。再独立启动 Manager 并确认进入产品模式。两项均通过后继续下表。[启动修复的实机验收条件](../remediation/linux-p05c-unprivileged-startup.md#实施与回归的验收条件)
+
+预计 60–90 分钟，含人工输入。原 C 批已建好合成账号 `radishlex-p05c` 并准备 Fcitx profile。接续时复核账号、home 与 profile 身份，桌面登录及实测动作按本批审批。仅在这个账号打开 product Manager、输入法和离线夹具，保留正常桌面进程启动和实际 FFI 映射的证据。经本批批准才允许该账号的 Fcitx profile、设置和 XDG 发生测试写入，记录预期写入及 owner/mode。用本地空文档、合成词与离线 HTML 表单，由操作者实际输入。应用缺失或身份不符时标记对应测试阻塞。
 
 | 验收项 | 操作与通过条件 |
 | --- | --- |
@@ -66,7 +68,7 @@ test ! -e /home/radishlex-p05c && test ! -L /home/radishlex-p05c
 
 ### D　正常关机、冷启动和终态
 
-预计 15–25 分钟。先复核 `40-3`、同一运行 boot、receipt 和合成数据的语义摘要；正常关机与稍后冷启动按获准批次分别各执行一次。关机后复核全部登记 VM 停机及目标文件零句柄。启动前重新复核停机与身份。
+预计 15–25 分钟。先复核 C 批验收的目标包版本、同一运行 boot、终态 receipt 和合成数据的语义摘要。正常关机与稍后冷启动按获准批次分别各执行一次。关机后复核全部登记 VM 停机及目标文件零句柄。启动前重新复核停机与身份。
 
 ```bash
 utmctl stop 755199B1-1C18-4441-8A1E-D423C8DE0022 --request
@@ -75,7 +77,7 @@ utmctl start 755199B1-1C18-4441-8A1E-D423C8DE0022
 utmctl list
 ```
 
-新离线 boot 复验 `40-3` receipt、28 项文件、双端实际产品启动、合成设置/隐私位、候选排序、tombstone、导入导出聚合与 SQLite 完整性，并记录会话差异。最终停机与证据清理仍各按授权处理。所有批次遇到身份、网络、产品状态或数据差异及回读超时均保留现场、停止推进，VM 和产品动作无自动重试。
+新离线 boot 按同一目标的实物清单逐件核验安装文件，复核 receipt 和启动核验记录，再验双端实际产品启动、合成设置/隐私位、候选排序、tombstone、导入导出聚合与 SQLite 完整性，并记录会话差异。最终停机与证据清理仍各按授权处理。所有批次遇到身份、网络、产品状态或数据差异及回读超时均保留现场、停止推进，VM 和产品动作无自动重试。
 
 ## 归档与退出判定
 

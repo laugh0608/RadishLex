@@ -5,9 +5,9 @@
 ## 当前判断
 
 - 11-14 收尾：R `65a4147` 固定受审 `40-2` seed。T `fa3b2c5` 通过完整仓库验证，ARM64 `40-3` 新 pair 已完成独立实物核验及宿主回读。macOS仍为09-09 source39恢复，`rolled_back`/`aborted_preserved`，材料保留、双组件停止。常态分支`dev`，主线`master`。
-- M5 已完成当前包对的连续 L6 与 `upgrade_quiesced` 恢复。P05C 的 `40-3` 已切到 RadishLex，普通用户启动引擎遇到 `PermissionDenied`，Qt 无候选。
+- `40-2 → 40-3` 已完成连续 L6 与 `upgrade_quiesced` 恢复。P05C 在 `40-3` 遇到普通用户启动 `PermissionDenied`，Qt 无候选。修复已进入 `40-4` 候选，实机待验。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- T 基线已通过八个自动合同。三个代表 crash 实机证据见下文，其余五个真实 crash 留作后续强化。
+- 旧 T `fa3b2c5` 通过八个自动合同。三个代表 crash 的实机证据见下文，其余五个留作后续强化。
 
 ## 能力与开放状态
 
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | macOS 离线输入与本地管理 | runtime、FFI、Manager、产品 bundle 与合同测试 | build 38 历史验收；build 39 安装、双端启动及普通选词/学习通过，其余复验待执行 | 已验收范围可供受控本地使用；尚未公开发布 |
 | Linux 输入与本地管理 | Fcitx5 addon、共享 XDG/FFI、Manager | P04 Wayland/X11 与同库验收 | 受控本地验收；尚未公开发布 |
-| Linux 安装维护 | `.deb`、事务、startup gate、八个 crash 自动合同 | 当前包对的连续六步、依赖、字体、冷启动和 `upgrade_quiesced` 恢复。两个历史 crash 按共同合同引用 | P05C 待验收，尚未公开发布 |
+| Linux 安装维护 | `.deb`、事务、startup gate、八个 crash 自动合同 | `40-2 → 40-3` 的连续六步、依赖、字体、冷启动和 `upgrade_quiesced` 恢复。两个历史 crash 按共同合同引用 | P05C 待验收，尚未公开发布 |
 | 加密同步 | 协议、服务、客户端及受控合成资格链 | macOS key backend 与本地 HTTPS 资格记录 | 真实用户同步关闭；目标生产部署未验收 |
 | Android / Windows / iOS | Android 仅有 Keystore 能力桥；其他平台壳未落地 | 不构成完整 IME 验收 | 后续串行计划 |
 
@@ -74,27 +74,23 @@
 
 ## 下一阶段：Linux M5 交付收口
 
-11-28 `40-3 → 40-4` 已通过真实输入的包对准入。S `fa3b2c5`、R `1ac7e84`、T `1773cae`，seed `01ca203b…e635`。[T 准入记录](../devlogs/2026-W48.md#2026-11-28-40-4-目标提交与包对准入)
+11-28 `40-3 → 40-4` 真实输入准入通过。S `fa3b2c5`、R `1ac7e84`、T `1773cae`。T 的可靠性专项 22/22 通过，常规门禁在 macOS 安装器构建中退出 101。[T 准入](../devlogs/2026-W48.md#2026-11-28-40-4-目标提交与包对准入) · [门禁与日终回顾](../devlogs/2026-W48.md#2026-11-28-日终回顾与目标提交验证)
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | C 批普通用户启动受阻 | 针对 T `1773cae` 分项确认完整验证与 ARM64 离线装配。取到 `40-4` 实物后核验包对，再复验普通用户启动、Qt 候选与 Manager。[候选准入](../runbooks/linux-source-first-assembly.md#从冻结的-40-3-建立-40-4-候选) |
-| 2 | C 批桌面实测与 D 批冷启动 | 分别授权。覆盖 Wayland/X11、多应用与多 session、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库及重启持久化 |
-| 3 | M5 退出评审 | 核对独立 P05C、代表 crash 适用域和常规及专项验证，关闭阻塞退出的缺陷，登记残余限制 |
+| 1 | 定位常规门禁失败 | 从失败日志和 `serde_derive` 的 Mach-O 字符串表入手，定向核对安装器 release 构建的链接、后处理与加载。确认成因并验证处置后，报批精确 T 的常规复验。若需改动源码，则按新候选重新核对准入与适用门禁。 |
+| 2 | 装配及 C/D 批实测 | ARM64 离线装配另批。核验 `40-4` 实物包对后，按批次复验普通账号的 Qt 预编辑、候选与 Esc、Manager 启动，再完成 C 批桌面矩阵及 D 批冷启动。[P05C 方案](../runbooks/linux-p05c-acceptance.md) |
+| 3 | M5 退出评审 | 核对候选的连续 L6、crash 适用域、独立 P05C 与门禁，登记剩余限制。 |
 
 原包对的 R 固定 40-2 seed `d0bd5b7c…c820b`。[T 记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。[合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用。
-
-启动命令、影响和测试矩阵见 [P05C 验收方案](../runbooks/linux-p05c-acceptance.md)。
 
 出口沿[路线图](../roadmap.md#m5linux-fcitx5-离线输入与个人化产品)：固定 Debian13 ARM64 本地 `.deb`，当前输入/个人化/隐私/持久化通过，连续 L6、八个 crash 自动合同、三个代表实际恢复边界和独立 P05C 闭合。不增加全部 Linux 平台、macOS 遗留清零或公开发布为 M5 条件。
 
 后置：macOS WAL 新升级及 Q2/F0/W0/最终取消、其余五个真实 crash hardening、新 VM 管理/clone/迁移框架、Android/Windows/iOS、真实用户同步，以及无新热点的性能/CI 极限优化。macOS action `10–13` 与已有自动证据保留，冻结现场不重试真实 40；完整发布顺序不变。
 
-首轮 seed `4f3ccb17…eaec` 审阅 9/12 项通过，旧机 `435CE261…8DFE` 已封存退役。两轮归档独立留存。实机、装配及完整门禁分项授权。[首轮审阅](../devlogs/2026-W48.md#2026-11-28-40-3-首装-seed-独立审阅)
-
 ## Linux M5 系统操作停止线
 
-日常复用 `Debian13-ARM64` / `Windows11-ARM64`，干净基线只作备份。11-26 A 批启动前五台全停，通用 Debian 与恢复专机的配置、EFI 和磁盘均为独立文件且零句柄。P04、原连续 L6 和恢复专机均已退役。后续操作沿用 [P05C 验收方案](../runbooks/linux-p05c-acceptance.md)。
+日常复用通用 Debian 或 Windows，干净基线只作备份。通用 Debian 保留 B 批升级现场。首轮首装机 `435CE261…8DFE` 已封存退役。第二轮首装机 `2FA2135A…3093` 在最后核验时已停机，占用唯一专机名额。两轮证据独立留存。[首装与停机](../devlogs/2026-W48.md#2026-11-28-40-3-第二轮离线首装取证)
 
 1. 留存的旧证据只用于历史审阅。迁移映射见 `datas/_organization/2026-11-01/`。旧 Move、adopt 和物化控制仅用于审阅历史，后续实机前门按新 source/pair 和实际载体重新建立。
 2. 通用测试机之外最多保留一台 RadishLex 专用 VM，按根协作约定计数。现有专用载体超额时暂停新增，按精确清单取得退役授权并核验后再安排专用 guest。
@@ -104,7 +100,7 @@
 
 - 日常 CI 已合入 `dev`，复测 1 分 43 秒。[CI 精简专题](../remediation/ci-critical-path-optimization.md)
 
-2026-11-14 的 T `fa3b2c5` 已串行通过常规门禁（含 source-first）和完整可靠性专项。命令、耗时和快照见[本周周志](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。
+旧 T `fa3b2c5` 的[验证记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)仅覆盖 `40-3`。
 
 ```bash
 ./scripts/check-linux-product-metadata.sh
@@ -124,7 +120,7 @@
 git diff --check
 ```
 
-上述入口覆盖八个 crash 合同和现有 L6 控制。当前包对的实际构建资格、连续 L6 与真实恢复证据见本页证据摘要。独立 P05C 和 M5 退出评审仍开放。
+上述入口覆盖八个 crash 合同和 L6 控制。既有实物、连续 L6 和恢复证据的版本见本页摘要。
 
 ## 阅读索引
 
