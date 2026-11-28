@@ -12,6 +12,10 @@ from source_first_io import (MAX_ELF, MAX_JSON, MAX_PACKAGE, SourceFirstError,
 PROFILE = "debian13-arm64-source-first-v1"
 MATRIX = "debian13-arm64-ephemeral-v1"
 CANDIDATE_FORMAT = "radishlex-linux-source-candidate-v1"
+FROZEN_CANDIDATE_FORMAT = "radishlex-linux-frozen-target-candidate-v1"
+# Pins the reviewed declaration, including the prior pair, its inventory, the
+# canonical source projection and the required startup-fix ancestor.
+FROZEN_CANDIDATE_SHA256 = "2aa778751eba0bb2e1534828a455cf9e7d0e54e65a5876ca9ad1d97c25e43fe3"
 BASELINE_FORMAT = "radishlex-linux-source-baseline-v1"
 SEED_FORMAT = "radishlex-linux-source-seed-evidence-v1"
 PAIR_FORMAT = "radishlex-linux-source-first-pair-evidence-v1"
@@ -76,6 +80,9 @@ def header(value: dict[str, Any], format_name: str) -> None:
 
 
 def validate_candidate(value: Any) -> None:
+    if isinstance(value, dict) and value.get("format") == FROZEN_CANDIDATE_FORMAT:
+        exact(digest(canonical(value)), FROZEN_CANDIDATE_SHA256, "frozen 40-3 source declaration")
+        return
     fields(value, {"format", "profile", "matrix_profile", "source_metadata",
                    "target_revision", "target_version", "seed_roles"}, "candidate")
     header(value, CANDIDATE_FORMAT)
@@ -147,7 +154,10 @@ def validate_source(source: Any, candidate: dict[str, Any]) -> None:
         hex_value(value)
     exact(source["locks"][LOCKS[2]], candidate["source_metadata"]["rime_data_lock_sha256"],
           "Rime source lock")
-    package = "radishlex_26.7.1+40-2_arm64.deb"
+    if candidate["format"] == FROZEN_CANDIDATE_FORMAT:
+        exact(digest(canonical(source)), candidate["frozen_handoff"]["source_sha256"],
+              "frozen target as source")
+    package = f"radishlex_{candidate['source_metadata']['package_version']}_arm64.deb"
     identity(source["package"], limit=MAX_PACKAGE, filename=package)
     identity(source["artifact_evidence"], limit=MAX_JSON, filename=package + ".evidence.json")
     fields(source["executables"], {"production", "verifier"}, "source executables")
@@ -316,7 +326,7 @@ def validate_candidate_metadata(metadata: dict[str, Any], candidate: dict[str, A
 
 
 def validate_pair(value: Any, baseline: dict[str, Any], baseline_commit: str,
-                  target_commit: str, baseline_sha256: str) -> None:
+                  target_commit: str, baseline_sha256: str, *, target_version: str = "26.7.1+40-3") -> None:
     fields(value, {"format", "profile", "matrix_profile", "source_commit", "baseline_commit",
                    "target_commit", "baseline_sha256", "seed_sha256", "review_sha256",
                    "source", "target", "executables", "environment_sha256"}, "pair")
@@ -336,7 +346,8 @@ def validate_pair(value: Any, baseline: dict[str, Any], baseline_commit: str,
     target = value["target"]
     fields(target, {"package", "artifact_evidence", "manifest_sha256", "dependencies_sha256"},
            "pair target")
-    package = "radishlex_26.7.1+40-3_arm64.deb"
+    exact(baseline["target_version"], target_version, "reviewed target version")
+    package = f"radishlex_{target_version}_arm64.deb"
     identity(target["package"], limit=MAX_PACKAGE, filename=package)
     identity(target["artifact_evidence"], limit=MAX_JSON, filename=package + ".evidence.json")
     for key in ("manifest_sha256", "dependencies_sha256"):

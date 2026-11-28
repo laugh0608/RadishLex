@@ -18,8 +18,27 @@ from source_first_io import (MAX_JSON, FileSnapshot, SourceFirstError, canonical
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CANDIDATE_PATH = "packaging/linux/source-first-candidate.json"
 BASELINE_PATH = "packaging/linux/source-first-baseline.json"
+LEGACY_CASE = "40-2-to-40-3"
+FROZEN_CASE = "40-3-to-40-4"
+CASE_PATHS = {
+    LEGACY_CASE: (CANDIDATE_PATH, BASELINE_PATH),
+    FROZEN_CASE: ("packaging/linux/source-first-40-4-candidate.json",
+                  "packaging/linux/source-first-40-4-baseline.json"),
+}
 METADATA_PATH = "packaging/linux/product.json"
 ARTIFACT_PATH = "packaging/linux/debian/artifact.json"
+
+
+def case_candidate(repository: Path, case: str, commit: str | None = None) -> dict[str, Any]:
+    candidate_path, _ = CASE_PATHS[case]
+    if commit is None:
+        candidate, _ = load_json(repository / candidate_path, mode=0o644)
+    else:
+        candidate = parse_json(blob(repository, commit, candidate_path))
+    contract.validate_candidate(candidate)
+    expected = contract.FROZEN_CANDIDATE_FORMAT if case == FROZEN_CASE else contract.CANDIDATE_FORMAT
+    contract.exact(candidate["format"], expected, "candidate for selected case")
+    return candidate
 
 
 def git(root: Path, *args: str) -> bytes:
@@ -77,18 +96,71 @@ def strict_ancestor(root: Path, ancestor: str, descendant: str) -> None:
     git(root, "merge-base", "--is-ancestor", ancestor, descendant)
 
 
+def source_build_inputs(root: Path, commit: str) -> dict[str, Any]:
+    metadata = committed_json(root, commit, METADATA_PATH)
+    recipe = {path: digest(blob(root, commit, path)) for path in contract.RECIPE_PATHS}
+    return {"metadata_sha256": digest(canonical(metadata)), "recipe_sha256": digest(canonical(recipe)),
+            "locks": {path: digest(blob(root, commit, path)) for path in contract.LOCKS}}
+
+
 def source_git_inputs(root: Path, source: dict[str, Any],
                        candidate: dict[str, Any]) -> None:
     commit = source["commit"]
     metadata = committed_json(root, commit, METADATA_PATH)
     contract.exact(metadata, candidate["source_metadata"], "S committed metadata")
-    contract.exact(digest(canonical(metadata)), source["metadata_sha256"], "S metadata digest")
-    for path in contract.LOCKS:
-        contract.exact(digest(blob(root, commit, path)), source["locks"][path], f"S lock {path}")
-    recipe = {path: digest(blob(root, commit, path)) for path in contract.RECIPE_PATHS}
-    contract.exact(digest(canonical(recipe)), source["recipe_sha256"], "S build recipe")
-    committed_candidate = parse_json(blob(root, commit, CANDIDATE_PATH))
-    contract.exact(committed_candidate, candidate, "S candidate")
+    for key, expected in source_build_inputs(root, commit).items():
+        contract.exact(source[key], expected, f"S {key}")
+    if candidate["format"] == contract.FROZEN_CANDIDATE_FORMAT:
+        # S was built as the old T. Its historical declaration describes that
+        # earlier pair. The new declaration pins the original T and its bytes.
+        contract.exact(commit, candidate["frozen_handoff"]["commit"], "frozen source commit")
+        contract.validate_source(source, candidate)
+        original = case_candidate(root, LEGACY_CASE, commit)
+        contract.validate_metadata_pair(original["source_metadata"], metadata, original)
+    else:
+        contract.exact(parse_json(blob(root, commit, CANDIDATE_PATH)), candidate, "S candidate")
+
+
+def inspect_frozen_source(repository: Path, handoff: Path, candidate: dict[str, Any]) -> dict[str, Any]:
+    """Project the archived target without creating a seed, baseline or package."""
+    contract.validate_candidate(candidate)
+    contract.exact(candidate["format"], contract.FROZEN_CANDIDATE_FORMAT, "frozen source case")
+    anchor = candidate["frozen_handoff"]
+    inventory, snapshot = load_json(handoff / "inventory.json")
+    contract.exact(snapshot.sha256, anchor["inventory_sha256"], "frozen inventory")
+    files = {"inventory.json": snapshot}
+    for relative, item in inventory.items():
+        expected = {key: item[key] for key in ("filename", "size", "sha256")}
+        _, files[relative] = read_file(handoff / relative, mode=item["mode"],
+                                       limit=item["size"], expected=expected)
+    pair, pair_file = load_json(handoff / "pair.evidence.json")
+    contract.exact(pair_file.sha256, anchor["pair_sha256"], "frozen pair")
+    commit = anchor["commit"]
+    baseline_commit = pair["baseline_commit"]
+    strict_ancestor(repository, pair["source_commit"], baseline_commit)
+    strict_ancestor(repository, baseline_commit, commit)
+    baseline_bytes = blob(repository, baseline_commit, BASELINE_PATH)
+    contract.exact(blob(repository, commit, BASELINE_PATH), baseline_bytes, "original T retains R")
+    contract.validate_pair(pair, parse_json(baseline_bytes), baseline_commit, commit,
+                           digest(baseline_bytes))
+    target = pair["target"]
+    for field in ("package", "artifact_evidence"):
+        entry = target[field]
+        contract.exact(files["artifacts/" + entry["filename"]].record(), entry, f"original {field}")
+    for entry in pair["executables"].values():
+        binary = entry["file"]
+        contract.exact(files[binary["filename"]].record(), binary, "original executable")
+    contract.exact(files["build-environment.json"].sha256, pair["environment_sha256"],
+                   "original build environment")
+    source = dict(target, commit=commit, **source_build_inputs(repository, commit),
+                  environment_sha256=pair["environment_sha256"],
+                  executables={k: pair["executables"][k] for k in ("production", "verifier")})
+    source_git_inputs(repository, source, candidate)
+    read_source_inputs(handoff / "artifacts" / source["package"]["filename"],
+                       handoff / "artifacts" / source["artifact_evidence"]["filename"], source,
+                       candidate["source_metadata"]["package_version"])
+    check_tree(handoff, files, mode=None)
+    return source
 
 
 def verify_seed(root: Path, candidate: dict[str, Any]) -> tuple[
@@ -114,25 +186,28 @@ def verify_seed(root: Path, candidate: dict[str, Any]) -> tuple[
 
 
 def pair_preflight(repository: Path, review_commit: str, seed_root: Path,
-                   review_path: Path, source_package: Path, source_evidence: Path) -> dict[str, Any]:
+                   review_path: Path, source_package: Path, source_evidence: Path, *,
+                   case: str = LEGACY_CASE) -> dict[str, Any]:
     """Only a committed R baseline can admit T; no external baseline argument exists."""
     target_commit = clean_head(repository)
-    candidate = parse_json(blob(repository, target_commit, CANDIDATE_PATH))
-    contract.validate_candidate(candidate)
-    baseline_raw = blob(repository, review_commit, BASELINE_PATH)
+    candidate = case_candidate(repository, case, target_commit)
+    candidate_path, baseline_path = CASE_PATHS[case]
+    if case == FROZEN_CASE:
+        strict_ancestor(repository, candidate["required_target_ancestor"], target_commit)
+    baseline_raw = blob(repository, review_commit, baseline_path)
     baseline = parse_json(baseline_raw)
     seed, files, observations = verify_seed(seed_root, candidate)
     contract.validate_baseline(baseline, candidate, seed, files["seed.evidence.json"].sha256)
     source = baseline["source"]
     strict_ancestor(repository, source["commit"], review_commit)
     strict_ancestor(repository, review_commit, target_commit)
-    contract.exact(blob(repository, target_commit, BASELINE_PATH), baseline_raw,
+    contract.exact(blob(repository, target_commit, baseline_path), baseline_raw,
                    "T preserves R baseline bytes")
-    contract.exact(blob(repository, review_commit, CANDIDATE_PATH), canonical(candidate),
+    contract.exact(blob(repository, review_commit, candidate_path), canonical(candidate),
                    "R candidate bytes")
     source_git_inputs(repository, source, candidate)
     _, _, package_snapshot, evidence_snapshot = read_source_inputs(
-        source_package, source_evidence, source)
+        source_package, source_evidence, source, candidate["source_metadata"]["package_version"])
     source_metadata = committed_json(repository, source["commit"], METADATA_PATH)
     contract.exact(committed_json(repository, review_commit, METADATA_PATH), source_metadata,
                    "R source metadata")
@@ -146,9 +221,9 @@ def pair_preflight(repository: Path, review_commit: str, seed_root: Path,
     source_artifact = committed_json(repository, source["commit"], ARTIFACT_PATH)
     contract.exact(committed_json(repository, review_commit, ARTIFACT_PATH), source_artifact,
                    "R artifact configuration")
-    target_artifact = dict(source_artifact,
-                           package_filename="radishlex_26.7.1+40-3_arm64.deb",
-                           evidence_filename="radishlex_26.7.1+40-3_arm64.deb.evidence.json")
+    target_name = f"radishlex_{candidate['target_version']}_arm64.deb"
+    target_artifact = dict(source_artifact, package_filename=target_name,
+                           evidence_filename=target_name + ".evidence.json")
     contract.exact(committed_json(repository, target_commit, ARTIFACT_PATH), target_artifact,
                    "T artifact configuration")
     review, review_snapshot = load_json(review_path)
@@ -171,8 +246,11 @@ def pair_preflight(repository: Path, review_commit: str, seed_root: Path,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--case", choices=CASE_PATHS, default=LEGACY_CASE)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("validate-candidate")
+    frozen_parser = sub.add_parser("inspect-frozen-source")
+    frozen_parser.add_argument("--handoff-root", required=True, type=Path)
     seed_parser = sub.add_parser("verify-seed")
     seed_parser.add_argument("--seed-root", required=True, type=Path)
     pair_parser = sub.add_parser("preflight-pair")
@@ -183,14 +261,15 @@ def main() -> int:
     pair_parser.add_argument("--source-artifact-evidence", required=True, type=Path)
     args = parser.parse_args()
     try:
-        candidate, _ = load_json(REPO_ROOT / CANDIDATE_PATH, mode=0o644)
-        contract.validate_candidate(candidate)
-        if args.command == "verify-seed":
+        candidate = case_candidate(REPO_ROOT, args.case)
+        if args.command == "inspect-frozen-source":
+            print(canonical(inspect_frozen_source(REPO_ROOT, args.handoff_root, candidate)).decode(), end="")
+        elif args.command == "verify-seed":
             verify_seed(args.seed_root, candidate)
             print("Portable seed bytes and summaries verified; raw-material review is still required.")
         elif args.command == "preflight-pair":
             result = pair_preflight(REPO_ROOT, args.review_commit, args.seed_root, args.review,
-                                    args.source_package, args.source_artifact_evidence)
+                                    args.source_package, args.source_artifact_evidence, case=args.case)
             print(canonical(result).decode(), end="")
         else:
             metadata = parse_json((REPO_ROOT / METADATA_PATH).read_bytes(), require_canonical=False)

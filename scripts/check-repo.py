@@ -167,6 +167,7 @@ REQUIRED_FILES = [
     "platforms/linux-product/src/tests/system_port.rs",
     "packaging/linux/l6-release-pair.json",
     "packaging/linux/source-first-candidate.json",
+    "packaging/linux/source-first-40-4-candidate.json",
     "packaging/linux/l6-maintenance-refresh.json",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.h",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.m",

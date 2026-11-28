@@ -11,7 +11,8 @@ from source_first_io import (MAX_JSON, MAX_PACKAGE, FileSnapshot, SourceFirstErr
                              new_private_root, parse_json, read_file, write_exclusive)
 
 
-def read_source_inputs(package: Path, evidence: Path, source: dict[str, Any]) -> tuple[
+def read_source_inputs(package: Path, evidence: Path, source: dict[str, Any],
+                       version: str = "26.7.1+40-2") -> tuple[
         bytes, bytes, FileSnapshot, FileSnapshot]:
     package_bytes, package_before = read_file(
         package, limit=MAX_PACKAGE, mode=0o644, expected=source["package"])
@@ -22,7 +23,7 @@ def read_source_inputs(package: Path, evidence: Path, source: dict[str, Any]) ->
     control = artifact_evidence.get("control")
     if not isinstance(control, dict):
         raise SourceFirstError("source evidence control is absent")
-    exact(control.get("version"), "26.7.1+40-2", "source control version")
+    exact(control.get("version"), version, "source control version")
     exact(control.get("architecture"), "arm64", "source control architecture")
     dependencies = control.get("depends")
     if (not isinstance(dependencies, list) or not dependencies or
@@ -38,9 +39,9 @@ def read_source_inputs(package: Path, evidence: Path, source: dict[str, Any]) ->
 
 
 def stage_source(package: Path, evidence: Path, output: Path,
-                 source: dict[str, Any]) -> dict[str, FileSnapshot]:
+                 source: dict[str, Any], version: str = "26.7.1+40-2") -> dict[str, FileSnapshot]:
     package_bytes, evidence_bytes, package_before, evidence_before = read_source_inputs(
-        package, evidence, source)
+        package, evidence, source, version)
     # Creation and every subsequent failure retain this attempt; no cleanup handler.
     new_private_root(output)
     try:

@@ -13,7 +13,7 @@ evidence_root="$(mktemp -d "${TMPDIR:-/tmp}/radishlex-source-first-v12.XXXXXX")"
 evidence_root="$(CDPATH= cd -- "${evidence_root}" && pwd -P)"
 echo "Source-first V1/V2 evidence: ${evidence_root}"
 PYTHONDONTWRITEBYTECODE=1 python3 \
-  "${repo_root}/scripts/linux-product/source_first.py" validate-candidate
+  "${repo_root}/scripts/linux-product/source_first.py" --case 40-3-to-40-4 validate-candidate
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_source_first.py" \
   --test-root "${evidence_root}/cases" >"${evidence_root}/tests.log" 2>&1

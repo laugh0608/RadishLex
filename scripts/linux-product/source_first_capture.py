@@ -92,7 +92,8 @@ def collect(capture_root: Path, package: Path, evidence: Path, verifier: Path,
     contract.validate_source(source, candidate)
     contract.validate_binding(binding, source)
     admission.source_git_inputs(admission.REPO_ROOT, source, candidate)
-    _, _, package_before, evidence_before = read_source_inputs(package, evidence, source)
+    _, _, package_before, evidence_before = read_source_inputs(
+        package, evidence, source, candidate["source_metadata"]["package_version"])
     _, verifier_before = read_file(verifier, mode=0o755, limit=MAX_ELF,
                                    expected=source["executables"]["verifier"]["file"])
     contract.exact(executable_record(verifier, source["commit"], "verifier"),
@@ -179,9 +180,10 @@ def main() -> int:
     for name in ("capture-root", "source-package", "source-artifact-evidence", "verifier", "work", "output"):
         parser.add_argument("--" + name, required=True, type=Path)
     parser.add_argument("--budget-seconds", required=True, type=int)
+    parser.add_argument("--case", choices=admission.CASE_PATHS, default=admission.LEGACY_CASE)
     args = parser.parse_args()
     try:
-        candidate, _ = load_json(admission.REPO_ROOT / admission.CANDIDATE_PATH, mode=0o644)
+        candidate = admission.case_candidate(admission.REPO_ROOT, args.case)
         result = collect(args.capture_root, args.source_package, args.source_artifact_evidence,
                          args.verifier, args.work, args.output, args.budget_seconds, candidate)
         print(f"Portable source seed collected: {result}; raw-material review remains required.")

@@ -113,7 +113,8 @@ def unchanged_checkout(repository: Path, commit: str, candidate: dict[str, Any],
         raise SourceFirstError("source changed during build")
     expected = candidate["source_metadata"]
     if target:
-        expected = dict(expected, debian_revision="3", package_version="26.7.1+40-3")
+        expected = dict(expected, debian_revision=candidate["target_revision"],
+                        package_version=candidate["target_version"])
     actual = parse_json((repository / admission.METADATA_PATH).read_bytes(), require_canonical=False)
     contract.exact(actual, expected, "build metadata")
     for path in contract.LOCKS + contract.RECIPE_PATHS:
@@ -160,7 +161,7 @@ def executable_record(path: Path, commit: str, role: str) -> dict[str, Any]:
 
 
 def assemble_artifact(repository: Path, work: Path, handoff: Path, commit: str,
-                      commands: BuildCommands, *, target: bool) -> tuple[dict[str, Any], dict[str, FileSnapshot]]:
+                      commands: BuildCommands, *, target: bool, version: str) -> tuple[dict[str, Any], dict[str, FileSnapshot]]:
     manager = repository / "apps/radishlex-manager/build/linux/arm64/release/bundle"
     addon, rootfs, artifacts = work / "addon", work / "rootfs", handoff / "artifacts"
     new_private_root(artifacts)
@@ -207,7 +208,6 @@ def assemble_artifact(repository: Path, work: Path, handoff: Path, commit: str,
         executables[role] = executable_record(handoff / binary, commit, role)
     if len({value["file"]["sha256"] for value in executables.values()}) != len(roles):
         raise SourceFirstError("build executables are not distinct")
-    version = "26.7.1+40-3" if target else "26.7.1+40-2"
     package = artifacts / f"radishlex_{version}_arm64.deb"
     evidence = package.with_name(package.name + ".evidence.json")
     _, package_snapshot = read_file(package, mode=0o644, limit=MAX_PACKAGE)
@@ -253,14 +253,19 @@ def failure(work: Path, phase: str, error: BaseException) -> None:
 def build(repository: Path, work: Path, output: Path, environment_file: Path, budget: int,
           *, review_commit: str | None = None, seed_root: Path | None = None,
           review_path: Path | None = None, source_package: Path | None = None,
-          source_evidence: Path | None = None) -> Path:
+          source_evidence: Path | None = None, case: str = admission.LEGACY_CASE) -> Path:
     if type(budget) is not int or not 1 <= budget <= 7200:
         raise SourceFirstError("explicit build budget must be 1..7200 seconds")
     deadline = time.monotonic() + budget
     target = review_commit is not None
+    if case == admission.FROZEN_CASE and not target:
+        raise SourceFirstError("the frozen source must be imported from its reviewed handoff")
     commit = admission.clean_head(repository)
-    candidate = parse_json(admission.blob(repository, commit, admission.CANDIDATE_PATH))
-    contract.validate_candidate(candidate)
+    frozen_declaration, _ = admission.CASE_PATHS[admission.FROZEN_CASE]
+    if case == admission.LEGACY_CASE and (repository / frozen_declaration).exists():
+        raise SourceFirstError("this checkout retains the historical pair for verification only")
+    candidate = admission.case_candidate(repository, case, commit)
+    source_version = candidate["source_metadata"]["package_version"]
     lineage = baseline = None
     source_snapshots: tuple[FileSnapshot, FileSnapshot] | None = None
     seed_snapshots: dict[str, FileSnapshot] = {}
@@ -269,10 +274,10 @@ def build(repository: Path, work: Path, output: Path, environment_file: Path, bu
         if None in (seed_root, review_path, source_package, source_evidence):
             raise SourceFirstError("target requires the reviewed seed and exact source inputs")
         lineage = admission.pair_preflight(repository, review_commit, seed_root, review_path,
-                                            source_package, source_evidence)
-        baseline = parse_json(admission.blob(repository, review_commit, admission.BASELINE_PATH))
+                                            source_package, source_evidence, case=case)
+        baseline = parse_json(admission.blob(repository, review_commit, admission.CASE_PATHS[case][1]))
         _, _, package_before, evidence_before = read_source_inputs(
-            source_package, source_evidence, baseline["source"])
+            source_package, source_evidence, baseline["source"], source_version)
         source_snapshots = (package_before, evidence_before)
         _, seed_snapshots, _ = admission.verify_seed(seed_root, candidate)
         _, review_snapshot = load_json(review_path)
@@ -303,10 +308,13 @@ def build(repository: Path, work: Path, output: Path, environment_file: Path, bu
         files: dict[str, FileSnapshot] = {}
         if target:
             phase = "exact-source-copy"
-            copied = stage_source(source_package, source_evidence, handoff / "source", baseline["source"])
+            copied = stage_source(source_package, source_evidence, handoff / "source",
+                                  baseline["source"], source_version)
             files.update({"source/" + name: item for name, item in copied.items()})
         phase = "target-artifact" if target else "source-artifact"
-        artifact, built_files = assemble_artifact(repository, work, handoff, commit, commands, target=target)
+        version = candidate["target_version"] if target else source_version
+        artifact, built_files = assemble_artifact(repository, work, handoff, commit, commands,
+                                                 target=target, version=version)
         files.update(built_files)
         phase = "record-and-revalidate"
         files["build-environment.json"] = write_exclusive(handoff / "build-environment.json",
@@ -330,7 +338,8 @@ def build(repository: Path, work: Path, output: Path, environment_file: Path, bu
                                ("package", "artifact_evidence", "manifest_sha256", "dependencies_sha256")},
                     "executables": artifact["executables"],
                     "environment_sha256": expected_snapshot.sha256}
-            contract.validate_pair(pair, baseline, review_commit, commit, lineage["baseline_sha256"])
+            contract.validate_pair(pair, baseline, review_commit, commit, lineage["baseline_sha256"],
+                                   target_version=candidate["target_version"])
             files["pair.evidence.json"] = write_exclusive(handoff / "pair.evidence.json", canonical(pair))
             # Revalidate private evidence without requiring the now-present expected build outputs absent.
             seed, seed_files, _ = admission.verify_seed(seed_root, candidate)
@@ -339,11 +348,7 @@ def build(repository: Path, work: Path, output: Path, environment_file: Path, bu
             contract.validate_baseline(baseline, candidate, seed, seed_files["seed.evidence.json"].sha256)
             read_file(review_path, previous=review_snapshot)
         else:
-            source = {**artifact, "commit": commit,
-                      "metadata_sha256": digest(canonical(candidate["source_metadata"])),
-                      "locks": {path: digest(admission.blob(repository, commit, path)) for path in contract.LOCKS},
-                      "recipe_sha256": digest(canonical(
-                          {path: digest(admission.blob(repository, commit, path)) for path in contract.RECIPE_PATHS})),
+            source = {**artifact, "commit": commit, **admission.source_build_inputs(repository, commit),
                       "environment_sha256": expected_snapshot.sha256}
             contract.validate_source(source, candidate)
             files["source.json"] = write_exclusive(handoff / "source.json", canonical(source))
@@ -381,6 +386,7 @@ def main() -> int:
             print(f"source-first environment probe rejected: {exc}", file=sys.stderr)
             return 1
     parser.add_argument("kind", choices=("source", "target"))
+    parser.add_argument("--case", choices=admission.CASE_PATHS, default=admission.LEGACY_CASE)
     parser.add_argument("--work", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--environment-file", required=True, type=Path)
@@ -404,7 +410,7 @@ def main() -> int:
         result = build(admission.REPO_ROOT, args.work, args.output, args.environment_file,
                        args.budget_seconds, review_commit=args.review_commit, seed_root=args.seed_root,
                        review_path=args.review, source_package=args.source_package,
-                       source_evidence=args.source_artifact_evidence)
+                       source_evidence=args.source_artifact_evidence, case=args.case)
         print(f"Source-first {args.kind} handoff: {result}")
         return 0
     except (SourceFirstError, OSError, elf_tools.L6ReleasePairError) as exc:

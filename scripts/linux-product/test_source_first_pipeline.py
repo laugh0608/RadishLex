@@ -119,7 +119,7 @@ class PipelineTests(unittest.TestCase):
         self.commands.hook = getattr(self, "hook", None)
         return self.commands
 
-    def assemble(self, *, source=False):
+    def assemble(self, *, source=False, case=admission.LEGACY_CASE):
         f = self.fixture
         kwargs = {} if source else {"review_commit": f.r, "seed_root": f.seed_root,
                                    "review_path": f.review_path, "source_package": f.package,
@@ -127,7 +127,7 @@ class PipelineTests(unittest.TestCase):
         with patch.object(build, "BuildCommands", side_effect=self.factory), patch.object(
                 build, "inspect_environment", return_value=(
                     self.environment, storage.read_file(self.pub_config, mode=0o644)[1])):
-            return build.build(f.repo, self.work, self.output, self.environment_path, 300, **kwargs)
+            return build.build(f.repo, self.work, self.output, self.environment_path, 300, case=case, **kwargs)
 
     def prepare_capture(self):
         f = self.fixture
@@ -248,6 +248,104 @@ class PipelineTests(unittest.TestCase):
         self.reject(self.assemble)
         self.assertIsNone(self.commands)
         self.assertFalse(self.work.exists())
+
+    def test_frozen_case_rejects_rebuild_and_changed_declaration(self):
+        candidate = admission.case_candidate(admission.REPO_ROOT, admission.FROZEN_CASE)
+        self.assertIn("frozen source", str(self.reject(
+            build.build, self.root, self.work, self.output, self.root / "environment.json",
+            300, case=admission.FROZEN_CASE)))
+        self.assertIsNone(self.commands)
+        self.assertFalse(self.work.exists())
+        for key in candidate["frozen_handoff"]:
+            changed = copy.deepcopy(candidate)
+            changed["frozen_handoff"][key] = "1" * len(changed["frozen_handoff"][key])
+            self.reject(contract.validate_candidate, changed)
+        changed = dict(candidate, required_target_ancestor="2" * 40)
+        self.reject(contract.validate_candidate, changed)
+
+    def test_frozen_target_becomes_source_only_with_new_seed_and_review(self):
+        self.prepare_build()
+        f = self.fixture
+        self.assemble()
+        old_handoff = self.output
+        pair, pair_file = storage.load_json(old_handoff / "pair.evidence.json")
+        _, inventory_file = storage.load_json(old_handoff / "inventory.json")
+        source_commit = f.t
+        executables = {k: pair["executables"][k] for k in ("production", "verifier")}
+        source = {**pair["target"], **admission.source_build_inputs(f.repo, source_commit),
+                  "commit": source_commit, "environment_sha256": pair["environment_sha256"],
+                  "executables": executables}
+        candidate = admission.case_candidate(admission.REPO_ROOT, admission.FROZEN_CASE)
+        candidate.update(required_target_ancestor=source_commit,
+                         frozen_handoff={"commit": source_commit, "pair_sha256": pair_file.sha256,
+                                         "inventory_sha256": inventory_file.sha256,
+                                         "source_sha256": storage.digest(storage.canonical(source))})
+        # Only this test trusts the synthetic archive generated above.
+        with patch.object(contract, "FROZEN_CANDIDATE_SHA256", storage.digest(storage.canonical(candidate))):
+            self.assertEqual(admission.inspect_frozen_source(f.repo, old_handoff, candidate), source)
+            self.reject(admission.verify_seed, f.seed_root, candidate)
+            sibling = self.root / "next-checkout"
+            f.command("clone", "--no-hardlinks", str(f.repo), str(sibling))
+            f.repo = sibling
+            (f.repo / ".git/info/exclude").write_text("target/\napps/radishlex-manager/.dart_tool/\n")
+            config = f.repo / "apps/radishlex-manager/.dart_tool/package_config.json"
+            put(config, self.pub_config.read_bytes(), 0o644)
+            self.pub_config = config
+            self.work, self.output = self.root / "next-work", self.root / "next-output"
+            self.commands = None
+            declaration, baseline_path = admission.CASE_PATHS[admission.FROZEN_CASE]
+            put(f.repo / declaration, candidate, 0o644)
+            f.commit("new synthetic declaration only")
+            error = self.reject(self.assemble, case=admission.FROZEN_CASE)
+            self.assertIn("Git admission failed", str(error))
+            self.assertIsNone(self.commands)
+            self.assertFalse(self.work.exists())
+            self.reject(self.assemble, case=admission.LEGACY_CASE)
+            f.root = self.root / "next-seed-materials"
+            storage.new_private_root(f.root)
+            f.source, f.candidate = source, candidate
+            f.package = old_handoff / "artifacts" / source["package"]["filename"]
+            f.evidence = old_handoff / "artifacts" / source["artifact_evidence"]["filename"]
+            f.make_seed()
+            for kind, length in (("upgrade", 2), ("install", 6)):
+                receipt = copy.deepcopy(f.observations["receipt"])
+                receipt["facts"].update(operation_kind=kind, chain_length=length)
+                self.reject(contract.validate_observation, receipt, "receipt", f.seed, candidate)
+            f.make_baseline()
+            put(f.repo / baseline_path, f.baseline, 0o644)
+            f.r = f.commit("independently reviewed synthetic seed")
+            meta = dict(candidate["source_metadata"], debian_revision="4",
+                        package_version=candidate["target_version"])
+            (f.repo / admission.METADATA_PATH).write_bytes(storage.canonical(meta))
+            name = "radishlex_26.7.1+40-4_arm64.deb"
+            artifact_path = f.repo / admission.ARTIFACT_PATH
+            artifact = json.loads(artifact_path.read_bytes())
+            artifact.update(package_filename=name, evidence_filename=name + ".evidence.json")
+            artifact_path.write_bytes(storage.canonical(artifact))
+            f.t = f.commit("synthetic target revision four")
+            seed = f.seed_root
+            f.seed_root = self.root / "missing-successor-seed"
+            self.reject(self.assemble, case=admission.FROZEN_CASE)
+            self.assertFalse(self.work.exists())
+            f.seed_root = seed
+            review = f.review_path
+            f.review_path = self.root / "independent-review.json"  # Original 40-2 review.
+            self.reject(self.assemble, case=admission.FROZEN_CASE)
+            self.assertFalse(self.work.exists())
+            f.review_path = review
+            self.assemble(case=admission.FROZEN_CASE)
+            result, _ = storage.load_json(self.output / "pair.evidence.json")
+            self.assertEqual(result["source"], source)
+            self.assertEqual(result["target"]["package"]["filename"], name)
+            self.assertEqual(self.commands.calls[-2:], ["actual-artifact", "actual-source"])
+            self.assertEqual((self.output / "source" / f.package.name).read_bytes(), f.package.read_bytes())
+            # Unknown inventory members and changes to archived bytes both invalidate import.
+            stray = old_handoff / "unexpected"
+            put(stray, b"synthetic")
+            self.reject(admission.inspect_frozen_source, f.repo, old_handoff, candidate)
+            stray.rename(self.root / "retained-unexpected")
+            f.package.write_bytes(b"changed synthetic source")
+            self.reject(admission.inspect_frozen_source, f.repo, old_handoff, candidate)
 
     def test_environment_drift_stops_before_commands(self):
         self.prepare_build(source=True)

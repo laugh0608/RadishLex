@@ -147,7 +147,8 @@ class Fixture:
             "binding": self.seed["binding"], "review_sha256": review["sha256"],
             "inventory_sha256": inventory, "receipt_sha256": sha("receipt"),
             "guest_result_sha256": sha("result"),
-            "target_revision": "3", "target_version": "26.7.1+40-3"}
+            "target_revision": self.candidate["target_revision"],
+            "target_version": self.candidate["target_version"]}
 
     def command(self, *args: str) -> str:
         result = subprocess.run(
