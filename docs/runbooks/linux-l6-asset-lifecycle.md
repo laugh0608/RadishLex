@@ -18,7 +18,7 @@ P05B 不再把八个 crash checkpoint 全部执行为真实系统阻塞项。八
 
 `upgrade_before_dpkg`、`upgrade_after_dpkg`、`upgrade_rollback_required`、`upgrade_before_source_restore` 和 `upgrade_after_source_restore` 的真实系统执行转为后续 hardening，不再阻塞 P05B 或 M5 退出。它们不得从 matrix、测试、validator 或文档合同中删除，也不能把未执行的真实系统结果写成通过。
 
-11-22，现包对已完成连续六步及冷启动对照，原连续 L6 专机冻结终态后已退役。旧 `install_prepared` 和 `install_artifacts_staged` 按共同恢复合同引用。现有 `upgrade_quiesced` 验收机占用唯一专机名额，停机保留。P05C 优先使用独立的通用 Debian，真实启停与更换专机均需逐批授权。[当前停止线](../status/current.md#linux-m5-系统操作停止线) · [适用性审阅](../devlogs/2026-W47.md#2026-11-22-两个历史-crash-的适用性)
+11-22，现包对已完成连续六步及冷启动对照，原连续 L6 专机冻结终态后已退役。旧 `install_prepared` 和 `install_artifacts_staged` 按共同恢复合同引用。11-28 已封存 `upgrade_quiesced` 验收机的终态配置、EFI 和磁盘，并核实登记及原载体均已移除。P05C 优先使用独立的通用 Debian，真实启停与更换专机均需逐批授权。[退役记录](../devlogs/2026-W48.md#2026-11-28-恢复专机退役) · [当前停止线](../status/current.md#linux-m5-系统操作停止线) · [适用性审阅](../devlogs/2026-W47.md#2026-11-22-两个历史-crash-的适用性)
 
 历史预算允许 5 台常驻注册锚点与 1 台 P05B disposable target。五批删除将 managed 注册项由 22 台降至 5 台，随后 `upgrade_quiesced` clone v2 增加 1 台停机 partial，达到当时的 6 台上限。另有 2 台当时的 foreign overlay。
 

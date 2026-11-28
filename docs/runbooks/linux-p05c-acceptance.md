@@ -4,15 +4,15 @@
 
 ## 载体与固定输入
 
-- 首选通用 `Debian13-ARM64`，UUID `755199B1-1C18-4441-8A1E-D423C8DE0022`，实际载体 `/Users/luobo/VirtualMachines/utms/Debian13-ARM64.utm`。宿主只读确认五台 VM 全停，候选 `Network=[]`、无共享目录且共享剪贴板关闭，配置、EFI、qcow2 均为独立文件且零句柄。其 qcow2 无 backing file，和现有专机磁盘的文件身份不同。最近记录的系统包为 `40-2`，运行态、桌面前端和合成账号资格留待首次启动后确认。[通用 Debian 原始 seed 停机记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)
-- 已停机的 `upgrade_quiesced` 专机继续保留并占用唯一专机名额。若通用 Debian 无法满足隔离、现有用户数据保护或桌面覆盖，先记录原因。确需换专机时，先单独审批现有专机退役并核实证据及名额，再单独审批从已验 S0 或合格干净基线准备新名称、UUID、独立磁盘、无网卡并登记后的停机载体。首次启动再另报。原连续 L6 和旧 P04 专机均已退役，冻结 S2 继续保留。
+- 首选通用 `Debian13-ARM64`，UUID `755199B1-1C18-4441-8A1E-D423C8DE0022`，实际载体 `/Users/luobo/VirtualMachines/utms/Debian13-ARM64.utm`。原 A 批前检确认当时五台 VM 全停，候选 `Network=[]`、无共享目录且共享剪贴板关闭，配置、EFI、qcow2 均为独立文件且零句柄。其 qcow2 无 backing file，与当时恢复专机磁盘的文件身份不同。A 批前的系统包为 `40-2`，B 批升级到 `40-3`。[通用 Debian 原始 seed 停机记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)
+- `upgrade_quiesced` 专机已退役，配置、EFI 和终态磁盘已封存。通用 Debian 保留升级现场。准备首装载体前核实名额，单独审批从已验 S0 或合格干净基线准备新名称、UUID、独立磁盘、无网卡的停机载体。首次启动再另报。原连续 L6 和旧 P04 专机均已退役，冻结 S2 继续保留。[退役记录](../devlogs/2026-W48.md#2026-11-28-恢复专机退役)
 - 使用 S `c038602`、R `65a4147` 和 T `fa3b2c5`。固定 pair SHA-256 `671c9633848a1a27176f978bbf28d8ecccb4ed5b8b5bdd44a85794509482507c`，生产维护执行器 `5d6c220ee7e9e0a174bd5a038c42c5bd39ce6aa0fdba002983646bf519b6ae82`。宿主已复算 pair、执行器、双侧 `.deb` 和 evidence。批次开始时逐项按 pair 再验来源、实际字节与 mode/link，保留 R 封存材料。S2 合成词库和既有账号的 XDG 不作为本轮测试输入。[固定输入归档](/Users/luobo/VirtualMachines/datas/RadishLex/source-first/target-02-d-rebuild-01/readback/pair.evidence.json)
 
 ## 分批审批与命令
 
 ### A　只启动通用 Debian 并复核资格
 
-预计 8–12 分钟。宿主先复核全部五台停机、UUID/路径、无共享、磁盘独立和文件零句柄。只有此批获准且前门通过，才执行下列唯一启动。启动会写入该机正常的 OS 日志、EFI 或磁盘状态；其余 VM 保持停机。
+预计 8–12 分钟。宿主先复核全部登记 VM 停机、UUID/路径、无共享、磁盘独立和文件零句柄。只有此批获准且前门通过，才执行下列唯一启动。启动会写入该机正常的 OS 日志、EFI 或磁盘状态；其余 VM 保持停机。
 
 ```bash
 utmctl list
@@ -66,7 +66,7 @@ test ! -e /home/radishlex-p05c && test ! -L /home/radishlex-p05c
 
 ### D　正常关机、冷启动和终态
 
-预计 15–25 分钟。先复核 `40-3`、同一运行 boot、receipt 和合成数据的语义摘要；正常关机与稍后冷启动按获准批次分别各执行一次。关机后复核五台全停及目标文件零句柄。启动前重新复核停机与身份。
+预计 15–25 分钟。先复核 `40-3`、同一运行 boot、receipt 和合成数据的语义摘要；正常关机与稍后冷启动按获准批次分别各执行一次。关机后复核全部登记 VM 停机及目标文件零句柄。启动前重新复核停机与身份。
 
 ```bash
 utmctl stop 755199B1-1C18-4441-8A1E-D423C8DE0022 --request

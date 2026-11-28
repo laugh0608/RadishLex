@@ -51,7 +51,7 @@
 
 ## 停止线
 
-- [R 记录](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)固定 S `c038602` 和源材料。通用 Debian 保留 B 批 `40-3` 现场、私有输入与 receipt。原连续 L6 专机已退役，终态副本与 S0/S1/S2、固定包对和持久证据保留。`upgrade_quiesced` 专机仍占用唯一专机名额。
+- [R 记录](../devlogs/2026-W46.md#2026-11-13-source-seed-所有者审阅与-r-锚点)固定 S `c038602` 和源材料。通用 Debian 保留 B 批 `40-3` 现场、私有输入与 receipt。原连续 L6 和 `upgrade_quiesced` 两台专机均已退役。保留各自的终态副本、S0/S1/S2、固定包对和持久证据。
 - macOS `aad9cf8ac2dae71b2b659e96a91ea706` 已为外层 `rolled_back` / 数据 `aborted_preserved`。源 39 双程序已恢复，target 40 保留在同 operation 的两个 `staged.app`；原 DB/WAL/SHM、snapshot/candidate/settings backup、独立恢复证据、原 39/40 与恢复 Installer 全部保留。输入源未选中、Manager/InputMethod 停止、privacy false，恢复 Installer 保持终态窗口。实际恢复授权已完成，不点“重新执行”/移除，不手动 checkpoint/删除 sidecar，不清理或启动双组件/输入测试；后续 WAL 新升级合同及系统动作另行确定范围。
 - 五批均闭合`deleted`，第五批manifest为`a65abab2…1b106`；授权均已消费，不得复跑。
 - 第五批证据、projection 与 S2 的留存证据冻结，三台 bundle 已 absent；不得恢复、重建、注册或复用。
@@ -74,7 +74,7 @@
 
 ## 下一阶段：Linux M5 交付收口
 
-11-28 恢复专机的配置、EFI 和磁盘已封存并回读，五台登记 VM 全停。通用 Debian 保留 `40-3 / completed / upgrade / chain=2`。从 S0 建机前，须单独确认并核验旧专机退役。[封存记录](../devlogs/2026-W48.md#2026-11-28-恢复专机终态封存)
+11-28 恢复专机退役，登记与原载体均已移除，余四台全停。通用 Debian 保留 `40-3 / completed / upgrade / chain=2`。从 S0 建机前须核实名额并单独确认。[退役记录](../devlogs/2026-W48.md#2026-11-28-恢复专机退役)
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
@@ -94,7 +94,7 @@
 
 ## Linux M5 系统操作停止线
 
-日常复用 `Debian13-ARM64` / `Windows11-ARM64`，干净基线只作备份。11-26 A 批启动前五台全停，通用 Debian 与恢复专机的配置、EFI 和磁盘均为独立文件且零句柄。P04 专机和原连续 L6 专机已退役。本轮只启动了通用 Debian。后续操作沿用 [P05C 验收方案](../runbooks/linux-p05c-acceptance.md)。
+日常复用 `Debian13-ARM64` / `Windows11-ARM64`，干净基线只作备份。11-26 A 批启动前五台全停，通用 Debian 与恢复专机的配置、EFI 和磁盘均为独立文件且零句柄。P04、原连续 L6 和恢复专机均已退役。后续操作沿用 [P05C 验收方案](../runbooks/linux-p05c-acceptance.md)。
 
 1. 留存的旧证据只用于历史审阅。迁移映射见 `datas/_organization/2026-11-01/`。旧 Move、adopt 和物化控制仅用于审阅历史，后续实机前门按新 source/pair 和实际载体重新建立。
 2. 通用测试机之外最多保留一台 RadishLex 专用 VM，按根协作约定计数。现有专用载体超额时暂停新增，按精确清单取得退役授权并核验后再安排专用 guest。

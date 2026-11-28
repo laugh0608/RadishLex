@@ -51,7 +51,7 @@
 | --- | --- | --- |
 | B1 新交付链 | 受审 S/R 与后继 T 已固定，`40-2` 安装终态为 `completed`/chain1 | 保持精确 source、receipt、seed、review 与 Git 关系，实机前门重新核对 |
 | B2 实际载体与后继构建 | D 的两份 ARM64 `.deb`、两端 FFI、实际 SQLite、执行器及交接清单已核验 | 后续 case 绑定 D 的闭合清单与实物，同一 T 无需为该前门重建 |
-| B3 guest 资源与第三 crash | 当前包对的独立 S2 副本已闭合 `upgrade_quiesced`、单次生产 resume 和正常停机。前两个历史 crash 的适用性限于共同安装恢复合同。[恢复记录](../devlogs/2026-W47.md#2026-11-22-upgrade_quiesced-恢复与停机) · [适用性审阅](../devlogs/2026-W47.md#2026-11-22-两个历史-crash-的适用性) | 保留恢复机与证据，独立 P05C 优先复用通用 Debian。更换专机须符合配额并逐项授权 |
+| B3 guest 资源与第三 crash | 当前包对的独立 S2 副本已闭合 `upgrade_quiesced`、单次生产 resume 和正常停机。前两个历史 crash 的适用性限于共同安装恢复合同。[恢复记录](../devlogs/2026-W47.md#2026-11-22-upgrade_quiesced-恢复与停机) · [适用性审阅](../devlogs/2026-W47.md#2026-11-22-两个历史-crash-的适用性) | 保留恢复终态的配置、EFI、磁盘和实测证据，独立 P05C 优先复用通用 Debian。更换专机须符合配额并逐项授权 |
 | B4 连续 L6 | 同一候选与当前包对完成 install→upgrade→repair→rollback→remove→reinstall，包含实际 dpkg、双端门禁、依赖和字体、断网、XDG 与重装后冷启动。[六步实测](../devlogs/2026-W47.md#2026-11-22-连续-l6-六步实测) · [冷启动](../devlogs/2026-W47.md#2026-11-22-连续-l6-冷启动对照与留存) | 保留终态与资料，向 M5 出口评审提交同一连续证据链 |
 | B5 当前 Linux 产品行为 | P04历史实测早于REV修复，当前候选真实隐私/学习/质量复验不足 | 对实际新产品覆盖Wayland主路径、X11适用回归、跨上下文隐私与普通恢复、多session、候选/commit、本地学习/删除/tombstone、Manager同库/重启；只用合成数据，不把安装维护的XDG零写入场景混作学习场景 |
 | B6 P05C与退出 | 独立实机方案已形成，通用 Debian 离线启动前门待批准。[P05C 方案](../runbooks/linux-p05c-acceptance.md) | 独立 guest 授权验收、适用的常规与专项验证、残余限制与 M5 退出审阅 |
