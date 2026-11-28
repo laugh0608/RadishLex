@@ -98,6 +98,7 @@ fn startup_relationship_revalidates_actual_terminal_package_and_dependencies() {
         site.paths.manager_component_path.clone(),
         9,
     );
+    site.qualify(&receipt, relationship.dependencies());
     port.validate_package_relationship(&receipt, &artifact)
         .expect("validate actual terminal package relationship");
 
@@ -127,6 +128,7 @@ fn startup_relationship_revalidates_actual_terminal_package_and_dependencies() {
         status_snapshot(&relationship, None, false).as_bytes(),
         0o644,
     );
+    repair_site.qualify(&repair, relationship.dependencies());
     LinuxSystemStartupPort::new(
         repair_site.paths.clone(),
         repair_site.paths.manager_component_path.clone(),

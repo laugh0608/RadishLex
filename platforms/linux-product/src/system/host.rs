@@ -16,11 +16,15 @@ use crate::store::{LinuxInstallStore, LinuxInstallStoreError, SYSTEM_STATE_ROOT}
 
 use super::observer::{
     validate_effective_root, verify_root_owned_input_artifact, LinuxSystemObservationError,
+    LinuxSystemObserver,
 };
 use super::port::LinuxDpkgTransactionPort;
+use super::qualification;
+use crate::startup::LinuxStartupPaths;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinuxMaintenanceHostErrorCode {
+    StartupQualification,
     AuthorizationRequired,
     ArgumentInvalid,
     ArtifactInvalid,
@@ -41,7 +45,7 @@ pub struct LinuxMaintenanceHostError {
 }
 
 impl LinuxMaintenanceHostError {
-    const fn new(code: LinuxMaintenanceHostErrorCode, message: &'static str) -> Self {
+    pub(super) const fn new(code: LinuxMaintenanceHostErrorCode, message: &'static str) -> Self {
         Self {
             code,
             message,
@@ -345,6 +349,8 @@ where
     let store = LinuxInstallStore::bootstrap_system().map_err(store_error)?;
     let guard = store.acquire_guard().map_err(store_error)?;
     let mut port = port_factory(relationships);
+    let paths = LinuxStartupPaths::system();
+    qualification::before_start(&paths, &store, &guard, &request, &mut LinuxSystemObserver)?;
     prepare_operation(&store, &guard, request, &mut port).map_err(transaction_error)?;
     if matches!(
         kind,
@@ -372,8 +378,11 @@ where
             .map_err(store_error)?;
     }
     finish_staging_at_prepared_checkpoint(&store, &guard, checkpoints)?;
-    resume_operation_with_checkpoints(&store, &guard, &mut port, checkpoints)
-        .map_err(transaction_error)
+    let outcome = resume_operation_with_checkpoints(&store, &guard, &mut port, checkpoints)
+        .map_err(transaction_error)?;
+    let terminal = qualification::current_receipt(&paths)?;
+    qualification::finish(&paths, &store, &guard, &terminal, &mut LinuxSystemObserver)?;
+    Ok(outcome)
 }
 
 pub(crate) fn finish_staging_at_prepared_checkpoint(
@@ -421,24 +430,35 @@ where
     }
     let store = LinuxInstallStore::bootstrap_system().map_err(store_error)?;
     let guard = store.acquire_guard().map_err(store_error)?;
-    let receipt = store.load_receipt().map_err(store_error)?.ok_or_else(|| {
-        LinuxMaintenanceHostError::new(
-            LinuxMaintenanceHostErrorCode::OperationIdentityChanged,
-            "maintenance receipt is unavailable",
-        )
-    })?;
+    let paths = LinuxStartupPaths::system();
+    let receipt = qualification::current_receipt(&paths)?;
     if receipt.operation_id() != operation_id {
         return Err(LinuxMaintenanceHostError::new(
             LinuxMaintenanceHostErrorCode::OperationIdentityChanged,
             "maintenance operation identity differs from the receipt",
         ));
     }
+    use crate::model::LinuxInstallState;
+    let terminal_outcome = match receipt.state() {
+        LinuxInstallState::Completed => Some(TransactionOutcome::Completed),
+        LinuxInstallState::AbortedPreserved => Some(TransactionOutcome::AbortedPreserved),
+        LinuxInstallState::RolledBack => Some(TransactionOutcome::RolledBack),
+        _ => None,
+    };
+    if let Some(outcome) = terminal_outcome {
+        qualification::finish(&paths, &store, &guard, &receipt, &mut LinuxSystemObserver)?;
+        return Ok(outcome);
+    }
+    qualification::before_resume(&paths)?;
     if receipt.state() == crate::model::LinuxInstallState::Prepared {
         store.finish_staging(&guard).map_err(store_error)?;
     }
     let mut port = port_factory(Vec::new());
-    resume_operation_with_checkpoints(&store, &guard, &mut port, checkpoints)
-        .map_err(transaction_error)
+    let outcome = resume_operation_with_checkpoints(&store, &guard, &mut port, checkpoints)
+        .map_err(transaction_error)?;
+    let terminal = qualification::current_receipt(&paths)?;
+    qualification::finish(&paths, &store, &guard, &terminal, &mut LinuxSystemObserver)?;
+    Ok(outcome)
 }
 
 fn checkpoint_error(
@@ -521,7 +541,7 @@ fn artifact_invalid() -> LinuxMaintenanceHostError {
     )
 }
 
-fn observation_error(error: LinuxSystemObservationError) -> LinuxMaintenanceHostError {
+pub(super) fn observation_error(error: LinuxSystemObservationError) -> LinuxMaintenanceHostError {
     use super::observer::LinuxSystemObservationErrorCode as Code;
     let code = match error.code() {
         Code::EnvironmentUnsupported => LinuxMaintenanceHostErrorCode::EnvironmentUnsupported,
@@ -532,7 +552,7 @@ fn observation_error(error: LinuxSystemObservationError) -> LinuxMaintenanceHost
     LinuxMaintenanceHostError::new(code, "maintenance artifact observation failed")
 }
 
-fn store_error(_error: LinuxInstallStoreError) -> LinuxMaintenanceHostError {
+pub(super) fn store_error(_error: LinuxInstallStoreError) -> LinuxMaintenanceHostError {
     LinuxMaintenanceHostError::new(
         LinuxMaintenanceHostErrorCode::Store,
         "maintenance state store failed",

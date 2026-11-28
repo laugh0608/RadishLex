@@ -12,13 +12,15 @@ pub use command::{
 };
 #[cfg(test)]
 pub(crate) use relationship::tests::helper::{status_snapshot, ArtifactFixture};
-pub(crate) use relationship::validate_radishlex_package_release;
 pub use relationship::{
     compare_debian_versions, validate_operation_relation, BinaryControlSnapshot,
     DebianRelationshipError, DebianRelationshipErrorCode, DebianVersionConstraint,
     DebianVersionOperator, DirectDependency, DpkgCurrentState, DpkgDesiredState, DpkgErrorState,
     DpkgMultiArch, DpkgPackageRecord, DpkgStatusSnapshot, ProductDataContract,
     VerifiedArtifactRelationship,
+};
+pub(crate) use relationship::{
+    parse_dependency_texts, validate_dependency_profile, validate_radishlex_package_release,
 };
 #[cfg(test)]
 pub(crate) use relationship::{

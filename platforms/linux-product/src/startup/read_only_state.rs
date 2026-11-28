@@ -4,12 +4,10 @@ use std::io::{self, Read};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
-use sha2::{Digest, Sha256};
-
 use crate::filesystem_policy::parent_permissions_are_safe;
 use crate::model::{
-    ArtifactFileIdentity, ArtifactSlot, LinuxInstallReceipt, LinuxInstallRootIdentity,
-    LinuxInstallState, StagedArtifactEvidence, MAX_LINUX_INSTALL_RECEIPT_BYTES,
+    LinuxInstallReceipt, LinuxInstallRootIdentity, LinuxInstallState,
+    MAX_LINUX_INSTALL_RECEIPT_BYTES,
 };
 
 use super::types::{
@@ -19,7 +17,6 @@ use super::types::{
 pub(super) const RECEIPT_FILENAME: &str = "receipt.json";
 pub(super) const RECEIPT_TMP_FILENAME: &str = "receipt.json.tmp";
 pub(super) const OPERATIONS_DIRECTORY: &str = "operations";
-const MAX_STAGED_ARTIFACT_BYTES: u64 = 512 * 1024 * 1024;
 
 #[derive(Debug)]
 pub(super) struct StartupInspectionError {
@@ -40,6 +37,17 @@ impl StartupInspectionError {
             self.reason,
             receipt_state,
         )
+    }
+
+    pub(super) fn port_error(self) -> super::LinuxStartupPortError {
+        let code = match self.reason {
+            LinuxStartupReason::PermissionDenied => {
+                super::LinuxStartupPortErrorCode::PermissionDenied
+            }
+            LinuxStartupReason::Io => super::LinuxStartupPortErrorCode::Io,
+            _ => super::LinuxStartupPortErrorCode::PackageIdentityChanged,
+        };
+        super::LinuxStartupPortError::new(code, "Linux startup state inspection failed")
     }
 
     fn from_io(error: &io::Error) -> Self {
@@ -70,13 +78,22 @@ impl ReadOnlyStateView {
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(Self::Absent),
             Err(error) => Err(StartupInspectionError::from_io(&error)),
             Ok(metadata) => {
+                let parent = paths.state_root.parent().ok_or_else(|| {
+                    StartupInspectionError::new(LinuxStartupReason::UnexpectedStateObject)
+                })?;
                 validate_parent(
-                    paths.state_root.parent().ok_or_else(|| {
-                        StartupInspectionError::new(LinuxStartupReason::UnexpectedStateObject)
-                    })?,
+                    parent,
                     paths.expected_owner_id,
                     paths.expected_group_id,
                     false,
+                )?;
+                let parent_meta = fs::symlink_metadata(parent)
+                    .map_err(|e| StartupInspectionError::from_io(&e))?;
+                validate_directory_metadata(
+                    &parent_meta,
+                    0o755,
+                    paths.expected_owner_id,
+                    paths.expected_group_id,
                 )?;
                 validate_directory_metadata(
                     &metadata,
@@ -369,11 +386,6 @@ fn validate_operation_entries(
             paths.expected_owner_id,
             paths.expected_group_id,
         )?;
-        if name == receipt.operation_id() {
-            validate_current_operation(paths, receipt, &entry.path())?;
-        } else {
-            validate_historical_operation(paths, &entry.path())?;
-        }
         let after = fs::symlink_metadata(entry.path())
             .map_err(|error| StartupInspectionError::from_io(&error))?;
         if !same_file_identity(&metadata, &after) {
@@ -390,7 +402,11 @@ fn validate_operation_entries(
             Err(error)
                 if error.kind() == io::ErrorKind::NotFound
                     && operation_id == receipt.operation_id()
-                    && recorded_staged_artifacts(receipt).is_empty() => {}
+                    && receipt.state() == LinuxInstallState::Prepared
+                    && receipt
+                        .required_slots()
+                        .iter()
+                        .all(|slot| receipt.staged_artifact(*slot).is_none()) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
                 return Err(StartupInspectionError::new(
                     LinuxStartupReason::RootIdentityChanged,
@@ -400,207 +416,6 @@ fn validate_operation_entries(
         }
     }
     Ok(())
-}
-
-fn validate_current_operation(
-    paths: &LinuxStartupPaths,
-    receipt: &LinuxInstallReceipt,
-    operation_path: &Path,
-) -> Result<(), StartupInspectionError> {
-    let staged = recorded_staged_artifacts(receipt);
-    if staged.is_empty() {
-        return Err(StartupInspectionError::new(
-            LinuxStartupReason::RootIdentityChanged,
-        ));
-    }
-    let expected_names: BTreeSet<&str> = staged
-        .iter()
-        .flat_map(|evidence| {
-            let (package, evidence) = staged_file_names(evidence.slot());
-            [package, evidence]
-        })
-        .collect();
-    let mut actual_names = BTreeSet::new();
-    for entry in
-        fs::read_dir(operation_path).map_err(|error| StartupInspectionError::from_io(&error))?
-    {
-        let entry = entry.map_err(|error| StartupInspectionError::from_io(&error))?;
-        let name = entry.file_name();
-        let name = name.to_str().ok_or_else(|| {
-            StartupInspectionError::new(LinuxStartupReason::UnexpectedStateObject)
-        })?;
-        if !expected_names.contains(name) || !actual_names.insert(name.to_owned()) {
-            return Err(StartupInspectionError::new(
-                LinuxStartupReason::UnexpectedStateObject,
-            ));
-        }
-    }
-    if actual_names.len() != expected_names.len() {
-        return Err(StartupInspectionError::new(
-            LinuxStartupReason::RootIdentityChanged,
-        ));
-    }
-
-    for evidence in staged {
-        let (package_name, evidence_name) = staged_file_names(evidence.slot());
-        validate_staged_file(
-            &operation_path.join(package_name),
-            evidence.package_file(),
-            paths,
-        )?;
-        validate_staged_file(
-            &operation_path.join(evidence_name),
-            evidence.evidence_file(),
-            paths,
-        )?;
-    }
-    Ok(())
-}
-
-fn validate_historical_operation(
-    paths: &LinuxStartupPaths,
-    operation_path: &Path,
-) -> Result<(), StartupInspectionError> {
-    let mut names = BTreeSet::new();
-    for entry in
-        fs::read_dir(operation_path).map_err(|error| StartupInspectionError::from_io(&error))?
-    {
-        let entry = entry.map_err(|error| StartupInspectionError::from_io(&error))?;
-        let name = entry.file_name();
-        let name = name.to_str().ok_or_else(|| {
-            StartupInspectionError::new(LinuxStartupReason::UnexpectedStateObject)
-        })?;
-        if !is_staged_file_name(name) || !names.insert(name.to_owned()) {
-            return Err(StartupInspectionError::new(
-                LinuxStartupReason::UnexpectedStateObject,
-            ));
-        }
-        let metadata = fs::symlink_metadata(entry.path())
-            .map_err(|error| StartupInspectionError::from_io(&error))?;
-        validate_regular_metadata(
-            &metadata,
-            &[0o600],
-            paths.expected_owner_id,
-            paths.expected_group_id,
-            1,
-            MAX_STAGED_ARTIFACT_BYTES,
-            LinuxStartupReason::RootIdentityChanged,
-        )?;
-    }
-    let source_complete = names.contains("source.deb") == names.contains("source.evidence.json");
-    let target_complete = names.contains("target.deb") == names.contains("target.evidence.json");
-    if names.is_empty() || !source_complete || !target_complete {
-        return Err(StartupInspectionError::new(
-            LinuxStartupReason::RootIdentityChanged,
-        ));
-    }
-    Ok(())
-}
-
-fn recorded_staged_artifacts(receipt: &LinuxInstallReceipt) -> Vec<&StagedArtifactEvidence> {
-    [ArtifactSlot::Source, ArtifactSlot::Target]
-        .into_iter()
-        .filter_map(|slot| receipt.staged_artifact(slot))
-        .collect()
-}
-
-fn staged_file_names(slot: ArtifactSlot) -> (&'static str, &'static str) {
-    match slot {
-        ArtifactSlot::Source => ("source.deb", "source.evidence.json"),
-        ArtifactSlot::Target => ("target.deb", "target.evidence.json"),
-    }
-}
-
-fn is_staged_file_name(name: &str) -> bool {
-    matches!(
-        name,
-        "source.deb" | "source.evidence.json" | "target.deb" | "target.evidence.json"
-    )
-}
-
-fn validate_staged_file(
-    path: &Path,
-    expected: &ArtifactFileIdentity,
-    paths: &LinuxStartupPaths,
-) -> Result<(), StartupInspectionError> {
-    let before = fs::symlink_metadata(path)
-        .map_err(|error| map_missing_identity(error, LinuxStartupReason::RootIdentityChanged))?;
-    validate_regular_metadata(
-        &before,
-        &[0o600],
-        paths.expected_owner_id,
-        paths.expected_group_id,
-        1,
-        MAX_STAGED_ARTIFACT_BYTES,
-        LinuxStartupReason::RootIdentityChanged,
-    )?;
-    if !metadata_matches_artifact_identity(&before, expected) {
-        return Err(StartupInspectionError::new(
-            LinuxStartupReason::RootIdentityChanged,
-        ));
-    }
-
-    let mut file = File::open(path).map_err(|error| StartupInspectionError::from_io(&error))?;
-    let opened = file
-        .metadata()
-        .map_err(|error| StartupInspectionError::from_io(&error))?;
-    if !same_file_identity(&before, &opened) {
-        return Err(StartupInspectionError::new(
-            LinuxStartupReason::RootIdentityChanged,
-        ));
-    }
-    let mut digest = Sha256::new();
-    let mut size = 0_u64;
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = file
-            .read(&mut buffer)
-            .map_err(|error| StartupInspectionError::from_io(&error))?;
-        if read == 0 {
-            break;
-        }
-        size = size
-            .checked_add(read as u64)
-            .ok_or_else(|| StartupInspectionError::new(LinuxStartupReason::RootIdentityChanged))?;
-        if size > expected.size() {
-            return Err(StartupInspectionError::new(
-                LinuxStartupReason::RootIdentityChanged,
-            ));
-        }
-        digest.update(&buffer[..read]);
-    }
-    let after = fs::symlink_metadata(path)
-        .map_err(|error| map_missing_identity(error, LinuxStartupReason::RootIdentityChanged))?;
-    if !same_file_identity(&before, &after)
-        || size != expected.size()
-        || format!("{:x}", digest.finalize()) != expected.sha256()
-    {
-        return Err(StartupInspectionError::new(
-            LinuxStartupReason::RootIdentityChanged,
-        ));
-    }
-    Ok(())
-}
-
-fn metadata_matches_artifact_identity(
-    metadata: &fs::Metadata,
-    expected: &ArtifactFileIdentity,
-) -> bool {
-    metadata.dev() == expected.device_id()
-        && metadata.ino() == expected.inode()
-        && metadata.uid() == expected.owner_id()
-        && metadata.gid() == expected.group_id()
-        && metadata.mode() & 0o7777 == expected.mode()
-        && metadata.nlink() == expected.hardlink_count()
-        && metadata.len() == expected.size()
-}
-
-fn map_missing_identity(error: io::Error, reason: LinuxStartupReason) -> StartupInspectionError {
-    if error.kind() == io::ErrorKind::NotFound {
-        StartupInspectionError::new(reason)
-    } else {
-        StartupInspectionError::from_io(&error)
-    }
 }
 
 fn validate_regular_metadata(

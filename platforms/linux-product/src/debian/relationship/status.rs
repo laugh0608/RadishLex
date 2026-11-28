@@ -98,7 +98,7 @@ impl DpkgPackageRecord {
         self.multi_arch
     }
 
-    fn is_fully_installed(&self) -> bool {
+    pub(crate) fn is_fully_installed(&self) -> bool {
         matches!(
             self.desired,
             DpkgDesiredState::Install | DpkgDesiredState::Hold
@@ -161,6 +161,21 @@ impl DpkgStatusSnapshot {
         &self,
         artifact: &VerifiedArtifactRelationship,
     ) -> Result<(), DebianRelationshipError> {
+        self.validate_installed_dependencies(
+            artifact.package_name(),
+            artifact.package_version(),
+            artifact.architecture(),
+            artifact.dependencies(),
+        )
+    }
+
+    pub(crate) fn validate_installed_dependencies(
+        &self,
+        package: &str,
+        version: &str,
+        architecture: &str,
+        dependencies: &[DirectDependency],
+    ) -> Result<(), DebianRelationshipError> {
         let product_records: Vec<_> = self
             .records
             .iter()
@@ -173,9 +188,9 @@ impl DpkgStatusSnapshot {
             ));
         }
         let product = product_records[0];
-        if product.package() != artifact.package_name()
-            || product.architecture() != Some(artifact.architecture())
-            || product.version() != Some(artifact.package_version())
+        if product.package() != package
+            || product.architecture() != Some(architecture)
+            || product.version() != Some(version)
         {
             return Err(DebianRelationshipError::new(
                 DebianRelationshipErrorCode::PackageIdentityMismatch,
@@ -188,13 +203,16 @@ impl DpkgStatusSnapshot {
                 "installed RadishLex package is not fully configured",
             ));
         }
-        if product.product_dependencies() != Some(artifact.dependencies()) {
+        if product.product_dependencies() != Some(dependencies) {
             return Err(DebianRelationshipError::new(
                 DebianRelationshipErrorCode::PackageIdentityMismatch,
                 "installed RadishLex Depends differs from the artifact",
             ));
         }
-        self.validate_dependencies(artifact)
+        for dependency in dependencies {
+            self.validate_dependency(dependency)?;
+        }
+        Ok(())
     }
 
     /// Validates target package dependencies before any dpkg mutation.

@@ -448,6 +448,21 @@ where
     }
 }
 
+impl From<DpkgCurrentState> for DpkgPackageState {
+    fn from(current: DpkgCurrentState) -> Self {
+        match current {
+            DpkgCurrentState::NotInstalled => DpkgPackageState::NotInstalled,
+            DpkgCurrentState::ConfigFiles => DpkgPackageState::ConfigFiles,
+            DpkgCurrentState::Installed => DpkgPackageState::Installed,
+            DpkgCurrentState::Unpacked => DpkgPackageState::Unpacked,
+            DpkgCurrentState::HalfConfigured => DpkgPackageState::HalfConfigured,
+            DpkgCurrentState::HalfInstalled => DpkgPackageState::HalfInstalled,
+            DpkgCurrentState::TriggersAwaited => DpkgPackageState::TriggersAwaited,
+            DpkgCurrentState::TriggersPending => DpkgPackageState::TriggersPending,
+        }
+    }
+}
+
 fn project_package_snapshot(
     status: &DpkgStatusSnapshot,
     context: DpkgOperationContext<'_>,
@@ -467,16 +482,7 @@ fn project_package_snapshot(
     let Some(record) = product_records.first() else {
         return Ok(PackageSnapshot::absent());
     };
-    let state = match record.current() {
-        DpkgCurrentState::NotInstalled => DpkgPackageState::NotInstalled,
-        DpkgCurrentState::ConfigFiles => DpkgPackageState::ConfigFiles,
-        DpkgCurrentState::Installed => DpkgPackageState::Installed,
-        DpkgCurrentState::Unpacked => DpkgPackageState::Unpacked,
-        DpkgCurrentState::HalfConfigured => DpkgPackageState::HalfConfigured,
-        DpkgCurrentState::HalfInstalled => DpkgPackageState::HalfInstalled,
-        DpkgCurrentState::TriggersAwaited => DpkgPackageState::TriggersAwaited,
-        DpkgCurrentState::TriggersPending => DpkgPackageState::TriggersPending,
-    };
+    let state = DpkgPackageState::from(record.current());
     let artifact = if state.is_recoverable() {
         let version = record
             .version()

@@ -41,6 +41,11 @@ impl TestSite {
     }
 
     pub(super) fn create_state_root(&self) -> LinuxInstallRootIdentity {
+        fs::set_permissions(
+            self.paths.state_root.parent().unwrap(),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
         fs::create_dir(&self.paths.state_root).expect("create state root");
         fs::set_permissions(&self.paths.state_root, fs::Permissions::from_mode(0o755))
             .expect("set state root mode");
@@ -72,6 +77,29 @@ impl TestSite {
         file.sync_all().expect("sync receipt");
     }
 
+    pub(super) fn write_qualified_receipt(&self, receipt: &LinuxInstallReceipt) {
+        self.write_receipt(receipt);
+        self.qualify(receipt, &test_dependencies());
+    }
+    pub(super) fn qualify(
+        &self,
+        receipt: &LinuxInstallReceipt,
+        deps: &[crate::debian::DirectDependency],
+    ) {
+        super::super::record::StartupRecord::new(receipt, deps)
+            .unwrap()
+            .publish(&self.paths)
+            .unwrap();
+    }
+    pub(super) fn store(&self) -> crate::LinuxInstallStore {
+        crate::LinuxInstallStore::bootstrap_at(
+            &self.paths.state_root,
+            &self.paths.guard_path,
+            self.paths.expected_owner_id,
+            self.paths.expected_group_id,
+        )
+        .unwrap()
+    }
     pub(super) fn tree_fingerprint(&self) -> Vec<(String, u64, u64, u32, u64, Vec<u8>)> {
         let mut paths = vec![self.root.clone()];
         let mut index = 0;
@@ -128,6 +156,7 @@ pub(super) struct FakeStartupPort {
     package: LinuxPackageObservation,
     relationship_error: Option<LinuxStartupPortErrorCode>,
     component_error: Option<LinuxStartupPortErrorCode>,
+    during_component: Option<Box<dyn Fn()>>,
     pub(super) package_calls: Cell<usize>,
     pub(super) relationship_calls: Cell<usize>,
     pub(super) component_calls: Cell<usize>,
@@ -139,6 +168,7 @@ impl FakeStartupPort {
             package,
             relationship_error: None,
             component_error: None,
+            during_component: None,
             package_calls: Cell::new(0),
             relationship_calls: Cell::new(0),
             component_calls: Cell::new(0),
@@ -147,6 +177,11 @@ impl FakeStartupPort {
 
     pub(super) fn with_relationship_error(mut self, code: LinuxStartupPortErrorCode) -> Self {
         self.relationship_error = Some(code);
+        self
+    }
+
+    pub(super) fn during_component(mut self, action: impl Fn() + 'static) -> Self {
+        self.during_component = Some(Box::new(action));
         self
     }
 
@@ -183,6 +218,9 @@ impl LinuxStartupPort for FakeStartupPort {
         _component: LinuxStartupComponent,
         _artifact: &LinuxArtifactIdentity,
     ) -> Result<(), LinuxStartupPortError> {
+        if let Some(action) = &self.during_component {
+            action();
+        }
         self.component_calls.set(self.component_calls.get() + 1);
         match self.component_error {
             Some(code) => Err(LinuxStartupPortError::new(
@@ -192,6 +230,19 @@ impl LinuxStartupPort for FakeStartupPort {
             None => Ok(()),
         }
     }
+}
+
+pub(super) fn test_dependencies() -> Vec<crate::debian::DirectDependency> {
+    [
+        "libc6",
+        "fcitx5 (>= 5.1.9)",
+        "librime1t64 (>= 1.13.1)",
+        "fonts-dejavu-core",
+        "fonts-noto-cjk",
+    ]
+    .into_iter()
+    .map(|s| crate::debian::DirectDependency::parse(s).unwrap())
+    .collect()
 }
 
 pub(super) fn artifact(version: &str, marker: u8) -> LinuxArtifactIdentity {

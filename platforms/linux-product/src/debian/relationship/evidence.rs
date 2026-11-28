@@ -535,7 +535,7 @@ pub(super) fn parse_control_dependency_field(
     parse_dependency_texts(&texts)
 }
 
-fn parse_dependency_texts(
+pub(crate) fn parse_dependency_texts(
     values: &[String],
 ) -> Result<Vec<DirectDependency>, DebianRelationshipError> {
     if values.is_empty() {
@@ -553,7 +553,7 @@ fn parse_dependency_texts(
     Ok(dependencies)
 }
 
-fn validate_dependency_profile(
+pub(crate) fn validate_dependency_profile(
     dependencies: &[DirectDependency],
 ) -> Result<(), DebianRelationshipError> {
     if dependencies.len() <= FIXED_DEPENDENCIES.len() {

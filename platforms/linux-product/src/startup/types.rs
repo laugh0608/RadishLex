@@ -231,6 +231,19 @@ pub trait LinuxStartupPort {
         artifact: &LinuxArtifactIdentity,
     ) -> Result<(), LinuxStartupPortError>;
 
+    fn inspect_installed_package(
+        &self,
+        receipt: &LinuxInstallReceipt,
+        artifact: &LinuxArtifactIdentity,
+        _dependencies: &[crate::debian::DirectDependency],
+    ) -> Result<LinuxPackageObservation, LinuxStartupPortError> {
+        let observed = self.inspect_package()?;
+        if observed.matches(artifact) {
+            self.validate_package_relationship(receipt, artifact)?;
+        }
+        Ok(observed)
+    }
+
     fn validate_component(
         &self,
         component: LinuxStartupComponent,

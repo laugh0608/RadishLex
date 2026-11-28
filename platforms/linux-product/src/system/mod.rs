@@ -3,6 +3,7 @@ mod host;
 mod observer;
 mod port;
 mod process;
+mod qualification;
 
 pub use executor::{
     DebianCommandExecutor, DebianCommandOutput, DebianCommandTermination, DebianExecutionError,
@@ -16,7 +17,6 @@ pub use host::{
     run_linux_maintenance, LinuxMaintenanceArtifactInput, LinuxMaintenanceCommand,
     LinuxMaintenanceHostError, LinuxMaintenanceHostErrorCode,
 };
-pub(crate) use observer::verify_owned_artifact;
 pub use observer::{
     DpkgSystemObserver, LinuxSystemObservationError, LinuxSystemObservationErrorCode,
     LinuxSystemObserver, LinuxSystemQuiescencePermit,

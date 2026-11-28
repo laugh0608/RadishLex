@@ -5,6 +5,7 @@ use crate::model::{DataContractIdentity, LinuxArtifactIdentity};
 
 mod archive;
 mod evidence;
+pub(crate) use evidence::{parse_dependency_texts, validate_dependency_profile};
 mod manifest;
 mod status;
 mod version;

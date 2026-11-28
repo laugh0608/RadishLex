@@ -1,18 +1,15 @@
-use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
-use crate::debian::{DebianRelationshipError, DebianRelationshipErrorCode, DpkgStatusSnapshot};
-use crate::model::{
-    ArtifactSlot, DpkgPackageState, LinuxArtifactIdentity, LinuxInstallReceipt, LinuxInstallState,
-};
-use crate::system::{
-    verify_owned_artifact, LinuxSystemObservationError, LinuxSystemObservationErrorCode,
-};
-
 use super::read_only_state::same_file_identity;
+use super::record::StartupRecord;
+use crate::debian::{
+    DebianRelationshipError, DebianRelationshipErrorCode, DirectDependency, DpkgCurrentState,
+    DpkgStatusSnapshot,
+};
+use crate::model::{DpkgPackageState, LinuxArtifactIdentity, LinuxInstallReceipt};
 
 mod manifest;
 
@@ -56,68 +53,43 @@ impl LinuxStartupPort for LinuxSystemStartupPort {
         receipt: &LinuxInstallReceipt,
         artifact: &LinuxArtifactIdentity,
     ) -> Result<(), LinuxStartupPortError> {
-        let preferred_slot = match receipt.state() {
-            LinuxInstallState::Completed => ArtifactSlot::Target,
-            LinuxInstallState::AbortedPreserved | LinuxInstallState::RolledBack => {
-                ArtifactSlot::Source
-            }
-            _ => {
-                return Err(LinuxStartupPortError::new(
-                    LinuxStartupPortErrorCode::PackageIdentityChanged,
-                    "startup package relationship requires a terminal receipt",
-                ))
-            }
-        };
-        let slot = [preferred_slot, alternate_slot(preferred_slot)]
-            .into_iter()
-            .find(|slot| {
-                receipt
-                    .staged_artifact(*slot)
-                    .is_some_and(|staged| staged.artifact() == artifact)
-            })
-            .ok_or_else(|| {
-                LinuxStartupPortError::new(
-                    LinuxStartupPortErrorCode::PackageIdentityChanged,
-                    "startup package relationship lacks its installed staged proof",
-                )
-            })?;
-        let operation = self
-            .paths
-            .state_root
-            .join("operations")
-            .join(receipt.operation_id());
-        let (package_name, evidence_name) = match slot {
-            ArtifactSlot::Source => ("source.deb", "source.evidence.json"),
-            ArtifactSlot::Target => ("target.deb", "target.evidence.json"),
-        };
-        let relationship = verify_owned_artifact(
-            &operation.join(package_name),
-            &operation.join(evidence_name),
-            artifact,
-            &[0o600],
-            self.paths.expected_owner_id,
-            self.paths.expected_group_id,
-        )
-        .map_err(startup_observation_error)?;
-        let status = read_owned_regular_file(
-            &self.paths.dpkg_status_path,
-            self.paths.expected_owner_id,
-            self.paths.expected_group_id,
-            &[0o644],
-            1,
-            MAX_DPKG_STATUS_BYTES,
-            LinuxStartupPortErrorCode::PackageStateUnknown,
-        )?
-        .ok_or_else(|| {
-            LinuxStartupPortError::new(
-                LinuxStartupPortErrorCode::PackageStateUnavailable,
-                "dpkg status database is unavailable",
+        if receipt.installed_artifact() != Some(artifact) {
+            return Err(super::record::invalid_record());
+        }
+        let record = StartupRecord::read(&self.paths)?.ok_or_else(super::record::invalid_record)?;
+        let deps = record.dependencies_for(receipt)?;
+        read_status(&self.paths)?
+            .validate_installed_dependencies(
+                artifact.package_name(),
+                artifact.package_version(),
+                artifact.architecture(),
+                &deps,
             )
-        })?;
-        let status = DpkgStatusSnapshot::parse(&status).map_err(startup_relationship_error)?;
-        status
-            .validate_installed_relationship(&relationship)
             .map_err(startup_relationship_error)
+    }
+
+    fn inspect_installed_package(
+        &self,
+        receipt: &LinuxInstallReceipt,
+        artifact: &LinuxArtifactIdentity,
+        dependencies: &[DirectDependency],
+    ) -> Result<LinuxPackageObservation, LinuxStartupPortError> {
+        if receipt.installed_artifact() != Some(artifact) {
+            return Err(super::record::invalid_record());
+        }
+        let status = read_status(&self.paths)?;
+        let observation = package_observation(&status)?;
+        if observation.matches(artifact) {
+            status
+                .validate_installed_dependencies(
+                    artifact.package_name(),
+                    artifact.package_version(),
+                    artifact.architecture(),
+                    dependencies,
+                )
+                .map_err(startup_relationship_error)?;
+        }
+        Ok(observation)
     }
 
     fn validate_component(
@@ -138,7 +110,11 @@ impl LinuxStartupPort for LinuxSystemStartupPort {
 pub(super) fn inspect_dpkg_status(
     paths: &LinuxStartupPaths,
 ) -> Result<LinuxPackageObservation, LinuxStartupPortError> {
-    let value = match read_owned_regular_file(
+    package_observation(&read_status(paths)?)
+}
+
+fn read_status(paths: &LinuxStartupPaths) -> Result<DpkgStatusSnapshot, LinuxStartupPortError> {
+    let bytes = read_owned_regular_file(
         &paths.dpkg_status_path,
         paths.expected_owner_id,
         paths.expected_group_id,
@@ -146,130 +122,46 @@ pub(super) fn inspect_dpkg_status(
         1,
         MAX_DPKG_STATUS_BYTES,
         LinuxStartupPortErrorCode::PackageStateUnknown,
-    ) {
-        Ok(Some(value)) => value,
-        Ok(None) => {
-            return Err(LinuxStartupPortError::new(
-                LinuxStartupPortErrorCode::PackageStateUnavailable,
-                "dpkg status database is unavailable",
-            ))
-        }
-        Err(error) => return Err(error),
-    };
-    let text = std::str::from_utf8(&value).map_err(|_| {
+    )?
+    .ok_or_else(|| {
         LinuxStartupPortError::new(
-            LinuxStartupPortErrorCode::PackageStateUnknown,
-            "dpkg status is not UTF-8",
+            LinuxStartupPortErrorCode::PackageStateUnavailable,
+            "dpkg status database is unavailable",
         )
     })?;
-    let mut radishlex = None;
-    for paragraph in text.split("\n\n") {
-        let fields = parse_debian_fields(paragraph)?;
-        if fields.get("Package").map(String::as_str) != Some("radishlex") {
-            continue;
-        }
-        if radishlex.replace(fields).is_some() {
-            return Err(LinuxStartupPortError::new(
-                LinuxStartupPortErrorCode::PackageStateUnknown,
-                "dpkg status contains duplicate RadishLex paragraphs",
-            ));
-        }
-    }
-    let Some(fields) = radishlex else {
+    DpkgStatusSnapshot::parse(&bytes).map_err(startup_relationship_error)
+}
+
+fn package_observation(
+    status: &DpkgStatusSnapshot,
+) -> Result<LinuxPackageObservation, LinuxStartupPortError> {
+    let mut products = status
+        .records()
+        .iter()
+        .filter(|r| r.package() == "radishlex");
+    let Some(record) = products.next() else {
         return Ok(LinuxPackageObservation::not_installed());
     };
-    let status = fields.get("Status").ok_or_else(|| {
-        LinuxStartupPortError::new(
-            LinuxStartupPortErrorCode::PackageStateUnknown,
-            "RadishLex dpkg status is missing Status",
-        )
-    })?;
-    let status_fields: Vec<_> = status.split_ascii_whitespace().collect();
-    if status_fields.len() != 3
-        || !matches!(
-            status_fields[0],
-            "unknown" | "install" | "hold" | "deinstall" | "purge"
-        )
-        || !matches!(status_fields[1], "ok" | "reinstreq")
+    if products.next().is_some()
+        || (record.current() == DpkgCurrentState::Installed && !record.is_fully_installed())
     {
         return Err(LinuxStartupPortError::new(
             LinuxStartupPortErrorCode::PackageStateUnknown,
-            "RadishLex dpkg status tuple is unknown",
+            "ambiguous or inconsistent product status",
         ));
     }
-    let state_name = status_fields[2];
-    let state = match state_name {
-        "not-installed" => DpkgPackageState::NotInstalled,
-        "config-files" => DpkgPackageState::ConfigFiles,
-        "installed" => DpkgPackageState::Installed,
-        "unpacked" => DpkgPackageState::Unpacked,
-        "half-configured" => DpkgPackageState::HalfConfigured,
-        "half-installed" => DpkgPackageState::HalfInstalled,
-        "triggers-awaited" => DpkgPackageState::TriggersAwaited,
-        "triggers-pending" => DpkgPackageState::TriggersPending,
-        _ => DpkgPackageState::Unknown,
-    };
-    if state == DpkgPackageState::Unknown {
-        return Err(LinuxStartupPortError::new(
-            LinuxStartupPortErrorCode::PackageStateUnknown,
-            "RadishLex dpkg state is unknown",
-        ));
+    let state = DpkgPackageState::from(record.current());
+    if state.is_absent() {
+        return LinuxPackageObservation::new(state, None, None);
     }
-    if state == DpkgPackageState::Installed
-        && (!matches!(status_fields[0], "install" | "hold") || status_fields[1] != "ok")
-    {
-        return Err(LinuxStartupPortError::new(
-            LinuxStartupPortErrorCode::PackageStateUnknown,
-            "RadishLex installed dpkg tuple is inconsistent",
-        ));
-    }
-    let (version, architecture) = if state.is_recoverable() {
-        (
-            Some(required_debian_field(&fields, "Version")?.to_owned()),
-            Some(required_debian_field(&fields, "Architecture")?.to_owned()),
-        )
-    } else {
-        (None, None)
-    };
-    LinuxPackageObservation::new(state, version, architecture)
+    LinuxPackageObservation::new(
+        state,
+        record.version().map(str::to_owned),
+        record.architecture().map(str::to_owned),
+    )
 }
 
-fn parse_debian_fields(paragraph: &str) -> Result<BTreeMap<String, String>, LinuxStartupPortError> {
-    let mut fields = BTreeMap::new();
-    for line in paragraph.lines() {
-        if line.is_empty() || line.starts_with([' ', '\t']) {
-            continue;
-        }
-        let Some((name, value)) = line.split_once(':') else {
-            return Err(LinuxStartupPortError::new(
-                LinuxStartupPortErrorCode::PackageStateUnknown,
-                "dpkg status contains a malformed field",
-            ));
-        };
-        if name.is_empty() || fields.contains_key(name) {
-            return Err(LinuxStartupPortError::new(
-                LinuxStartupPortErrorCode::PackageStateUnknown,
-                "dpkg status contains an invalid field",
-            ));
-        }
-        fields.insert(name.to_owned(), value.trim().to_owned());
-    }
-    Ok(fields)
-}
-
-fn required_debian_field<'a>(
-    fields: &'a BTreeMap<String, String>,
-    name: &str,
-) -> Result<&'a str, LinuxStartupPortError> {
-    fields.get(name).map(String::as_str).ok_or_else(|| {
-        LinuxStartupPortError::new(
-            LinuxStartupPortErrorCode::PackageStateUnknown,
-            "RadishLex dpkg identity field is missing",
-        )
-    })
-}
-
-fn read_owned_regular_file(
+pub(super) fn read_owned_regular_file(
     path: &Path,
     owner_id: u32,
     group_id: u32,
@@ -306,7 +198,10 @@ fn read_owned_regular_file(
         ));
     }
     let mut value = Vec::with_capacity(before.len() as usize);
-    file.read_to_end(&mut value).map_err(port_io_error)?;
+    (&mut file)
+        .take(maximum_size + 1)
+        .read_to_end(&mut value)
+        .map_err(port_io_error)?;
     let after = fs::symlink_metadata(path).map_err(port_io_error)?;
     if !same_file_identity(&before, &after) || value.len() as u64 != before.len() {
         return Err(LinuxStartupPortError::new(
@@ -317,7 +212,7 @@ fn read_owned_regular_file(
     Ok(Some(value))
 }
 
-fn port_io_error(error: io::Error) -> LinuxStartupPortError {
+pub(super) fn port_io_error(error: io::Error) -> LinuxStartupPortError {
     LinuxStartupPortError::new(
         if error.kind() == io::ErrorKind::PermissionDenied {
             LinuxStartupPortErrorCode::PermissionDenied
@@ -326,13 +221,6 @@ fn port_io_error(error: io::Error) -> LinuxStartupPortError {
         },
         "Linux startup inspection failed",
     )
-}
-
-const fn alternate_slot(slot: ArtifactSlot) -> ArtifactSlot {
-    match slot {
-        ArtifactSlot::Source => ArtifactSlot::Target,
-        ArtifactSlot::Target => ArtifactSlot::Source,
-    }
 }
 
 fn startup_relationship_error(error: DebianRelationshipError) -> LinuxStartupPortError {
@@ -349,15 +237,4 @@ fn startup_relationship_error(error: DebianRelationshipError) -> LinuxStartupPor
         _ => LinuxStartupPortErrorCode::PackageIdentityChanged,
     };
     LinuxStartupPortError::new(code, "Linux startup package relationship is invalid")
-}
-
-fn startup_observation_error(error: LinuxSystemObservationError) -> LinuxStartupPortError {
-    let code = match error.code() {
-        LinuxSystemObservationErrorCode::PermissionDenied => {
-            LinuxStartupPortErrorCode::PermissionDenied
-        }
-        LinuxSystemObservationErrorCode::Io => LinuxStartupPortErrorCode::Io,
-        _ => LinuxStartupPortErrorCode::PackageIdentityChanged,
-    };
-    LinuxStartupPortError::new(code, "Linux startup staged package identity changed")
 }

@@ -120,7 +120,7 @@ fn terminal_install_abort_and_rollback_use_the_installed_artifact() {
             .installed_artifact()
             .expect("terminal receipt has installed artifact")
             .clone();
-        site.write_receipt(&receipt);
+        site.write_qualified_receipt(&receipt);
         let port = FakeStartupPort::new(LinuxPackageObservation::installed(&installed));
         let before = site.tree_fingerprint();
         let outcome = inspect_linux_startup(
@@ -428,7 +428,7 @@ fn partial_unknown_and_identity_drift_never_reach_business_initialization() {
             Some(target.clone()),
         );
         advance_to(&site, &mut receipt, LinuxInstallState::Completed);
-        site.write_receipt(&receipt);
+        site.write_qualified_receipt(&receipt);
         let observation = if state.is_recoverable() {
             LinuxPackageObservation::new(
                 state,
@@ -474,7 +474,7 @@ fn partial_unknown_and_identity_drift_never_reach_business_initialization() {
             Some(target.clone()),
         );
         advance_to(&site, &mut receipt, LinuxInstallState::Completed);
-        site.write_receipt(&receipt);
+        site.write_qualified_receipt(&receipt);
         let port = FakeStartupPort::new(LinuxPackageObservation::installed(&target))
             .with_component_error(error);
         let outcome = inspect_linux_startup(
@@ -526,7 +526,7 @@ fn package_relationship_failure_precedes_component_validation() {
             Some(target.clone()),
         );
         advance_to(&site, &mut receipt, LinuxInstallState::Completed);
-        site.write_receipt(&receipt);
+        site.write_qualified_receipt(&receipt);
         let port = FakeStartupPort::new(LinuxPackageObservation::installed(&target))
             .with_relationship_error(error);
         let outcome = inspect_linux_startup(
@@ -591,7 +591,7 @@ fn staged_artifact_identity_and_inventory_changes_fail_closed() {
             Some(target.clone()),
         );
         advance_to(&site, &mut receipt, LinuxInstallState::Completed);
-        site.write_receipt(&receipt);
+        site.write_qualified_receipt(&receipt);
         let (package_path, _) = staged_paths(&site, ArtifactSlot::Target);
         match case {
             "missing" => fs::remove_file(&package_path).expect("remove staged package"),
@@ -622,26 +622,10 @@ fn staged_artifact_identity_and_inventory_changes_fail_closed() {
             _ => unreachable!(),
         }
 
-        let port = FakeStartupPort::new(LinuxPackageObservation::installed(&target));
-        let before = site.tree_fingerprint();
-        let outcome = inspect_linux_startup(
-            &site.paths,
-            LinuxStartupBuildIdentity::DebianSystemProduct,
-            LinuxStartupComponent::Manager,
-            &port,
+        assert!(
+            site.store().load_receipt().is_err(),
+            "private material drift: {case}"
         );
-        assert_eq!(outcome.decision(), LinuxStartupDecision::FailedClosed);
-        assert_eq!(
-            outcome.reason(),
-            if case == "unexpected" {
-                LinuxStartupReason::UnexpectedStateObject
-            } else {
-                LinuxStartupReason::RootIdentityChanged
-            }
-        );
-        assert_eq!(port.package_calls.get(), 0);
-        assert_eq!(port.component_calls.get(), 0);
-        assert_eq!(site.tree_fingerprint(), before);
     }
 }
 
@@ -658,23 +642,11 @@ fn terminal_source_rollback_material_cannot_disappear() {
         Some(target.clone()),
     );
     advance_to(&site, &mut receipt, LinuxInstallState::Completed);
-    site.write_receipt(&receipt);
+    site.write_qualified_receipt(&receipt);
     let (_, source_evidence_path) = staged_paths(&site, ArtifactSlot::Source);
     fs::remove_file(source_evidence_path).expect("remove terminal source rollback evidence");
 
-    let port = FakeStartupPort::new(LinuxPackageObservation::installed(&target));
-    let before = site.tree_fingerprint();
-    let outcome = inspect_linux_startup(
-        &site.paths,
-        LinuxStartupBuildIdentity::DebianSystemProduct,
-        LinuxStartupComponent::FcitxAddon,
-        &port,
-    );
-    assert_eq!(outcome.decision(), LinuxStartupDecision::FailedClosed);
-    assert_eq!(outcome.reason(), LinuxStartupReason::RootIdentityChanged);
-    assert_eq!(port.package_calls.get(), 0);
-    assert_eq!(port.component_calls.get(), 0);
-    assert_eq!(site.tree_fingerprint(), before);
+    assert!(site.store().load_receipt().is_err());
 }
 
 #[test]
@@ -712,7 +684,7 @@ fn operation_chain_directories_are_required_and_reject_incomplete_history() {
         b"historical-evidence",
         0o600,
     );
-    site.write_receipt(&receipt);
+    site.write_qualified_receipt(&receipt);
 
     let port = FakeStartupPort::new(LinuxPackageObservation::installed(&target));
     let allowed = inspect_linux_startup(
@@ -741,14 +713,8 @@ fn operation_chain_directories_are_required_and_reject_incomplete_history() {
 
     fs::remove_file(historical_directory.join("target.evidence.json"))
         .expect("remove historical evidence pair member");
-    let before = site.tree_fingerprint();
-    let rejected = inspect_linux_startup(
-        &site.paths,
-        LinuxStartupBuildIdentity::DebianSystemProduct,
-        LinuxStartupComponent::Manager,
-        &port,
+    assert!(
+        site.store().load_receipt().is_err(),
+        "maintenance requires complete historical pairs"
     );
-    assert_eq!(rejected.decision(), LinuxStartupDecision::FailedClosed);
-    assert_eq!(rejected.reason(), LinuxStartupReason::RootIdentityChanged);
-    assert_eq!(site.tree_fingerprint(), before);
 }
