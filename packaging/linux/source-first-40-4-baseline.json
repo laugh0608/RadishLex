@@ -1,0 +1,75 @@
+{
+  "binding": {
+    "attempt": "40-3-first-install-20261128-02",
+    "boot_sha256": "9fc05c18c3088bef388363d8dfd81880517229cc34bc8c69d884887aa6045321",
+    "executor_sha256": "5d6c220ee7e9e0a174bd5a038c42c5bd39ce6aa0fdba002983646bf519b6ae82",
+    "guest_sha256": "568280634dc4daf6d2469459420fd3b595ed48d3e1e0f396bd1dd8ed53cef25d",
+    "operation_sha256": "4d0b2a926a2923565df9f72f3122203e6309a119d1258a23537067e1f00916b3",
+    "source_sha256": "7bc75c31dda4868f7f5375d4b0b076ca1c0736992392ce604404e91226cf3d69"
+  },
+  "candidate_sha256": "2aa778751eba0bb2e1534828a455cf9e7d0e54e65a5876ca9ad1d97c25e43fe3",
+  "format": "radishlex-linux-source-baseline-v1",
+  "guest_result_sha256": "ed8c554c25b0402961fc72da33fd20f70e0cb918c1b7f78a5ae65ae17e87b6c2",
+  "inventory_sha256": "a02ff55285847ed28c16c92a21f4627bf7bf820d8d62a5ce81431ecc07eebc29",
+  "profile": "debian13-arm64-source-first-v1",
+  "receipt_sha256": "d57938fb3754d5f322c01a41cd5881414891873fd599fe612083479f6694d90a",
+  "review_sha256": "0465f186d261571c51dff5cf396d26d2a7dd0e616ebfccf71ddf022d7f6da012",
+  "seed_sha256": "01ca203b3e5d54676d2b86c1203637d74a47d803bb890a9c93aec36545eee635",
+  "source": {
+    "artifact_evidence": {
+      "filename": "radishlex_26.7.1+40-3_arm64.deb.evidence.json",
+      "sha256": "a56383a6bd5b0a2f9be0dadfb1a48e97dfdeaa15ca16c1d80352fefefb795022",
+      "size": 2376
+    },
+    "commit": "fa3b2c5ad9c469b6ba521e2e835768ea2091b8a7",
+    "dependencies_sha256": "2ee2b7e58434b3358e8b1dbc699473f3f2fd9cb341c6bd5afd96050f80ea5743",
+    "environment_sha256": "04a0c97a60f53802a4e2e83bbafe8f61c2f5d4abd65353bd463a620b4431b02d",
+    "executables": {
+      "production": {
+        "commit": "fa3b2c5ad9c469b6ba521e2e835768ea2091b8a7",
+        "elf": {
+          "class": "ELF64",
+          "interpreter": "/lib/ld-linux-aarch64.so.1",
+          "machine": "AArch64",
+          "type": "dynamic-or-executable"
+        },
+        "feature_profile": "no-default-features",
+        "file": {
+          "filename": "radishlex-linux-maintenance",
+          "sha256": "5d6c220ee7e9e0a174bd5a038c42c5bd39ce6aa0fdba002983646bf519b6ae82",
+          "size": 1670008
+        }
+      },
+      "verifier": {
+        "commit": "fa3b2c5ad9c469b6ba521e2e835768ea2091b8a7",
+        "elf": {
+          "class": "ELF64",
+          "interpreter": "/lib/ld-linux-aarch64.so.1",
+          "machine": "AArch64",
+          "type": "dynamic-or-executable"
+        },
+        "feature_profile": "no-default-features",
+        "file": {
+          "filename": "radishlex-linux-artifact-verifier",
+          "sha256": "60fae055e05ee9ef2dc5c9db8b6add5f2052b284ee03997e7540e2fa04919b0c",
+          "size": 1169008
+        }
+      }
+    },
+    "locks": {
+      "Cargo.lock": "c6389589be716706fb0d3c0f61d2d40f75c83d2b29d2a1d017b01b9a2c83a67a",
+      "apps/radishlex-manager/pubspec.lock": "a0c0468f85ad4cbd3f19bc85a8f92e258bb76588eb51e8f17f2233343be504cd",
+      "packaging/rime/product-rime-data.json": "5722b2f31769758d392db395e0c367f2a30e189f25e7cc23bf05a3e3385698a1"
+    },
+    "manifest_sha256": "6b3697a7fb586e1120b2ef47efd944dedfbb85323922e324fee9c8a5bf515dda",
+    "metadata_sha256": "3cdb8c67cc90079dfb906c53885b210a7de87f6540d1102dad441428a790bd8f",
+    "package": {
+      "filename": "radishlex_26.7.1+40-3_arm64.deb",
+      "sha256": "4906eb8959f24809763074f5eade52430507799626db77e81267b87679a7a6e5",
+      "size": 40458432
+    },
+    "recipe_sha256": "eed0815d5b5281c76854f5f4bdf393521b85f22678b5900d15d1e614dd2cca98"
+  },
+  "target_revision": "4",
+  "target_version": "26.7.1+40-4"
+}
