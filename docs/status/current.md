@@ -78,11 +78,11 @@
 
 | 顺位 | 必须继续 | 必要阻塞 / 关闭标准 |
 | --- | --- | --- |
-| 1 | C 批普通用户启动受阻 | [仓库修复与非特权回归](../remediation/linux-p05c-unprivileged-startup.md)已通过。新候选待准入，再验 Qt 候选、Esc 与 Manager。[实机诊断](../devlogs/2026-W48.md#2026-11-27-qt-普通字段无候选) |
+| 1 | C 批普通用户启动受阻 | [40-4 候选准入](../runbooks/linux-source-first-assembly.md#从冻结的-40-3-建立-40-4-候选)已实现。先取 40-3 首装 seed，再验 Qt 候选、Esc 与 Manager。[实机诊断](../devlogs/2026-W48.md#2026-11-27-qt-普通字段无候选) |
 | 2 | C 批桌面实测与 D 批冷启动 | 分别授权。覆盖 Wayland/X11、多应用与多 session、隐私与普通输入恢复、学习、删除/tombstone、Manager 同库及重启持久化 |
 | 3 | M5 退出评审 | 核对独立 P05C、代表 crash 适用域和常规及专项验证，关闭阻塞退出的缺陷，登记残余限制 |
 
-V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair 见[日终记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。[合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用；guest 已安装，不清理后冒充 fresh。
+原包对的 R 固定 40-2 seed `d0bd5b7c…c820b`。[T 记录](../devlogs/2026-W46.md#2026-11-14-t40-3-日终回顾与批次结果)。[合同](../remediation/linux-m5-source-first-contract.md)与[前门](../runbooks/linux-source-first-assembly.md#v3-seed-只读前门)继续适用。
 
 启动命令、影响和测试矩阵见 [P05C 验收方案](../runbooks/linux-p05c-acceptance.md)。
 
@@ -90,7 +90,7 @@ V1/V2 与 V3 seed 已完成，R 固定 seed `d0bd5b7c…c820b`。T 的新 pair �
 
 后置：macOS WAL 新升级及 Q2/F0/W0/最终取消、其余五个真实 crash hardening、新 VM 管理/clone/迁移框架、Android/Windows/iOS、真实用户同步，以及无新热点的性能/CI 极限优化。macOS action `10–13` 与已有自动证据保留，冻结现场不重试真实 40；完整发布顺序不变。
 
-冻结 `40-2 → 40-3` 包对及其证据。新目标须使用新 Debian revision，先评审 source seed 和原证据适用域。制品装配、实机维护、VM 和完整门禁分项授权。
+冻结原包对。新包对为 `40-3 → 40-4`，源包已核验，seed、R 和 T 待建。[证据适用域](../remediation/linux-p05c-unprivileged-startup.md#旧安装与候选过渡)。装配、实机、VM 和完整门禁分项授权。
 
 ## Linux M5 系统操作停止线
 

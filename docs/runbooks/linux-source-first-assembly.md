@@ -2,6 +2,19 @@
 
 本文供构建和验收维护者使用，说明仓库入口、输入、失败保留与验证。合同见[设计](../remediation/linux-m5-source-first-contract.md)，当前资格与授权以[current](../status/current.md)为准。本文件不授权执行真实构建、安装、VM/网络/工具链或完整门禁；下面的ABS路径是待执行申请固定的参数，不能直接运行。
 
+## 从冻结的 40-3 建立 40-4 候选
+
+新包对固定为 `26.7.1+40-3 → 26.7.1+40-4`。源包取自旧 T `fa3b2c5` 的原始交接目录。以下两条命令只读，第二条输出源包身份 JSON，可供后续 seed 归集使用。`HANDOFF` 指 11 月 14 日 D 批封存且含 `inventory.json` 的 readback 根目录。[候选声明](../../packaging/linux/source-first-40-4-candidate.json) · [D 批交接清单](/Users/luobo/VirtualMachines/datas/RadishLex/source-first/target-02-d-rebuild-01/readback/inventory.json)
+
+```bash
+python3 -B scripts/linux-product/source_first.py --case 40-3-to-40-4 validate-candidate
+python3 -B scripts/linux-product/source_first.py --case 40-3-to-40-4 inspect-frozen-source --handoff-root "$HANDOFF"
+```
+
+1. 入口核对原始包对及清单摘要、完整目录成员、权限、单链接、读取前后身份，交叉验证旧 S/R/T 提交关系、目标包及 evidence、20 项展开依赖、manifest、构建环境和执行器。源包身份来自原 T 的元数据、锁和配方，生产与验证执行器取原 T 的角色记录。输出规范字节 SHA-256 为 `7bc75c31dda4868f7f5375d4b0b076ca1c0736992392ce604404e91226cf3d69`。本步骤到源制品核验为止。
+2. 单独批准实际载体和首次安装后，在符合离线、dpkg 严格未安装、状态根及指定合成 XDG 均为空等前提的 Debian 13 ARM64 环境，取得原包 `completed / install / chain=1`。用 `source_first_capture.py --case 40-3-to-40-4` 和下文既有 capture 参数归集，再用 `source_first.py --case 40-3-to-40-4 verify-seed --seed-root "$SEED"` 复核 12 类附件。对旧版启动结果记录调用身份，普通用户双端启动由新目标另验。当前 P05C 的 chain=2 现场保留供将来的升级复验。
+3. 原始材料独立审阅及所有者确认后，才能在 R 提交 `packaging/linux/source-first-40-4-baseline.json`。R 保持 `40-3` 产品元数据。T 须为 R 和修复 `d0fc8ac` 的后继，元数据及制品文件名升为 `40-4`。以新 case 调用下文的 `preflight-pair` 和 `target`，传入新 R、seed、review 及原始 `40-3` 包和 evidence。准入通过且单独批准装配后，构建目标及配套执行器。旧 baseline 和旧 review 各自固定在原包对。
+
 ## 单 artifact 与 target
 
 入口为`scripts/linux-product/source_first_build.py`：

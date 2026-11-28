@@ -56,11 +56,17 @@
 
 冻结的 `40-2 → 40-3`、原执行器和既有证据保留原身份。新记录无法改变旧二进制中的读目录行为，单独刷新维护执行器也不能修复 Fcitx5 或 Manager。
 
-建议将已安装的 `40-3` 作为拟议升级起点，修复后的目标包使用新 Debian revision，配套构建维护执行器。当前 guest 的 receipt 为 `completed / upgrade / chain=2`，而 source-first 的 seed 要求精确 source 从未安装状态完成 `install / chain=1`。若选 `40-3` 作新包对的 source，须另取合格 seed 并评审新基线，现有 guest 与冻结 pair 原样保留。[seed 判定代码](../../platforms/linux-product/src/model/source_seed.rs)
+评审选定 `40-3 → 40-4`。已复核原包、evidence 与交接清单，仓库准入只接受这份冻结的 `40-3` 作源。通用 Debian 的 `completed / upgrade / chain=2` 是后续 P05C 升级起点，L6 留存的重装为 `completed / install / chain=6`。两者均不满足 source-first 要求的首次安装 `not_installed → completed / install / chain=1`。新 seed、独立 review 和 R 仍待取得。[候选准入与命令](../runbooks/linux-source-first-assembly.md#从冻结的-40-3-建立-40-4-候选) · [seed 判定](../../platforms/linux-product/src/model/source_seed.rs)
 
-仓库实现通过后分别审批制品装配与实机升级。新维护端取得 guard，以旧 receipt、实际旧 source 包/evidence、私有 staging 和安装实物重新验证起点，沿正常升级追加新 operation。修复版本的双端与目标终态逐件取证后才进入 P05C。旧 receipt 继续使用原格式，桌面进程只读，放行依据始终来自受控系统安装。
+新包对准入通过后分别审批制品装配与实机升级。新维护端取得 guard，以旧 receipt、实际旧 source 包/evidence、私有 staging 和安装实物重新验证起点，沿正常升级追加新 operation。若从原 P05C 的 chain=2 接续，预期为同链追加至 `completed / upgrade / chain=3`。修复版本的双端与目标终态逐件取证后才进入 P05C。旧 receipt 继续使用原格式，桌面进程只读，放行依据始终来自受控系统安装。
 
-升级中断按同一 operation 恢复。若回到旧 source，记录实际 rollback/abort 结果，普通用户仍受旧 gate 限制。冻结包对的连续 L6、八个自动合同及代表 crash 各有既定适用域。评审新候选时逐项区分可引用的旧证据和须重取的证据。[固定包对合同](linux-m5-source-first-contract.md) · [P05C 验收方案](../runbooks/linux-p05c-acceptance.md)
+升级中断按同一 operation 恢复。若回到旧 source，记录实际 rollback/abort 结果，普通用户仍受旧 gate 限制。冻结包对的连续 L6、八个自动合同及代表 crash 各有既定适用域。[固定包对合同](linux-m5-source-first-contract.md) · [P05C 验收方案](../runbooks/linux-p05c-acceptance.md)
+
+| 已有证据 | 在新候选中的适用范围 |
+| --- | --- |
+| 冻结包对的连续六步、冷启动、依赖、字体与 XDG | 保留为旧版本对照。新包对重新核验实际制品、依赖、字体、双 FFI、完整维护链与 XDG，并观察每个适用终态的启动记录出具、撤销或缺失 |
+| 八个自动 crash 合同、两个历史 install 中断及旧 `upgrade_quiesced` 恢复 | 旧结果可说明对应 checkpoint、暂存与原事务恢复行为。新代码改变了 prepare 前及 resume 后的处理，须在新候选验证八个自动合同，并为三个代表边界取得修复版本适用的恢复和终态证据。回到旧源时须记录旧 gate 的实际行为 |
+| P05C 旧 Qt 故障与本轮仓库非特权回归 | 用于复现条件和预期。新目标须以普通账号实际加载 Fcitx，观察 Qt 的预编辑、中文候选与 Esc 取消，再独立启动 Manager。其余 C/D 批仍按原矩阵验收 |
 
 ## 实施与回归的验收条件
 
